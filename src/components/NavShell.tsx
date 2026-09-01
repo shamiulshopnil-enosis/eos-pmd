@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { recentActivities } from "@/lib/data";
 import { ACTIVITY_LABELS, VENDOR_NAME } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
+import type { SessionUser } from "@/lib/session";
+import { signOut } from "@/app/login/actions";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Performance Dashboard", icon: "📊" },
@@ -10,7 +12,7 @@ const NAV_ITEMS = [
   { href: "/releases", label: "Releases", icon: "🚀" },
 ];
 
-export default async function NavShell({ children }: { children: ReactNode }) {
+export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const recentActivity = await recentActivities(8);
 
   return (
@@ -42,9 +44,17 @@ export default async function NavShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-          MVP prototype — single-vendor demo, no authentication. See{" "}
-          <span className="font-medium text-slate-600 dark:text-slate-300">PRD.md</span> for full scope.
+        <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <div className="px-2 text-xs uppercase tracking-wide text-slate-400">Signed in as</div>
+          <div className="truncate px-2 text-sm font-medium text-slate-700 dark:text-slate-200">{user.email}</div>
+          <form action={signOut} className="mt-2 px-2">
+            <button
+              type="submit"
+              className="text-sm text-slate-500 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </aside>
 

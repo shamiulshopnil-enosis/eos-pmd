@@ -6,6 +6,7 @@ import {
   ProjectModel,
   ReleaseModel,
 } from "../src/lib/models";
+import { seedUsers } from "./seed-users";
 
 function daysAgo(n: number) {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
@@ -24,6 +25,9 @@ async function main() {
     FeedbackRequestModel.deleteMany({}),
     ActivityModel.deleteMany({}),
   ]);
+
+  // Sign-in accounts are not wiped, only ensured (see scripts/seed-users.ts).
+  await seedUsers();
 
   // ---------------------------------------------------------------------
   // Project 1 — healthy, active, multiple releases, ALREADY PUBLISHED

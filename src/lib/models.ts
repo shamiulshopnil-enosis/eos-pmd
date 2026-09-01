@@ -111,10 +111,36 @@ const activitySchema = new Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+// --- Identity (Milestones plan, Phase 0) ---
+
+const USER_ROLE = ["buyer", "vendor", "admin"] as const;
+const LOGIN_CODE_PURPOSE = ["login", "invite"] as const;
+
+const userSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: USER_ROLE, default: "buyer" },
+    emailVerified: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+
+const loginCodeSchema = new Schema({
+  email: { type: String, required: true, lowercase: true, trim: true, index: true },
+  codeHash: { type: String, required: true },
+  purpose: { type: String, enum: LOGIN_CODE_PURPOSE, default: "login" },
+  expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+  consumedAt: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now },
+});
+
 export type ProjectDoc = InferSchemaType<typeof projectSchema>;
 export type ReleaseDoc = InferSchemaType<typeof releaseSchema>;
 export type FeedbackRequestDoc = InferSchemaType<typeof feedbackRequestSchema>;
 export type ActivityDoc = InferSchemaType<typeof activitySchema>;
+export type UserDoc = InferSchemaType<typeof userSchema>;
+export type LoginCodeDoc = InferSchemaType<typeof loginCodeSchema>;
 
 export const ProjectModel =
   (models.Project as mongoose.Model<ProjectDoc>) ?? model<ProjectDoc>("Project", projectSchema);
@@ -126,3 +152,8 @@ export const FeedbackRequestModel =
 export const ActivityModel =
   (models.Activity as mongoose.Model<ActivityDoc>) ??
   model<ActivityDoc>("Activity", activitySchema);
+export const UserModel =
+  (models.User as mongoose.Model<UserDoc>) ?? model<UserDoc>("User", userSchema);
+export const LoginCodeModel =
+  (models.LoginCode as mongoose.Model<LoginCodeDoc>) ??
+  model<LoginCodeDoc>("LoginCode", loginCodeSchema);
