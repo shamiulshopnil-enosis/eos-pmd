@@ -1,17 +1,20 @@
 import { notFound } from "next/navigation";
-import { getProjectWithReleases } from "@/lib/data";
-import { computeProjectPerformance, isEvaluationComplete } from "@/lib/derived";
+import { requireUser } from "@/lib/auth";
+import { getProjectWithMilestones } from "@/lib/data";
+import { isVendorOwner, isVendorTeamMember } from "@/lib/permissions";
+import { computeProjectPerformance, isMilestoneReviewed } from "@/lib/derived";
 import { unpublishProject } from "@/lib/actions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
 export default async function PublicPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = await getProjectWithReleases(id);
-  if (!project) notFound();
+  const user = await requireUser("vendor");
+  const project = await getProjectWithMilestones(id);
+  if (!project || !isVendorTeamMember(user, project)) notFound();
 
   const perf = computeProjectPerformance(project);
-  const reviewedCount = project.releases.filter((r) => isEvaluationComplete(r.feedbackRequest)).length;
+  const reviewedCount = project.milestones.filter(isMilestoneReviewed).length;
   const showPerformance = project.publicPerformanceConsent && reviewedCount > 0;
 
   return (
@@ -21,11 +24,13 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
         description="This is how the converted project would appear on the existing EOS public project page (PRD Appendix A.2)."
         back={{ href: `/projects/${project.id}`, label: "Back to Project" }}
         action={
-          <form action={unpublishProject.bind(null, project.id)}>
-            <button type="submit" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
-              Revert to Private
-            </button>
-          </form>
+          isVendorOwner(user, project) ? (
+            <form action={unpublishProject.bind(null, project.id)}>
+              <button type="submit" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                Revert to Private
+              </button>
+            </form>
+          ) : null
         }
       />
 
@@ -64,10 +69,10 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
               <div className="mb-1 text-sm font-semibold text-blue-800 dark:text-blue-200">Verified Delivery Performance</div>
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                {reviewedCount} Release{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Client Response Rate
+                {reviewedCount} Milestone{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Client Response Rate
               </p>
               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                Aggregate only — individual release ratings and comments stay private (PRD §21).
+                Aggregate only — individual milestone ratings and comments stay private (PRD §21).
               </p>
             </div>
           ) : null}

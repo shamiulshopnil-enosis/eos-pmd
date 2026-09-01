@@ -6,15 +6,17 @@ import mongoose, { Schema, model, models, type InferSchemaType } from "mongoose"
 
 const PROJECT_STATUS = ["ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED", "ARCHIVED"] as const;
 const PROJECT_VISIBILITY = ["PRIVATE", "PUBLIC"] as const;
-const RELEASE_STATUS = [
-  "DRAFT",
-  "IN_PROGRESS",
-  "DELIVERED",
-  "FEEDBACK_REQUESTED",
-  "REVIEWED",
-  "CLOSED",
-] as const;
-const FEEDBACK_REQUEST_STATUS = ["PENDING", "COMPLETED"] as const;
+// Milestones plan, Phase 1.
+const PROJECT_TYPE = ["whole", "milestone"] as const;
+const ADMIN_STATUS = ["draft", "pending_approval", "published", "rejected", "edited", "trashed"] as const;
+const EXECUTION_STATUS = ["ongoing", "awaiting_completion", "completed"] as const;
+const MILESTONE_STATUS = ["draft", "sent", "reviewed"] as const;
+// Milestones plan, Phase 3.
+const VENDOR_TEAM_ROLE = ["owner", "member"] as const;
+const CLIENT_CONTACT_ROLE = ["primary", "collaborator"] as const;
+const INVITATION_KIND = ["vendor_team", "client_contact"] as const;
+const INVITATION_ROLE = ["owner", "member", "primary", "collaborator"] as const;
+const INVITATION_STATUS = ["pending", "accepted", "revoked"] as const;
 const ACTIVITY_TYPE = [
   "PROJECT_CREATED",
   "PROJECT_UPDATED",
@@ -28,6 +30,30 @@ const ACTIVITY_TYPE = [
   "PUBLICATION_REQUESTED",
   "PROJECT_PUBLISHED",
 ] as const;
+
+// Milestones plan, Phase 3 — per-project people, embedded on Project.
+const vendorTeamMemberSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: VENDOR_TEAM_ROLE, default: "member" },
+    invitePending: { type: Boolean, default: true },
+  },
+  { _id: false },
+);
+
+const clientContactSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    designation: { type: String, default: "" },
+    role: { type: String, enum: CLIENT_CONTACT_ROLE, default: "collaborator" },
+    invitePending: { type: Boolean, default: true },
+  },
+  { _id: false },
+);
 
 const projectSchema = new Schema(
   {
@@ -47,6 +73,22 @@ const projectSchema = new Schema(
     projectUrl: { type: String, default: null },
     visibility: { type: String, enum: PROJECT_VISIBILITY, default: "PRIVATE" },
 
+    // --- Milestones plan, Phase 1 ---
+    projectType: { type: String, enum: PROJECT_TYPE, default: "whole" },
+    adminStatus: { type: String, enum: ADMIN_STATUS, default: "draft" },
+    executionStatus: { type: String, enum: EXECUTION_STATUS, default: "ongoing" },
+    minReviewThreshold: { type: Number, default: 0 },
+    completionRequestedAt: { type: Date, default: null },
+    completionConfirmedByClient: { type: Boolean, default: false },
+    completionForcedByAdmin: { type: Boolean, default: false },
+    liveScore: { type: Number, default: null },
+    reviewedMilestoneCount: { type: Number, default: 0 },
+    finalScore: { type: Number, default: null },
+
+    // --- Milestones plan, Phase 3 ---
+    vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
+    clientContacts: { type: [clientContactSchema], default: [] },
+
     publicSummary: { type: String, default: null },
     publicKeyChallenges: { type: String, default: null },
     publicSolution: { type: String, default: null },
@@ -61,51 +103,27 @@ const projectSchema = new Schema(
   { timestamps: true },
 );
 
-const releaseSchema = new Schema(
+// --- Milestone (Milestones plan, Phase 2 — replaces Release + FeedbackRequest) ---
+const milestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
-    name: { type: String, required: true },
-    versionLabel: { type: String, default: null },
-    description: { type: String, default: null },
-    objectives: { type: String, default: null },
-    deliverables: { type: String, default: null },
-    plannedDeliveryDate: { type: Date, default: null },
-    actualDeliveryDate: { type: Date, default: null },
-    startDate: { type: Date, default: null },
-    status: { type: String, enum: RELEASE_STATUS, default: "DRAFT" },
-    demoUrl: { type: String, default: null },
-    internalNotes: { type: String, default: null },
-    clientFacingNotes: { type: String, default: null },
-    teamSize: { type: Number, default: null },
+    title: { type: String, required: true }, // plain text
+    description: { type: String, default: "" }, // sanitized rich-text HTML (bold + lists)
+    targetDate: { type: Date, default: null },
+    status: { type: String, enum: MILESTONE_STATUS, default: "draft" },
+    rating: { type: Number, default: null }, // 1-5, "Quality of Deliverables"
+    comment: { type: String, default: null },
+    editRequestedByVendor: { type: Boolean, default: false },
+    ratingSubmittedAt: { type: Date, default: null },
+    reviewedAt: { type: Date, default: null },
+    sentAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
 
-const feedbackRequestSchema = new Schema({
-  releaseId: { type: Schema.Types.ObjectId, ref: "Release", required: true, unique: true },
-  clientEmail: { type: String, required: true },
-  token: { type: String, required: true, unique: true },
-  status: { type: String, enum: FEEDBACK_REQUEST_STATUS, default: "PENDING" },
-  sentAt: { type: Date, default: Date.now },
-  remindersSent: { type: Number, default: 0 },
-  completedAt: { type: Date, default: null },
-
-  overallSatisfaction: { type: Number, default: null },
-  qualityOfDeliverables: { type: Number, default: null },
-  timeliness: { type: Number, default: null },
-  communication: { type: Number, default: null },
-  understandingOfRequirements: { type: Number, default: null },
-  deliveryAgainstScope: { type: Number, default: null },
-  wouldContinue: { type: Number, default: null },
-  comments: { type: String, default: null },
-  reviewerEmail: { type: String, default: null },
-  verified: { type: Boolean, default: true },
-  flagged: { type: Boolean, default: false },
-});
-
 const activitySchema = new Schema({
   projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
-  releaseId: { type: Schema.Types.ObjectId, ref: "Release", default: null },
+  milestoneId: { type: Schema.Types.ObjectId, ref: "Milestone", default: null },
   type: { type: String, enum: ACTIVITY_TYPE, required: true },
   message: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
@@ -135,20 +153,30 @@ const loginCodeSchema = new Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+const invitationSchema = new Schema(
+  {
+    email: { type: String, required: true, lowercase: true, trim: true, index: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
+    kind: { type: String, enum: INVITATION_KIND, required: true },
+    proposedRole: { type: String, enum: INVITATION_ROLE, required: true },
+    designation: { type: String, default: null },
+    invitedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    status: { type: String, enum: INVITATION_STATUS, default: "pending" },
+  },
+  { timestamps: true },
+);
+
 export type ProjectDoc = InferSchemaType<typeof projectSchema>;
-export type ReleaseDoc = InferSchemaType<typeof releaseSchema>;
-export type FeedbackRequestDoc = InferSchemaType<typeof feedbackRequestSchema>;
+export type MilestoneDoc = InferSchemaType<typeof milestoneSchema>;
 export type ActivityDoc = InferSchemaType<typeof activitySchema>;
 export type UserDoc = InferSchemaType<typeof userSchema>;
 export type LoginCodeDoc = InferSchemaType<typeof loginCodeSchema>;
+export type InvitationDoc = InferSchemaType<typeof invitationSchema>;
 
 export const ProjectModel =
   (models.Project as mongoose.Model<ProjectDoc>) ?? model<ProjectDoc>("Project", projectSchema);
-export const ReleaseModel =
-  (models.Release as mongoose.Model<ReleaseDoc>) ?? model<ReleaseDoc>("Release", releaseSchema);
-export const FeedbackRequestModel =
-  (models.FeedbackRequest as mongoose.Model<FeedbackRequestDoc>) ??
-  model<FeedbackRequestDoc>("FeedbackRequest", feedbackRequestSchema);
+export const MilestoneModel =
+  (models.Milestone as mongoose.Model<MilestoneDoc>) ?? model<MilestoneDoc>("Milestone", milestoneSchema);
 export const ActivityModel =
   (models.Activity as mongoose.Model<ActivityDoc>) ??
   model<ActivityDoc>("Activity", activitySchema);
@@ -157,3 +185,6 @@ export const UserModel =
 export const LoginCodeModel =
   (models.LoginCode as mongoose.Model<LoginCodeDoc>) ??
   model<LoginCodeDoc>("LoginCode", loginCodeSchema);
+export const InvitationModel =
+  (models.Invitation as mongoose.Model<InvitationDoc>) ??
+  model<InvitationDoc>("Invitation", invitationSchema);

@@ -1,8 +1,10 @@
-// Derived indicators and metric calculations (PRD §8, §13, §25). Kept as pure
-// functions over plain data so they're easy to unit test and reuse between
-// server components, server actions, and the dashboard.
+// Derived indicators and metric calculations. Pure functions over plain data so
+// they're easy to reuse between server components, server actions, and the
+// dashboard. Milestones plan, Phase 2: these now run off Milestone data (single
+// `rating` per milestone) instead of the old per-release FeedbackRequest. The
+// PCS / public-threshold layer arrives in Phase 5.
 
-import type { Release, FeedbackRequest, Project } from "./types";
+import type { Milestone, ProjectWithMilestones } from "./types";
 import {
   AT_RISK_RATING_THRESHOLD,
   CLIENT_HEALTH_LABELS,
@@ -12,37 +14,30 @@ import {
   type ClientHealth,
 } from "./constants";
 
-export type ReleaseWithFeedback = Release & {
-  feedbackRequest: FeedbackRequest | null;
-};
+export type { ProjectWithMilestones } from "./types";
 
-export type ProjectWithReleases = Project & {
-  releases: ReleaseWithFeedback[];
-};
+/** Derived indicators layered on top of the milestone status (spec §8-style). */
+export type MilestoneFlag = "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null;
 
-/** PRD §8 — derived indicators layered on top of the manual release status. */
-export type ReleaseFlag = "OVERDUE" | "DUE_SOON" | "AWAITING_FEEDBACK" | null;
-
-export function getReleaseFlag(release: Release, now: Date = new Date()): ReleaseFlag {
-  const openStatuses = new Set(["DRAFT", "IN_PROGRESS"]);
-  if (release.plannedDeliveryDate && openStatuses.has(release.status)) {
-    const planned = new Date(release.plannedDeliveryDate);
+export function getMilestoneFlag(milestone: Milestone, now: Date = new Date()): MilestoneFlag {
+  if (milestone.targetDate && milestone.status === "draft") {
+    const target = new Date(milestone.targetDate);
     const msPerDay = 24 * 60 * 60 * 1000;
-    const daysUntil = (planned.getTime() - now.getTime()) / msPerDay;
+    const daysUntil = (target.getTime() - now.getTime()) / msPerDay;
     if (daysUntil < 0) return "OVERDUE";
     if (daysUntil <= DUE_SOON_WINDOW_DAYS) return "DUE_SOON";
   }
-  if (release.status === "FEEDBACK_REQUESTED") return "AWAITING_FEEDBACK";
+  if (milestone.status === "sent") return "AWAITING_REVIEW";
   return null;
 }
 
-export function isAwaitingFeedback(feedbackRequest: FeedbackRequest | null): boolean {
-  return feedbackRequest?.status === "PENDING";
+export function isAwaitingReview(milestone: Milestone): boolean {
+  return milestone.status === "sent";
 }
 
-/** A release evaluation is "complete" once overallSatisfaction has been recorded. */
-export function isEvaluationComplete(fr: FeedbackRequest | null): fr is FeedbackRequest & { overallSatisfaction: number } {
-  return !!fr && fr.status === "COMPLETED" && fr.overallSatisfaction != null;
+/** A milestone is "reviewed" once the client has recorded a rating. */
+export function isMilestoneReviewed(m: Milestone | null): m is Milestone & { rating: number } {
+  return !!m && m.status === "reviewed" && m.rating != null;
 }
 
 export function classifyHealth(rating: number | null): ClientHealth {
@@ -56,12 +51,11 @@ export function healthLabel(health: ClientHealth): string {
   return CLIENT_HEALTH_LABELS[health];
 }
 
-/** Completed evaluations for a project, most recent first. */
-export function completedEvaluations(project: ProjectWithReleases) {
-  return project.releases
-    .map((r) => r.feedbackRequest)
-    .filter(isEvaluationComplete)
-    .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0));
+/** Reviewed milestones for a project, most recent review first. */
+export function reviewedMilestones(project: ProjectWithMilestones) {
+  return project.milestones
+    .filter(isMilestoneReviewed)
+    .sort((a, b) => (b.reviewedAt?.getTime() ?? 0) - (a.reviewedAt?.getTime() ?? 0));
 }
 
 export function average(values: number[]): number | null {
@@ -73,33 +67,32 @@ export interface ProjectPerformance {
   avgRating: number | null;
   latestRating: number | null;
   health: ClientHealth;
-  activeReleases: number;
-  totalReleases: number;
-  releasesCompleted: number;
+  activeMilestones: number;
+  totalMilestones: number;
+  milestonesReviewed: number;
   responseRate: number | null;
   isAtRisk: boolean;
   satisfactionDeclined: boolean;
 }
 
-/** PRD §6 Performance Summary + §15 Project Performance Table, in one pass. */
-export function computeProjectPerformance(project: ProjectWithReleases): ProjectPerformance {
-  const evals = completedEvaluations(project);
-  const ratings = evals.map((e) => e.overallSatisfaction as number);
+export function computeProjectPerformance(project: ProjectWithMilestones): ProjectPerformance {
+  const reviewed = reviewedMilestones(project);
+  const ratings = reviewed.map((m) => m.rating as number);
   const avgRating = average(ratings);
   const latestRating = ratings[0] ?? null;
   const previousRating = ratings[1] ?? null;
 
-  const sentRequests = project.releases.filter((r) => r.feedbackRequest).length;
-  const completedRequests = evals.length;
+  // A milestone counts as "requested" once it has been sent to the client.
+  const sentOrReviewed = project.milestones.filter((m) => m.status === "sent" || m.status === "reviewed").length;
 
   return {
     avgRating,
     latestRating,
     health: classifyHealth(latestRating),
-    activeReleases: project.releases.filter((r) => r.status === "IN_PROGRESS").length,
-    totalReleases: project.releases.length,
-    releasesCompleted: project.releases.filter((r) => r.status === "CLOSED" || r.status === "REVIEWED").length,
-    responseRate: sentRequests > 0 ? (completedRequests / sentRequests) * 100 : null,
+    activeMilestones: project.milestones.filter((m) => m.status === "draft").length,
+    totalMilestones: project.milestones.length,
+    milestonesReviewed: reviewed.length,
+    responseRate: sentOrReviewed > 0 ? (reviewed.length / sentOrReviewed) * 100 : null,
     isAtRisk: latestRating != null && latestRating < AT_RISK_RATING_THRESHOLD,
     satisfactionDeclined: latestRating != null && previousRating != null && latestRating < previousRating,
   };
@@ -107,31 +100,31 @@ export function computeProjectPerformance(project: ProjectWithReleases): Project
 
 export interface DashboardKpis {
   activeProjects: number;
-  activeReleases: number;
-  releasesDelivered: number;
-  awaitingFeedback: number;
-  averageReleaseRating: number | null;
+  activeMilestones: number;
+  milestonesReviewed: number;
+  awaitingReview: number;
+  averageMilestoneRating: number | null;
   clientSatisfactionRate: number | null;
   atRiskProjects: number;
 }
 
 export function computeDashboardKpis(
-  projects: ProjectWithReleases[],
+  projects: ProjectWithMilestones[],
   periodStart: Date | null,
 ): DashboardKpis {
-  const allReleases = projects.flatMap((p) => p.releases);
-  const allEvals = projects.flatMap((p) => completedEvaluations(p));
+  const allMilestones = projects.flatMap((p) => p.milestones);
+  const allReviewed = projects.flatMap((p) => reviewedMilestones(p));
   const inPeriod = (d: Date | null) => !periodStart || (d != null && d >= periodStart);
 
-  const ratings = allEvals.map((e) => e.overallSatisfaction as number);
+  const ratings = allReviewed.map((m) => m.rating as number);
   const satisfiedCount = ratings.filter((r) => r >= SATISFIED_RATING_THRESHOLD).length;
 
   return {
     activeProjects: projects.filter((p) => p.status === "ACTIVE").length,
-    activeReleases: allReleases.filter((r) => r.status === "IN_PROGRESS").length,
-    releasesDelivered: allReleases.filter((r) => r.actualDeliveryDate && inPeriod(r.actualDeliveryDate)).length,
-    awaitingFeedback: allReleases.filter((r) => isAwaitingFeedback(r.feedbackRequest)).length,
-    averageReleaseRating: average(ratings),
+    activeMilestones: allMilestones.filter((m) => m.status === "draft").length,
+    milestonesReviewed: allReviewed.filter((m) => inPeriod(m.reviewedAt)).length,
+    awaitingReview: allMilestones.filter((m) => m.status === "sent").length,
+    averageMilestoneRating: average(ratings),
     clientSatisfactionRate: ratings.length > 0 ? (satisfiedCount / ratings.length) * 100 : null,
     atRiskProjects: projects.filter((p) => computeProjectPerformance(p).isAtRisk).length,
   };
@@ -144,28 +137,27 @@ export interface AlertItem {
   href: string;
 }
 
-/** PRD §17 — Alerts / Attention Required. */
-export function computeAlerts(projects: ProjectWithReleases[]): AlertItem[] {
+export function computeAlerts(projects: ProjectWithMilestones[]): AlertItem[] {
   const alerts: AlertItem[] = [];
-  const allReleases = projects.flatMap((p) => p.releases.map((r) => ({ ...r, project: p })));
+  const allMilestones = projects.flatMap((p) => p.milestones);
 
-  const awaitingCount = allReleases.filter((r) => isAwaitingFeedback(r.feedbackRequest)).length;
+  const awaitingCount = allMilestones.filter((m) => m.status === "sent").length;
   if (awaitingCount > 0) {
     alerts.push({
-      id: "awaiting-feedback",
+      id: "awaiting-review",
       severity: "warning",
-      message: `${awaitingCount} release${awaitingCount === 1 ? "" : "s"} awaiting feedback`,
-      href: "/releases?feedback=PENDING",
+      message: `${awaitingCount} milestone${awaitingCount === 1 ? "" : "s"} awaiting client review`,
+      href: "/milestones?status=sent",
     });
   }
 
-  const overdueCount = allReleases.filter((r) => getReleaseFlag(r) === "OVERDUE").length;
+  const overdueCount = allMilestones.filter((m) => getMilestoneFlag(m) === "OVERDUE").length;
   if (overdueCount > 0) {
     alerts.push({
       id: "overdue",
       severity: "critical",
-      message: `${overdueCount} release${overdueCount === 1 ? "" : "s"} overdue`,
-      href: "/releases?flag=OVERDUE",
+      message: `${overdueCount} milestone${overdueCount === 1 ? "" : "s"} overdue`,
+      href: "/milestones?flag=OVERDUE",
     });
   }
 
@@ -191,8 +183,8 @@ export function computeAlerts(projects: ProjectWithReleases[]): AlertItem[] {
   return alerts;
 }
 
-/** PRD §14 — Average Release Rating Over Time, bucketed by month. */
-export function computeRatingTrend(projects: ProjectWithReleases[], months = 6) {
+/** Average milestone rating over time, bucketed by the month it was reviewed. */
+export function computeRatingTrend(projects: ProjectWithMilestones[], months = 6) {
   const now = new Date();
   const buckets: { label: string; year: number; month: number; ratings: number[] }[] = [];
   for (let i = months - 1; i >= 0; i--) {
@@ -206,11 +198,11 @@ export function computeRatingTrend(projects: ProjectWithReleases[], months = 6) 
   }
 
   for (const project of projects) {
-    for (const evaluation of completedEvaluations(project)) {
-      const completed = evaluation.completedAt;
-      if (!completed) continue;
-      const bucket = buckets.find((b) => b.year === completed.getFullYear() && b.month === completed.getMonth());
-      if (bucket) bucket.ratings.push(evaluation.overallSatisfaction as number);
+    for (const milestone of reviewedMilestones(project)) {
+      const reviewed = milestone.reviewedAt;
+      if (!reviewed) continue;
+      const bucket = buckets.find((b) => b.year === reviewed.getFullYear() && b.month === reviewed.getMonth());
+      if (bucket) bucket.ratings.push(milestone.rating as number);
     }
   }
 

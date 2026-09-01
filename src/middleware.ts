@@ -2,9 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 // Authentication guard. Everything is private except the sign-in page and the
-// token-based client feedback links. Authorization by role is enforced in the
+// invitation-acceptance links. Authorization by role is enforced in the
 // per-area layouts via requireUser().
-const PUBLIC_PREFIXES = ["/login", "/feedback"];
+const PUBLIC_PREFIXES = ["/login", "/invite"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

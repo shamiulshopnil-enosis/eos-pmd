@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth";
 import { getProject } from "@/lib/data";
+import { isVendorOwner } from "@/lib/permissions";
 import { updateProject } from "@/lib/actions";
 import { PROJECT_STATUS_LABELS } from "@/lib/constants";
 import { toDateInputValue } from "@/lib/format";
@@ -8,8 +10,9 @@ import { Card, PageHeader } from "@/components/ui";
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const user = await requireUser("vendor");
   const project = await getProject(id);
-  if (!project) notFound();
+  if (!project || !isVendorOwner(user, project)) notFound();
 
   const action = updateProject.bind(null, project.id);
 

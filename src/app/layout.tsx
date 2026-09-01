@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "EOS Performance Monitoring",
-  description: "Private project delivery & release-based client feedback (MVP prototype)",
+  description: "Private project delivery & milestone-based client reviews (MVP prototype)",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

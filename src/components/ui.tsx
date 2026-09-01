@@ -1,6 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { PROJECT_STATUS_LABELS, RELEASE_STATUS_LABELS, type ClientHealth, CLIENT_HEALTH_LABELS } from "@/lib/constants";
+import {
+  PROJECT_STATUS_LABELS,
+  MILESTONE_STATUS_LABELS,
+  type ClientHealth,
+  CLIENT_HEALTH_LABELS,
+  PROJECT_TYPE_LABELS,
+  ADMIN_STATUS_LABELS,
+  EXECUTION_STATUS_LABELS,
+} from "@/lib/constants";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -48,17 +56,41 @@ export function ProjectStatusBadge({ status }: { status: string }) {
   return <Badge tone={projectStatusTone[status] ?? "slate"}>{PROJECT_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const releaseStatusTone: Record<string, keyof typeof toneClasses> = {
-  DRAFT: "slate",
-  IN_PROGRESS: "blue",
-  DELIVERED: "purple",
-  FEEDBACK_REQUESTED: "amber",
-  REVIEWED: "green",
-  CLOSED: "slate",
+const milestoneStatusTone: Record<string, keyof typeof toneClasses> = {
+  draft: "slate",
+  sent: "amber",
+  reviewed: "green",
 };
 
-export function ReleaseStatusBadge({ status }: { status: string }) {
-  return <Badge tone={releaseStatusTone[status] ?? "slate"}>{RELEASE_STATUS_LABELS[status] ?? status}</Badge>;
+export function MilestoneStatusBadge({ status }: { status: string }) {
+  return <Badge tone={milestoneStatusTone[status] ?? "slate"}>{MILESTONE_STATUS_LABELS[status] ?? status}</Badge>;
+}
+
+export function ProjectTypeBadge({ type }: { type: string }) {
+  return <Badge tone={type === "milestone" ? "purple" : "slate"}>{PROJECT_TYPE_LABELS[type] ?? type}</Badge>;
+}
+
+const adminStatusTone: Record<string, keyof typeof toneClasses> = {
+  draft: "slate",
+  pending_approval: "amber",
+  published: "green",
+  rejected: "red",
+  edited: "amber",
+  trashed: "slate",
+};
+
+export function AdminStatusBadge({ status }: { status: string }) {
+  return <Badge tone={adminStatusTone[status] ?? "slate"}>{ADMIN_STATUS_LABELS[status] ?? status}</Badge>;
+}
+
+const executionStatusTone: Record<string, keyof typeof toneClasses> = {
+  ongoing: "blue",
+  awaiting_completion: "amber",
+  completed: "green",
+};
+
+export function ExecutionStatusBadge({ status }: { status: string }) {
+  return <Badge tone={executionStatusTone[status] ?? "slate"}>{EXECUTION_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
 const healthTone: Record<ClientHealth, keyof typeof toneClasses> = {
@@ -72,11 +104,11 @@ export function HealthBadge({ health }: { health: ClientHealth }) {
   return <Badge tone={healthTone[health]}>{CLIENT_HEALTH_LABELS[health]}</Badge>;
 }
 
-export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_FEEDBACK" | null }) {
+export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null }) {
   if (!flag) return null;
   if (flag === "OVERDUE") return <Badge tone="red">Overdue</Badge>;
   if (flag === "DUE_SOON") return <Badge tone="amber">Due Soon</Badge>;
-  return <Badge tone="amber">Feedback Pending</Badge>;
+  return <Badge tone="amber">Awaiting Review</Badge>;
 }
 
 export function StarRating({ value, size = "sm" }: { value: number | null; size?: "sm" | "lg" }) {

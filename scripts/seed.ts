@@ -1,12 +1,7 @@
 import mongoose from "mongoose";
 import { connectToDatabase } from "../src/lib/mongoose";
-import {
-  ActivityModel,
-  FeedbackRequestModel,
-  ProjectModel,
-  ReleaseModel,
-} from "../src/lib/models";
-import { seedUsers } from "./seed-users";
+import { ActivityModel, MilestoneModel, ProjectModel, UserModel } from "../src/lib/models";
+import { SEED_USERS, seedUsers } from "./seed-users";
 
 function daysAgo(n: number) {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
@@ -15,22 +10,73 @@ function daysFromNow(n: number) {
   return daysAgo(-n);
 }
 
+type MilestoneSeed = {
+  title: string;
+  description?: string;
+  targetDate?: Date | null;
+  status: "draft" | "sent" | "reviewed";
+  rating?: number;
+  comment?: string;
+  reviewedAt?: Date;
+  sentAt?: Date;
+};
+
+async function addMilestone(projectId: mongoose.Types.ObjectId, m: MilestoneSeed) {
+  return MilestoneModel.create({
+    projectId,
+    title: m.title,
+    description: m.description ?? "",
+    targetDate: m.targetDate ?? null,
+    status: m.status,
+    rating: m.rating ?? null,
+    comment: m.comment ?? null,
+    reviewedAt: m.reviewedAt ?? null,
+    ratingSubmittedAt: m.reviewedAt ?? null,
+    sentAt: m.sentAt ?? (m.status !== "draft" ? m.reviewedAt ?? daysAgo(1) : null),
+  });
+}
+
 async function main() {
   await connectToDatabase();
 
   console.log("Resetting database…");
   await Promise.all([
     ProjectModel.deleteMany({}),
-    ReleaseModel.deleteMany({}),
-    FeedbackRequestModel.deleteMany({}),
+    MilestoneModel.deleteMany({}),
     ActivityModel.deleteMany({}),
   ]);
 
   // Sign-in accounts are not wiped, only ensured (see scripts/seed-users.ts).
   await seedUsers();
+  const vendorEmail = SEED_USERS.find((u) => u.role === "vendor")!.email;
+  const vendorUser = await UserModel.findOne({ email: vendorEmail });
+
+  // Every seeded project: the seed vendor is the founding Owner; the named client
+  // contact is a pending Primary Contact (accept via /invite once invited).
+  const people = (clientEmail: string, clientContactName: string) => ({
+    vendorTeam: [
+      {
+        userId: vendorUser?._id ?? null,
+        email: vendorEmail,
+        name: vendorUser?.name ?? "Vendor Owner",
+        role: "owner",
+        invitePending: false,
+      },
+    ],
+    clientContacts: [
+      {
+        userId: null,
+        email: clientEmail,
+        name: clientContactName,
+        designation: "Client Contact",
+        role: "primary",
+        invitePending: true,
+      },
+    ],
+  });
 
   // ---------------------------------------------------------------------
-  // Project 1 — healthy, active, multiple releases, ALREADY PUBLISHED
+  // Project 1 — healthy, active, five milestones, ALREADY PUBLISHED
   // ---------------------------------------------------------------------
   const p1 = await ProjectModel.create({
     name: "E-commerce Platform Development",
@@ -46,139 +92,78 @@ async function main() {
     teamSize: 5,
     engagementModel: "Offshore",
     internalRef: "GRV-2026-01",
+    ...people("saz.virk@gravity77.example", "Saz Virk"),
+    projectType: "milestone",
+    adminStatus: "published",
+    executionStatus: "ongoing",
+    minReviewThreshold: 2,
     visibility: "PUBLIC",
     publishedAt: daysAgo(20),
     publicSummary:
       "Gravity77 engaged the team to build a cross-platform e-commerce app end to end, from product catalog through to a production launch.",
     publicKeyChallenges: "Tight timeline across catalog, cart, and payment integration in parallel workstreams.",
-    publicSolution: "Delivered in five incremental releases with a client evaluation collected after each one.",
-    publicOutcome: "Consistently high client satisfaction across every reviewed release.",
+    publicSolution: "Delivered as incremental milestones with a client review collected after each one.",
+    publicOutcome: "Consistently high client satisfaction across every reviewed milestone.",
     publicTechStack: "React Native, Node.js, Stripe",
     publicPlatforms: "iOS, Android",
     publicBudget: "50K – 99K",
     publicPerformanceConsent: true,
   });
 
-  const p1r1 = await ReleaseModel.create({
-    projectId: p1._id,
-    name: "Release 1 — Product Catalog",
-    versionLabel: "v1.0",
-    description: "Browsable product catalog with search and filtering.",
-    deliverables: "Catalog UI, search API, product detail pages",
-    startDate: daysAgo(150),
-    plannedDeliveryDate: daysAgo(122),
-    actualDeliveryDate: daysAgo(120),
-    status: "CLOSED",
-    teamSize: 4,
+  const p1m1 = await addMilestone(p1._id, {
+    title: "Milestone 1 — Product Catalog",
+    description: "<p>Browsable product catalog with search and filtering.</p><ul><li>Catalog UI</li><li>Search API</li><li>Product detail pages</li></ul>",
+    targetDate: daysAgo(122),
+    status: "reviewed",
+    rating: 5,
+    comment: "Great start — the catalog exceeded expectations and communication was excellent throughout.",
+    reviewedAt: daysAgo(115),
   });
-  await FeedbackRequestModel.create({
-    releaseId: p1r1._id,
-    clientEmail: "saz.virk@gravity77.example",
-    token: "demo-p1r1-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(119),
-    completedAt: daysAgo(115),
-    overallSatisfaction: 5,
-    qualityOfDeliverables: 5,
-    timeliness: 4,
-    communication: 5,
-    understandingOfRequirements: 5,
-    deliveryAgainstScope: 5,
-    wouldContinue: 5,
-    comments: "Great start — the catalog exceeded expectations and communication was excellent throughout.",
-    reviewerEmail: "saz.virk@gravity77.example",
+  const p1m2 = await addMilestone(p1._id, {
+    title: "Milestone 2 — Shopping Cart",
+    description: "<ul><li>Cart</li><li>Checkout flow</li><li>Promo codes</li></ul>",
+    targetDate: daysAgo(92),
+    status: "reviewed",
+    rating: 5,
+    comment: "Smooth checkout, no complaints.",
+    reviewedAt: daysAgo(85),
   });
-
-  const p1r2 = await ReleaseModel.create({
-    projectId: p1._id,
-    name: "Release 2 — Shopping Cart",
-    versionLabel: "v1.1",
-    deliverables: "Cart, checkout flow, promo codes",
-    startDate: daysAgo(118),
-    plannedDeliveryDate: daysAgo(92),
-    actualDeliveryDate: daysAgo(90),
-    status: "CLOSED",
-    teamSize: 4,
+  const p1m3 = await addMilestone(p1._id, {
+    title: "Milestone 3 — Payment Integration",
+    description: "<ul><li>Stripe integration</li><li>Refunds</li><li>Receipts</li></ul>",
+    targetDate: daysAgo(32),
+    status: "reviewed",
+    rating: 4,
+    comment: "Payment integration works well; one minor bug fixed quickly after we flagged it.",
+    reviewedAt: daysAgo(25),
   });
-  await FeedbackRequestModel.create({
-    releaseId: p1r2._id,
-    clientEmail: "saz.virk@gravity77.example",
-    token: "demo-p1r2-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(89),
-    completedAt: daysAgo(85),
-    overallSatisfaction: 5,
-    qualityOfDeliverables: 5,
-    timeliness: 5,
-    communication: 4,
-    understandingOfRequirements: 5,
-    deliveryAgainstScope: 5,
-    wouldContinue: 5,
-    comments: "Smooth checkout, no complaints.",
-    reviewerEmail: "saz.virk@gravity77.example",
+  const p1m4 = await addMilestone(p1._id, {
+    title: "Milestone 4 — Customer Dashboard",
+    description: "<ul><li>Order history</li><li>Account settings</li><li>Saved addresses</li></ul>",
+    targetDate: daysFromNow(3),
+    status: "sent",
+    sentAt: daysAgo(1),
   });
-
-  const p1r3 = await ReleaseModel.create({
-    projectId: p1._id,
-    name: "Release 3 — Payment Integration",
-    versionLabel: "v1.2",
-    deliverables: "Stripe integration, refunds, receipts",
-    startDate: daysAgo(60),
-    plannedDeliveryDate: daysAgo(32),
-    actualDeliveryDate: daysAgo(30),
-    status: "CLOSED",
-    teamSize: 3,
-  });
-  await FeedbackRequestModel.create({
-    releaseId: p1r3._id,
-    clientEmail: "saz.virk@gravity77.example",
-    token: "demo-p1r3-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(29),
-    completedAt: daysAgo(25),
-    overallSatisfaction: 4,
-    qualityOfDeliverables: 4,
-    timeliness: 4,
-    communication: 4,
-    wouldContinue: 5,
-    comments: "Payment integration works well; one minor bug fixed quickly after we flagged it.",
-    reviewerEmail: "saz.virk@gravity77.example",
-  });
-
-  const p1r4 = await ReleaseModel.create({
-    projectId: p1._id,
-    name: "Release 4 — Customer Dashboard",
-    versionLabel: "v1.3",
-    deliverables: "Order history, account settings, saved addresses",
-    startDate: daysAgo(20),
-    plannedDeliveryDate: daysFromNow(3),
-    status: "IN_PROGRESS",
-    teamSize: 4,
-    clientFacingNotes: "On track for delivery this week — final QA pass in progress.",
-  });
-
-  await ReleaseModel.create({
-    projectId: p1._id,
-    name: "Release 5 — Production Launch",
-    versionLabel: "v1.0.0",
-    deliverables: "App store submission, production infra, launch monitoring",
-    plannedDeliveryDate: daysFromNow(40),
-    status: "DRAFT",
+  await addMilestone(p1._id, {
+    title: "Milestone 5 — Production Launch",
+    description: "<ul><li>App store submission</li><li>Production infra</li><li>Launch monitoring</li></ul>",
+    targetDate: daysFromNow(40),
+    status: "draft",
   });
 
   await ActivityModel.insertMany([
     { projectId: p1._id, type: "PROJECT_CREATED", message: `Project "${p1.name}" created for ${p1.clientCompanyName}` },
-    { projectId: p1._id, releaseId: p1r1._id, type: "RELEASE_CREATED", message: `Release "${p1r1.name}" created` },
-    { projectId: p1._id, releaseId: p1r1._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p1r1.name}" (5/5 overall)`, createdAt: daysAgo(115) },
-    { projectId: p1._id, releaseId: p1r2._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p1r2.name}" (5/5 overall)`, createdAt: daysAgo(85) },
-    { projectId: p1._id, releaseId: p1r3._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p1r3.name}" (4/5 overall)`, createdAt: daysAgo(25) },
-    { projectId: p1._id, releaseId: p1r4._id, type: "RELEASE_CREATED", message: `Release "${p1r4.name}" created` },
+    { projectId: p1._id, milestoneId: p1m1._id, type: "RELEASE_CREATED", message: `Milestone "${p1m1.title}" created` },
+    { projectId: p1._id, milestoneId: p1m1._id, type: "FEEDBACK_RECEIVED", message: `"${p1m1.title}" reviewed (5/5)`, createdAt: daysAgo(115) },
+    { projectId: p1._id, milestoneId: p1m2._id, type: "FEEDBACK_RECEIVED", message: `"${p1m2.title}" reviewed (5/5)`, createdAt: daysAgo(85) },
+    { projectId: p1._id, milestoneId: p1m3._id, type: "FEEDBACK_RECEIVED", message: `"${p1m3.title}" reviewed (4/5)`, createdAt: daysAgo(25) },
+    { projectId: p1._id, milestoneId: p1m4._id, type: "FEEDBACK_REQUESTED", message: `Sent "${p1m4.title}" for client review`, createdAt: daysAgo(1) },
     { projectId: p1._id, type: "PUBLICATION_REQUESTED", message: "Publication requested by vendor", createdAt: daysAgo(20) },
     { projectId: p1._id, type: "PROJECT_PUBLISHED", message: "Project published to public portfolio", createdAt: daysAgo(20) },
   ]);
 
   // ---------------------------------------------------------------------
-  // Project 2 — declining satisfaction, one overdue release (At Risk)
+  // Project 2 — declining satisfaction, one overdue milestone (At Risk)
   // ---------------------------------------------------------------------
   const p2 = await ProjectModel.create({
     name: "Internal Tools Revamp",
@@ -193,76 +178,43 @@ async function main() {
     teamSize: 3,
     engagementModel: "Dedicated Team",
     internalRef: "NPL-2026-03",
+    ...people("dana.okafor@northpeak.example", "Dana Okafor"),
+    projectType: "milestone",
+    adminStatus: "published",
+    executionStatus: "ongoing",
+    minReviewThreshold: 1,
   });
 
-  const p2r1 = await ReleaseModel.create({
-    projectId: p2._id,
-    name: "Release 1 — Auth Module",
-    deliverables: "SSO login, role-based access control",
-    startDate: daysAgo(100),
-    plannedDeliveryDate: daysAgo(62),
-    actualDeliveryDate: daysAgo(60),
-    status: "CLOSED",
-    teamSize: 2,
+  const p2m1 = await addMilestone(p2._id, {
+    title: "Milestone 1 — Auth Module",
+    description: "<ul><li>SSO login</li><li>Role-based access control</li></ul>",
+    targetDate: daysAgo(62),
+    status: "reviewed",
+    rating: 3,
+    comment: "Functional, but we had to chase status updates a few times.",
+    reviewedAt: daysAgo(55),
   });
-  await FeedbackRequestModel.create({
-    releaseId: p2r1._id,
-    clientEmail: "dana.okafor@northpeak.example",
-    token: "demo-p2r1-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(59),
-    completedAt: daysAgo(55),
-    overallSatisfaction: 3,
-    qualityOfDeliverables: 3,
-    timeliness: 3,
-    communication: 3,
-    wouldContinue: 3,
-    comments: "Functional, but we had to chase status updates a few times.",
-    reviewerEmail: "dana.okafor@northpeak.example",
+  const p2m2 = await addMilestone(p2._id, {
+    title: "Milestone 2 — Reporting Dashboard",
+    description: "<ul><li>Ops KPI dashboard</li><li>CSV export</li></ul>",
+    targetDate: daysAgo(17),
+    status: "reviewed",
+    rating: 2,
+    comment: "Several reports didn't match the agreed spec and needed rework after delivery.",
+    reviewedAt: daysAgo(12),
   });
-
-  const p2r2 = await ReleaseModel.create({
-    projectId: p2._id,
-    name: "Release 2 — Reporting Dashboard",
-    deliverables: "Ops KPI dashboard, CSV export",
-    startDate: daysAgo(50),
-    plannedDeliveryDate: daysAgo(17),
-    actualDeliveryDate: daysAgo(15),
-    status: "CLOSED",
-    teamSize: 3,
-  });
-  await FeedbackRequestModel.create({
-    releaseId: p2r2._id,
-    clientEmail: "dana.okafor@northpeak.example",
-    token: "demo-p2r2-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(14),
-    completedAt: daysAgo(12),
-    overallSatisfaction: 2,
-    qualityOfDeliverables: 2,
-    timeliness: 2,
-    communication: 3,
-    wouldContinue: 2,
-    comments: "Several reports didn't match the agreed spec and needed rework after delivery.",
-    reviewerEmail: "dana.okafor@northpeak.example",
-  });
-
-  const p2r3 = await ReleaseModel.create({
-    projectId: p2._id,
-    name: "Release 3 — Notifications",
-    deliverables: "Email + in-app alerts for exceptions",
-    startDate: daysAgo(30),
-    plannedDeliveryDate: daysAgo(5),
-    status: "IN_PROGRESS",
-    teamSize: 2,
-    internalNotes: "Blocked on client's SMTP credentials for 4 days — flagged to account manager.",
+  const p2m3 = await addMilestone(p2._id, {
+    title: "Milestone 3 — Notifications",
+    description: "<ul><li>Email + in-app alerts for exceptions</li></ul>",
+    targetDate: daysAgo(5),
+    status: "draft",
   });
 
   await ActivityModel.insertMany([
     { projectId: p2._id, type: "PROJECT_CREATED", message: `Project "${p2.name}" created for ${p2.clientCompanyName}` },
-    { projectId: p2._id, releaseId: p2r1._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p2r1.name}" (3/5 overall)`, createdAt: daysAgo(55) },
-    { projectId: p2._id, releaseId: p2r2._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p2r2.name}" (2/5 overall)`, createdAt: daysAgo(12) },
-    { projectId: p2._id, releaseId: p2r3._id, type: "RELEASE_CREATED", message: `Release "${p2r3.name}" created` },
+    { projectId: p2._id, milestoneId: p2m1._id, type: "FEEDBACK_RECEIVED", message: `"${p2m1.title}" reviewed (3/5)`, createdAt: daysAgo(55) },
+    { projectId: p2._id, milestoneId: p2m2._id, type: "FEEDBACK_RECEIVED", message: `"${p2m2.title}" reviewed (2/5)`, createdAt: daysAgo(12) },
+    { projectId: p2._id, milestoneId: p2m3._id, type: "RELEASE_CREATED", message: `Milestone "${p2m3.title}" created` },
   ]);
 
   // ---------------------------------------------------------------------
@@ -282,67 +234,43 @@ async function main() {
     teamSize: 3,
     engagementModel: "Fixed Price",
     internalRef: "BWM-2025-11",
+    ...people("priya.menon@brightwave.example", "Priya Menon"),
+    projectType: "milestone",
+    adminStatus: "published",
+    executionStatus: "completed",
+    minReviewThreshold: 1,
+    liveScore: 5,
+    finalScore: 5,
+    reviewedMilestoneCount: 2,
+    completionConfirmedByClient: true,
   });
 
-  const p3r1 = await ReleaseModel.create({
-    projectId: p3._id,
-    name: "Release 1 — Homepage",
-    startDate: daysAgo(200),
-    plannedDeliveryDate: daysAgo(172),
-    actualDeliveryDate: daysAgo(170),
-    status: "CLOSED",
-    teamSize: 3,
+  const p3m1 = await addMilestone(p3._id, {
+    title: "Milestone 1 — Homepage",
+    targetDate: daysAgo(172),
+    status: "reviewed",
+    rating: 5,
+    comment: "Loved the new homepage — great collaboration.",
+    reviewedAt: daysAgo(165),
   });
-  await FeedbackRequestModel.create({
-    releaseId: p3r1._id,
-    clientEmail: "priya.menon@brightwave.example",
-    token: "demo-p3r1-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(169),
-    completedAt: daysAgo(165),
-    overallSatisfaction: 5,
-    qualityOfDeliverables: 5,
-    timeliness: 5,
-    communication: 5,
-    wouldContinue: 5,
-    comments: "Loved the new homepage — great collaboration.",
-    reviewerEmail: "priya.menon@brightwave.example",
-  });
-
-  const p3r2 = await ReleaseModel.create({
-    projectId: p3._id,
-    name: "Release 2 — Blog Platform",
-    startDate: daysAgo(160),
-    plannedDeliveryDate: daysAgo(80),
-    actualDeliveryDate: daysAgo(78),
-    status: "CLOSED",
-    teamSize: 2,
-  });
-  await FeedbackRequestModel.create({
-    releaseId: p3r2._id,
-    clientEmail: "priya.menon@brightwave.example",
-    token: "demo-p3r2-completed",
-    status: "COMPLETED",
-    sentAt: daysAgo(77),
-    completedAt: daysAgo(73),
-    overallSatisfaction: 5,
-    qualityOfDeliverables: 5,
-    timeliness: 4,
-    communication: 5,
-    wouldContinue: 5,
-    comments: "Consistently reliable delivery across the whole engagement.",
-    reviewerEmail: "priya.menon@brightwave.example",
+  const p3m2 = await addMilestone(p3._id, {
+    title: "Milestone 2 — Blog Platform",
+    targetDate: daysAgo(80),
+    status: "reviewed",
+    rating: 5,
+    comment: "Consistently reliable delivery across the whole engagement.",
+    reviewedAt: daysAgo(73),
   });
 
   await ActivityModel.insertMany([
     { projectId: p3._id, type: "PROJECT_CREATED", message: `Project "${p3.name}" created for ${p3.clientCompanyName}` },
-    { projectId: p3._id, releaseId: p3r1._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p3r1.name}" (5/5 overall)`, createdAt: daysAgo(165) },
-    { projectId: p3._id, releaseId: p3r2._id, type: "FEEDBACK_RECEIVED", message: `Client feedback received for "${p3r2.name}" (5/5 overall)`, createdAt: daysAgo(73) },
+    { projectId: p3._id, milestoneId: p3m1._id, type: "FEEDBACK_RECEIVED", message: `"${p3m1.title}" reviewed (5/5)`, createdAt: daysAgo(165) },
+    { projectId: p3._id, milestoneId: p3m2._id, type: "FEEDBACK_RECEIVED", message: `"${p3m2.title}" reviewed (5/5)`, createdAt: daysAgo(73) },
     { projectId: p3._id, type: "PROJECT_COMPLETED", message: "Project status changed to COMPLETED", createdAt: daysAgo(75) },
   ]);
 
   // ---------------------------------------------------------------------
-  // Project 4 — brand new, no releases yet (empty-state demo)
+  // Project 4 — brand new, no milestones yet, pending admin approval
   // ---------------------------------------------------------------------
   const p4 = await ProjectModel.create({
     name: "New Client Onboarding Portal",
@@ -356,6 +284,11 @@ async function main() {
     status: "ACTIVE",
     teamSize: 2,
     engagementModel: "Offshore",
+    ...people("marcus.lee@deltafreight.example", "Marcus Lee"),
+    projectType: "milestone",
+    adminStatus: "pending_approval",
+    executionStatus: "ongoing",
+    minReviewThreshold: 0,
   });
 
   await ActivityModel.create({
@@ -364,33 +297,11 @@ async function main() {
     message: `Project "${p4.name}" created for ${p4.clientCompanyName}`,
   });
 
-  // ---------------------------------------------------------------------
-  // One live pending feedback request so /feedback/[token] is demoable.
-  // ---------------------------------------------------------------------
-  await FeedbackRequestModel.create({
-    releaseId: p1r4._id,
-    clientEmail: "saz.virk@gravity77.example",
-    token: "demo-pending-feedback",
-    status: "PENDING",
-    sentAt: daysAgo(1),
-  });
-  await ReleaseModel.findByIdAndUpdate(p1r4._id, {
-    status: "FEEDBACK_REQUESTED",
-    actualDeliveryDate: daysAgo(1),
-  });
-  await ActivityModel.create({
-    projectId: p1._id,
-    releaseId: p1r4._id,
-    type: "FEEDBACK_REQUESTED",
-    message: "Feedback requested from saz.virk@gravity77.example",
-    createdAt: daysAgo(1),
-  });
-
   console.log("Seed complete:");
-  console.log(`  ${p1.name} (published) — try /feedback/demo-pending-feedback`);
-  console.log(`  ${p2.name} (declining / at-risk)`);
+  console.log(`  ${p1.name} (published, milestone 4 with the client)`);
+  console.log(`  ${p2.name} (declining / at-risk, milestone 3 overdue)`);
   console.log(`  ${p3.name} (completed, strong history)`);
-  console.log(`  ${p4.name} (empty state demo)`);
+  console.log(`  ${p4.name} (empty, pending admin approval)`);
 }
 
 main()

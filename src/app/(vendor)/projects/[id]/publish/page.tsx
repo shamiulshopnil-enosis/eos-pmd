@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
-import { getProjectWithReleases } from "@/lib/data";
-import { computeProjectPerformance, isEvaluationComplete } from "@/lib/derived";
+import { requireUser } from "@/lib/auth";
+import { getProjectWithMilestones } from "@/lib/data";
+import { isVendorOwner } from "@/lib/permissions";
+import { computeProjectPerformance, isMilestoneReviewed } from "@/lib/derived";
 import { publishProject } from "@/lib/actions";
 import { formatPercent, formatRating } from "@/lib/format";
 import { Card, PageHeader } from "@/components/ui";
@@ -8,11 +10,12 @@ import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 
 export default async function PublishProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = await getProjectWithReleases(id);
-  if (!project) notFound();
+  const user = await requireUser("vendor");
+  const project = await getProjectWithMilestones(id);
+  if (!project || !isVendorOwner(user, project)) notFound();
 
   const perf = computeProjectPerformance(project);
-  const reviewedCount = project.releases.filter((r) => isEvaluationComplete(r.feedbackRequest)).length;
+  const reviewedCount = project.milestones.filter(isMilestoneReviewed).length;
   const action = publishProject.bind(null, project.id);
 
   return (
@@ -67,17 +70,17 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
             <div className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-100">Verified Delivery Performance (PRD §21)</div>
             {reviewedCount === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                No reviewed releases yet — this section won&apos;t appear on the public page until at least one release has verified client feedback.
+                No reviewed milestones yet — this section won&apos;t appear on the public page until at least one milestone has a client rating.
               </p>
             ) : (
               <>
                 <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-                  {reviewedCount} Release{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Response Rate
+                  {reviewedCount} Milestone{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Response Rate
                 </p>
                 <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <input type="checkbox" name="publicPerformanceConsent" className="mt-0.5" defaultChecked={project.publicPerformanceConsent} />
                   <span>
-                    I have client consent to display this aggregate performance summary publicly. Individual release
+                    I have client consent to display this aggregate performance summary publicly. Individual milestone
                     ratings and comments will remain private (PRD §21) regardless of this choice.
                   </span>
                 </label>

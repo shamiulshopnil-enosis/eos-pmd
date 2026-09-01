@@ -1,10 +1,10 @@
-/** PRD §14 — Average Release Rating Over Time. Plain inline SVG, no chart library. */
+/** Average milestone rating over time. Plain inline SVG, no chart library. */
 export function TrendChart({ points }: { points: { label: string; avgRating: number | null }[] }) {
   const hasData = points.some((p) => p.avgRating != null);
   if (!hasData) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-slate-400">
-        Not enough reviewed releases yet to show a trend.
+        Not enough reviewed milestones yet to show a trend.
       </div>
     );
   }
@@ -28,7 +28,7 @@ export function TrendChart({ points }: { points: { label: string; avgRating: num
   const path = known.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Average release rating over time">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Average milestone rating over time">
       {[1, 2, 3, 4, 5].map((v) => (
         <g key={v}>
           <line

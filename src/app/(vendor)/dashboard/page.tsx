@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { listProjectsWithReleases } from "@/lib/data";
+import { requireUser } from "@/lib/auth";
+import { listProjectsWithMilestones } from "@/lib/data";
 import {
   computeAlerts,
   computeDashboardKpis,
@@ -14,7 +15,8 @@ import { TrendChart } from "@/components/TrendChart";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const projects = await listProjectsWithReleases();
+  const user = await requireUser("vendor");
+  const projects = await listProjectsWithMilestones({ vendorUserId: user.id });
 
   if (projects.length === 0) {
     return (
@@ -22,7 +24,7 @@ export default async function DashboardPage() {
         <PageHeader title="Performance Monitoring Dashboard" />
         <EmptyState
           title="Start monitoring client delivery performance"
-          description="Create your first client project, manage releases, collect client feedback, and track performance over time."
+          description="Create your first client project, break it into milestones, collect client reviews, and track performance over time."
           actionHref="/projects/new"
           actionLabel="Create Project"
         />
@@ -37,12 +39,12 @@ export default async function DashboardPage() {
   const table = projects
     .map((p) => ({ project: p, perf: computeProjectPerformance(p) }))
     .sort((a, b) => {
-      const lastA = a.project.releases.reduce(
-        (acc, r) => Math.max(acc, r.updatedAt.getTime()),
+      const lastA = a.project.milestones.reduce(
+        (acc, m) => Math.max(acc, m.updatedAt.getTime()),
         a.project.updatedAt.getTime(),
       );
-      const lastB = b.project.releases.reduce(
-        (acc, r) => Math.max(acc, r.updatedAt.getTime()),
+      const lastB = b.project.milestones.reduce(
+        (acc, m) => Math.max(acc, m.updatedAt.getTime()),
         b.project.updatedAt.getTime(),
       );
       return lastB - lastA;
@@ -57,14 +59,14 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
         <StatCard label="Active Projects" value={kpis.activeProjects} />
-        <StatCard label="Active Releases" value={kpis.activeReleases} />
-        <StatCard label="Releases Delivered" value={kpis.releasesDelivered} />
+        <StatCard label="Active Milestones" value={kpis.activeMilestones} />
+        <StatCard label="Milestones Reviewed" value={kpis.milestonesReviewed} />
         <StatCard
-          label="Awaiting Feedback"
-          value={kpis.awaitingFeedback}
-          tone={kpis.awaitingFeedback > 0 ? "amber" : "slate"}
+          label="Awaiting Review"
+          value={kpis.awaitingReview}
+          tone={kpis.awaitingReview > 0 ? "amber" : "slate"}
         />
-        <StatCard label="Avg. Release Rating" value={formatRating(kpis.averageReleaseRating)} />
+        <StatCard label="Avg. Milestone Rating" value={formatRating(kpis.averageMilestoneRating)} />
         <StatCard label="Client Satisfaction Rate" value={formatPercent(kpis.clientSatisfactionRate)} />
         <StatCard
           label="At-Risk Projects"
@@ -97,7 +99,7 @@ export default async function DashboardPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2">
-          <SectionHeading>Average Release Rating — Last 6 Months</SectionHeading>
+          <SectionHeading>Average Milestone Rating — Last 6 Months</SectionHeading>
           <TrendChart points={trend} />
         </Card>
 
@@ -128,8 +130,8 @@ export default async function DashboardPage() {
                 <th className="px-4 py-3 font-medium">Project</th>
                 <th className="px-4 py-3 font-medium">Client</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium text-right">Active Releases</th>
-                <th className="px-4 py-3 font-medium text-right">Total Releases</th>
+                <th className="px-4 py-3 font-medium text-right">Active Milestones</th>
+                <th className="px-4 py-3 font-medium text-right">Total Milestones</th>
                 <th className="px-4 py-3 font-medium text-right">Avg. Rating</th>
                 <th className="px-4 py-3 font-medium text-right">Latest Rating</th>
                 <th className="px-4 py-3 font-medium">Client Health</th>
@@ -153,8 +155,8 @@ export default async function DashboardPage() {
                   <td className="px-4 py-3">
                     <ProjectStatusBadge status={project.status} />
                   </td>
-                  <td className="px-4 py-3 text-right">{perf.activeReleases}</td>
-                  <td className="px-4 py-3 text-right">{perf.totalReleases}</td>
+                  <td className="px-4 py-3 text-right">{perf.activeMilestones}</td>
+                  <td className="px-4 py-3 text-right">{perf.totalMilestones}</td>
                   <td className="px-4 py-3 text-right">{formatRating(perf.avgRating)}</td>
                   <td className="px-4 py-3 text-right">{formatRating(perf.latestRating)}</td>
                   <td className="px-4 py-3">

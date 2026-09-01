@@ -9,11 +9,11 @@ import { signOut } from "@/app/login/actions";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Performance Dashboard", icon: "📊" },
   { href: "/projects", label: "Projects", icon: "📁" },
-  { href: "/releases", label: "Releases", icon: "🚀" },
+  { href: "/milestones", label: "Milestones", icon: "🚀" },
 ];
 
 export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {
-  const recentActivity = await recentActivities(8);
+  const recentActivity = await recentActivities(8, user.id);
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">

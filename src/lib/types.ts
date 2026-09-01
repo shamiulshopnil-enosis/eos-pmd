@@ -5,14 +5,15 @@
 
 export type ProjectStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
 export type ProjectVisibility = "PRIVATE" | "PUBLIC";
-export type ReleaseStatus =
-  | "DRAFT"
-  | "IN_PROGRESS"
-  | "DELIVERED"
-  | "FEEDBACK_REQUESTED"
-  | "REVIEWED"
-  | "CLOSED";
-export type FeedbackRequestStatus = "PENDING" | "COMPLETED";
+export type ProjectType = "whole" | "milestone";
+export type AdminStatus = "draft" | "pending_approval" | "published" | "rejected" | "edited" | "trashed";
+export type ExecutionStatus = "ongoing" | "awaiting_completion" | "completed";
+export type MilestoneStatus = "draft" | "sent" | "reviewed";
+export type VendorTeamRole = "owner" | "member";
+export type ClientContactRole = "primary" | "collaborator";
+export type InvitationKind = "vendor_team" | "client_contact";
+export type InvitationRole = VendorTeamRole | ClientContactRole;
+export type InvitationStatus = "pending" | "accepted" | "revoked";
 export type ActivityType =
   | "PROJECT_CREATED"
   | "PROJECT_UPDATED"
@@ -44,6 +45,20 @@ export interface Project {
   projectUrl: string | null;
   visibility: ProjectVisibility;
 
+  projectType: ProjectType;
+  adminStatus: AdminStatus;
+  executionStatus: ExecutionStatus;
+  minReviewThreshold: number;
+  completionRequestedAt: Date | null;
+  completionConfirmedByClient: boolean;
+  completionForcedByAdmin: boolean;
+  liveScore: number | null;
+  reviewedMilestoneCount: number;
+  finalScore: number | null;
+
+  vendorTeam: VendorTeamMember[];
+  clientContacts: ClientContact[];
+
   publicSummary: string | null;
   publicKeyChallenges: string | null;
   publicSolution: string | null;
@@ -59,53 +74,56 @@ export interface Project {
   updatedAt: Date;
 }
 
-export interface Release {
+export interface Milestone {
   id: string;
   projectId: string;
-  name: string;
-  versionLabel: string | null;
-  description: string | null;
-  objectives: string | null;
-  deliverables: string | null;
-  plannedDeliveryDate: Date | null;
-  actualDeliveryDate: Date | null;
-  startDate: Date | null;
-  status: ReleaseStatus;
-  demoUrl: string | null;
-  internalNotes: string | null;
-  clientFacingNotes: string | null;
-  teamSize: number | null;
+  title: string;
+  description: string; // sanitized rich-text HTML
+  targetDate: Date | null;
+  status: MilestoneStatus;
+  rating: number | null; // 1-5, "Quality of Deliverables"
+  comment: string | null;
+  editRequestedByVendor: boolean;
+  ratingSubmittedAt: Date | null;
+  reviewedAt: Date | null;
+  sentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface FeedbackRequest {
-  id: string;
-  releaseId: string;
-  clientEmail: string;
-  token: string;
-  status: FeedbackRequestStatus;
-  sentAt: Date;
-  remindersSent: number;
-  completedAt: Date | null;
+export interface VendorTeamMember {
+  userId: string | null;
+  email: string;
+  name: string | null;
+  role: VendorTeamRole;
+  invitePending: boolean;
+}
 
-  overallSatisfaction: number | null;
-  qualityOfDeliverables: number | null;
-  timeliness: number | null;
-  communication: number | null;
-  understandingOfRequirements: number | null;
-  deliveryAgainstScope: number | null;
-  wouldContinue: number | null;
-  comments: string | null;
-  reviewerEmail: string | null;
-  verified: boolean;
-  flagged: boolean;
+export interface ClientContact {
+  userId: string | null;
+  email: string;
+  name: string | null;
+  designation: string;
+  role: ClientContactRole;
+  invitePending: boolean;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  projectId: string;
+  kind: InvitationKind;
+  proposedRole: InvitationRole;
+  designation: string | null;
+  invitedByUserId: string | null;
+  status: InvitationStatus;
+  createdAt: Date;
 }
 
 export interface Activity {
   id: string;
   projectId: string;
-  releaseId: string | null;
+  milestoneId: string | null;
   type: ActivityType;
   message: string;
   createdAt: Date;
@@ -113,30 +131,22 @@ export interface Activity {
 
 // --- Composite shapes assembled by the data layer ---
 
-export type ReleaseWithFeedback = Release & {
-  feedbackRequest: FeedbackRequest | null;
+export type ProjectWithMilestones = Project & {
+  milestones: Milestone[];
 };
 
-export type ProjectWithReleases = Project & {
-  releases: ReleaseWithFeedback[];
-};
-
-export type ActivityWithReleaseName = Activity & {
-  release: { name: string } | null;
+export type ActivityWithMilestoneName = Activity & {
+  milestone: { title: string } | null;
 };
 
 export type RecentActivity = Activity & {
   project: { id: string; name: string };
 };
 
-export type ReleaseWithProject = ReleaseWithFeedback & {
+export type MilestoneWithProject = Milestone & {
   project: Pick<Project, "id" | "name" | "clientCompanyName">;
 };
 
-export type ReleaseWithFullProject = ReleaseWithFeedback & {
+export type MilestoneWithFullProject = Milestone & {
   project: Project;
-};
-
-export type FeedbackRequestWithContext = FeedbackRequest & {
-  release: Release & { project: Project };
 };
