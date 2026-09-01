@@ -11,6 +11,8 @@ const PROJECT_TYPE = ["whole", "milestone"] as const;
 const ADMIN_STATUS = ["draft", "pending_approval", "published", "rejected", "edited", "trashed"] as const;
 const EXECUTION_STATUS = ["ongoing", "awaiting_completion", "completed"] as const;
 const MILESTONE_STATUS = ["draft", "sent", "reviewed"] as const;
+// Milestones plan, Phase 7.
+const CAPSTONE_TIER = ["promoter", "neutral", "detractor"] as const;
 // Milestones plan, Phase 3.
 const VENDOR_TEAM_ROLE = ["owner", "member"] as const;
 const CLIENT_CONTACT_ROLE = ["primary", "collaborator"] as const;
@@ -55,6 +57,22 @@ const clientContactSchema = new Schema(
   { _id: false },
 );
 
+// Milestones plan, Phase 7 — one-time qualitative wrap-up after completion,
+// embedded on Project. `tier` is frozen from `finalScore` at request time.
+const capstoneEndorsementSchema = new Schema(
+  {
+    requested: { type: Boolean, default: false },
+    submitted: { type: Boolean, default: false },
+    attributes: { type: [String], default: [] },
+    testimonial: { type: String, default: "" },
+    anonymous: { type: Boolean, default: false },
+    tier: { type: String, enum: CAPSTONE_TIER, default: "neutral" },
+    requestedAt: { type: Date, default: null },
+    submittedAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 const projectSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -88,6 +106,9 @@ const projectSchema = new Schema(
     // --- Milestones plan, Phase 3 ---
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
+
+    // --- Milestones plan, Phase 7 ---
+    capstone: { type: capstoneEndorsementSchema, default: null },
 
     publicSummary: { type: String, default: null },
     publicKeyChallenges: { type: String, default: null },

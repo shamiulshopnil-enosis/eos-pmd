@@ -6,8 +6,14 @@ import { clientRole, isClientContact } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { confirmCompletion, editOwnMilestoneRating, submitMilestoneRating } from "@/lib/actions";
 import { formatDate, formatDateTime, formatRating } from "@/lib/format";
-import { ACTIVITY_LABELS, MILESTONE_RATING_LABEL, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
+  ACTIVITY_LABELS,
+  CAPSTONE_TIER_LABELS,
+  MILESTONE_RATING_LABEL,
+  RATING_SELF_CORRECTION_HOURS,
+} from "@/lib/constants";
+import {
+  Badge,
   Card,
   ExecutionStatusBadge,
   FlagBadge,
@@ -85,6 +91,53 @@ export default async function ClientPmdPage({ params }: { params: Promise<{ id: 
               Awaiting the primary contact&apos;s confirmation.
             </p>
           )}
+        </div>
+      ) : null}
+
+      {project.capstone?.requested && !project.capstone.submitted ? (
+        <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950">
+          <div className="text-sm font-semibold text-violet-800 dark:text-violet-200">
+            Capstone endorsement requested
+          </div>
+          <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
+            The vendor has asked for a short written endorsement of the whole engagement.
+          </p>
+          {isPrimary ? (
+            <Link
+              href={`/my-projects/${id}/capstone`}
+              className="mt-3 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Write the endorsement
+            </Link>
+          ) : (
+            <p className="mt-2 text-xs text-violet-600 dark:text-violet-400">
+              Awaiting the primary contact&apos;s endorsement.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      {project.capstone?.submitted ? (
+        <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-violet-800 dark:text-violet-200">Capstone endorsement</span>
+            <Badge tone="purple">{CAPSTONE_TIER_LABELS[project.capstone.tier] ?? project.capstone.tier}</Badge>
+            {project.capstone.anonymous ? <Badge tone="slate">Anonymous</Badge> : null}
+          </div>
+          {project.capstone.attributes.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {project.capstone.attributes.map((attr) => (
+                <Badge key={attr} tone="blue">
+                  {attr}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+          {project.capstone.testimonial ? (
+            <p className="text-sm italic text-violet-700 dark:text-violet-300">
+              &ldquo;{project.capstone.testimonial}&rdquo;
+            </p>
+          ) : null}
         </div>
       ) : null}
 

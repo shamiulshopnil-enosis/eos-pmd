@@ -5,8 +5,13 @@ import { getProjectDetail } from "@/lib/data";
 import { isVendorOwner, isVendorTeamMember } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
-import { PROJECT_STATUS_LABELS, ACTIVITY_LABELS, MILESTONE_RATING_LABEL } from "@/lib/constants";
-import { requestCompletion, setProjectStatus, submitForApproval } from "@/lib/actions";
+import {
+  PROJECT_STATUS_LABELS,
+  ACTIVITY_LABELS,
+  CAPSTONE_TIER_LABELS,
+  MILESTONE_RATING_LABEL,
+} from "@/lib/constants";
+import { requestCapstone, requestCompletion, setProjectStatus, submitForApproval } from "@/lib/actions";
 import {
   AdminStatusBadge,
   Badge,
@@ -81,6 +86,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 ) : project.executionStatus === "awaiting_completion" ? (
                   <span className="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
                     Awaiting client confirmation
+                  </span>
+                ) : null}
+                {project.executionStatus === "completed" && !project.capstone?.requested ? (
+                  <form action={requestCapstone.bind(null, project.id)}>
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Request Capstone Endorsement
+                    </button>
+                  </form>
+                ) : project.capstone?.requested && !project.capstone.submitted ? (
+                  <span className="inline-flex items-center rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                    Capstone endorsement requested
                   </span>
                 ) : null}
               </>
@@ -237,6 +256,35 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </Card>
         )}
       </div>
+
+      {project.capstone?.submitted ? (
+        <div className="mt-6">
+          <SectionHeading>Capstone Endorsement</SectionHeading>
+          <Card className="p-5">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge tone="purple">{CAPSTONE_TIER_LABELS[project.capstone.tier] ?? project.capstone.tier}</Badge>
+              {project.capstone.anonymous ? <Badge tone="slate">Anonymous</Badge> : null}
+            </div>
+            {project.capstone.attributes.length > 0 ? (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {project.capstone.attributes.map((attr) => (
+                  <Badge key={attr} tone="blue">
+                    {attr}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+            {project.capstone.testimonial ? (
+              <p className="text-sm italic text-slate-600 dark:text-slate-300">
+                &ldquo;{project.capstone.testimonial}&rdquo;
+              </p>
+            ) : null}
+            <div className="mt-2 text-xs text-slate-400">
+              Submitted {formatDateTime(project.capstone.submittedAt)}
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>

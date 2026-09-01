@@ -41,6 +41,9 @@ export const canRequestCompletion = (u: SessionUser | null, p: ProjectPeople) =>
 export const canRateMilestone = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 export const canConfirmCompletion = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 export const canInviteCollaborator = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
+/** Capstone endorsement (spec §6.9): vendor Owner requests, Primary Contact submits. */
+export const canRequestCapstone = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
+export const canSubmitCapstone = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 
 export function assertPermission(ok: boolean, message = "You do not have permission to do that."): void {
   if (!ok) throw new Error(message);

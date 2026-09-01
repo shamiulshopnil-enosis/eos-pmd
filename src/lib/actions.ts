@@ -14,14 +14,17 @@ import {
   canInviteTeammate,
   canManageProject,
   canRateMilestone,
+  canRequestCapstone,
   canRequestCompletion,
   canSendMilestone,
+  canSubmitCapstone,
 } from "./permissions";
 import { ActivityModel, InvitationModel, MilestoneModel, ProjectModel } from "./models";
 import { sanitizeMilestoneHtml } from "./richtext";
 import { runningAverage } from "./scoring";
+import { CAPSTONE_ATTRIBUTE_POOL, MAX_CAPSTONE_ATTRIBUTES, tierForScore } from "./attributes";
 import { COMPLETION_TIMEOUT_DAYS, minReviewThreshold, RATING_SELF_CORRECTION_HOURS } from "./constants";
-import type { ActivityType, Project } from "./types";
+import type { ActivityType, CapstoneTier, Project } from "./types";
 import type { SessionUser } from "./session";
 
 // ---------------------------------------------------------------------------
@@ -651,6 +654,97 @@ export async function forceCompleteProject(projectId: string) {
 
   revalidateCompletion(projectId);
   revalidatePath(`/admin/projects/${projectId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Capstone endorsement (Milestones plan, Phase 7 — spec §4.5, §6.9)
+// ---------------------------------------------------------------------------
+
+function revalidateCapstone(projectId: string) {
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/public-preview`);
+  revalidatePath(`/projects/${projectId}/publish`);
+  revalidatePath(`/my-projects/${projectId}`);
+  revalidatePath(`/my-projects/${projectId}/capstone`);
+}
+
+/**
+ * Vendor Owner asks the client for a capstone endorsement. Separate from the
+ * completion request, allowed only after the project is completed, once ever
+ * (spec §6.9). The tier is frozen from `finalScore` at this point.
+ */
+export async function requestCapstone(projectId: string) {
+  await requirePermission(projectId, canRequestCapstone, "Only a project owner can request a capstone endorsement.");
+  await connectToDatabase();
+
+  const doc = await ProjectModel.findById(projectId);
+  if (!doc) throw new Error("Project not found.");
+  if (doc.executionStatus !== "completed") {
+    throw new Error("A capstone endorsement can only be requested after the project is completed.");
+  }
+  if (doc.capstone?.requested) {
+    throw new Error("A capstone endorsement has already been requested for this project.");
+  }
+
+  doc.capstone = {
+    requested: true,
+    submitted: false,
+    attributes: [],
+    testimonial: "",
+    anonymous: false,
+    tier: tierForScore(doc.finalScore ?? null),
+    requestedAt: new Date(),
+    submittedAt: null,
+  } as never;
+  await doc.save();
+
+  await logActivity({
+    projectId,
+    type: "PROJECT_UPDATED",
+    message: "Vendor requested a capstone endorsement from the client",
+  });
+
+  revalidateCapstone(projectId);
+}
+
+/**
+ * Primary Contact submits the capstone: up to 5 attributes from the frozen
+ * tier pool, a short testimonial, and an optional anonymous flag. No stars
+ * (spec §4.5, §6.9).
+ */
+export async function submitCapstone(projectId: string, formData: FormData) {
+  await requirePermission(projectId, canSubmitCapstone, "Only the primary client contact can submit the capstone endorsement.");
+  await connectToDatabase();
+
+  const doc = await ProjectModel.findById(projectId);
+  if (!doc) throw new Error("Project not found.");
+  if (!doc.capstone?.requested) throw new Error("No capstone endorsement has been requested for this project.");
+  if (doc.capstone.submitted) throw new Error("The capstone endorsement has already been submitted.");
+
+  const pool = new Set(CAPSTONE_ATTRIBUTE_POOL[doc.capstone.tier as CapstoneTier]);
+  const attributes = formData.getAll("attributes").map(String).filter((a) => pool.has(a));
+  if (attributes.length === 0) throw new Error("Pick at least one attribute.");
+  if (attributes.length > MAX_CAPSTONE_ATTRIBUTES) {
+    throw new Error(`Pick at most ${MAX_CAPSTONE_ATTRIBUTES} attributes.`);
+  }
+  const testimonial = str(formData, "testimonial");
+  if (!testimonial) throw new Error("A short testimonial is required.");
+
+  doc.capstone.attributes = attributes as never;
+  doc.capstone.testimonial = testimonial;
+  doc.capstone.anonymous = formData.get("anonymous") === "on";
+  doc.capstone.submitted = true;
+  doc.capstone.submittedAt = new Date();
+  await doc.save();
+
+  await logActivity({
+    projectId,
+    type: "FEEDBACK_RECEIVED",
+    message: "Client submitted a capstone endorsement",
+  });
+
+  revalidateCapstone(projectId);
+  redirect(`/my-projects/${projectId}`);
 }
 
 // ---------------------------------------------------------------------------

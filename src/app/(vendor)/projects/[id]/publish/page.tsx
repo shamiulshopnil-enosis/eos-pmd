@@ -100,6 +100,17 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
             )}
           </div>
 
+          {project.capstone?.submitted ? (
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950">
+              <div className="mb-1 text-sm font-medium text-violet-800 dark:text-violet-200">Client Endorsement</div>
+              <p className="text-sm text-violet-700 dark:text-violet-300">
+                The capstone endorsement the client submitted ({project.capstone.attributes.length} attribute
+                {project.capstone.attributes.length === 1 ? "" : "s"} + testimonial) will appear on the public page
+                {project.capstone.anonymous ? " without the client's name" : ""}.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
             <SubmitButton>Publish Project</SubmitButton>
           </div>

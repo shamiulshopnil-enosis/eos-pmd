@@ -9,6 +9,7 @@ export type ProjectType = "whole" | "milestone";
 export type AdminStatus = "draft" | "pending_approval" | "published" | "rejected" | "edited" | "trashed";
 export type ExecutionStatus = "ongoing" | "awaiting_completion" | "completed";
 export type MilestoneStatus = "draft" | "sent" | "reviewed";
+export type CapstoneTier = "promoter" | "neutral" | "detractor";
 export type VendorTeamRole = "owner" | "member";
 export type ClientContactRole = "primary" | "collaborator";
 export type InvitationKind = "vendor_team" | "client_contact";
@@ -58,6 +59,7 @@ export interface Project {
 
   vendorTeam: VendorTeamMember[];
   clientContacts: ClientContact[];
+  capstone: CapstoneEndorsement | null;
 
   publicSummary: string | null;
   publicKeyChallenges: string | null;
@@ -106,6 +108,17 @@ export interface ClientContact {
   designation: string;
   role: ClientContactRole;
   invitePending: boolean;
+}
+
+export interface CapstoneEndorsement {
+  requested: boolean;
+  submitted: boolean;
+  attributes: string[]; // max 5, from the frozen tier pool
+  testimonial: string;
+  anonymous: boolean;
+  tier: CapstoneTier; // frozen from finalScore at request time
+  requestedAt: Date | null;
+  submittedAt: Date | null;
 }
 
 export interface Invitation {

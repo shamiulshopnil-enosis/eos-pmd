@@ -4,6 +4,7 @@ import { ActivityModel, InvitationModel, MilestoneModel, ProjectModel } from "./
 import type {
   Activity,
   ActivityWithMilestoneName,
+  CapstoneEndorsement,
   ClientContact,
   Invitation,
   Milestone,
@@ -43,6 +44,20 @@ function serializeClientContact(c: Raw): ClientContact {
     designation: (c.designation as string) ?? "",
     role: (c.role as ClientContact["role"]) ?? "collaborator",
     invitePending: Boolean(c.invitePending),
+  };
+}
+
+function serializeCapstone(c: Raw | null | undefined): CapstoneEndorsement | null {
+  if (!c) return null;
+  return {
+    requested: Boolean(c.requested),
+    submitted: Boolean(c.submitted),
+    attributes: Array.isArray(c.attributes) ? (c.attributes as unknown[]).map(String) : [],
+    testimonial: (c.testimonial as string) ?? "",
+    anonymous: Boolean(c.anonymous),
+    tier: (c.tier as CapstoneEndorsement["tier"]) ?? "neutral",
+    requestedAt: date(c.requestedAt),
+    submittedAt: date(c.submittedAt),
   };
 }
 
@@ -92,6 +107,7 @@ function serializeProject(p: Raw): Project {
     clientContacts: Array.isArray(p.clientContacts)
       ? (p.clientContacts as Raw[]).map(serializeClientContact)
       : [],
+    capstone: serializeCapstone(p.capstone as Raw | null | undefined),
     publicSummary: str(p.publicSummary),
     publicKeyChallenges: str(p.publicKeyChallenges),
     publicSolution: str(p.publicSolution),

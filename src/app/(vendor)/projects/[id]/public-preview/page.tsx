@@ -89,6 +89,29 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
               </p>
             </div>
           ) : null}
+
+          {project.capstone?.submitted ? (
+            <div className="rounded-xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950">
+              <div className="mb-1 text-sm font-semibold text-violet-800 dark:text-violet-200">Client Endorsement</div>
+              {project.capstone.attributes.length > 0 ? (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {project.capstone.attributes.map((attr) => (
+                    <Badge key={attr} tone="blue">
+                      {attr}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              {project.capstone.testimonial ? (
+                <p className="text-sm italic text-violet-700 dark:text-violet-300">
+                  &ldquo;{project.capstone.testimonial}&rdquo;
+                </p>
+              ) : null}
+              <p className="mt-1 text-xs text-violet-600 dark:text-violet-400">
+                — {project.capstone.anonymous ? "Anonymous client" : project.clientCompanyName}
+              </p>
+            </div>
+          ) : null}
         </div>
       </Card>
     </div>

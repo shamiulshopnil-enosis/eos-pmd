@@ -9,11 +9,15 @@ import { runningAverage } from "./scoring";
 import {
   AT_RISK_RATING_THRESHOLD,
   CLIENT_HEALTH_LABELS,
+  COMPLETION_TIMEOUT_DAYS,
   DUE_SOON_WINDOW_DAYS,
   SATISFACTION_THRESHOLDS,
   SATISFIED_RATING_THRESHOLD,
+  STALE_MILESTONE_REVIEW_DAYS,
   type ClientHealth,
 } from "./constants";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type { ProjectWithMilestones } from "./types";
 
@@ -21,12 +25,12 @@ export type { ProjectWithMilestones } from "./types";
 export type MilestoneFlag = "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null;
 
 export function getMilestoneFlag(milestone: Milestone, now: Date = new Date()): MilestoneFlag {
-  if (milestone.targetDate && milestone.status === "draft") {
-    const target = new Date(milestone.targetDate);
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const daysUntil = (target.getTime() - now.getTime()) / msPerDay;
+  // A target date can lapse while the milestone is still a draft or already with
+  // the client (Milestones plan, Phase 8 — spec §8-style delivery signal).
+  if (milestone.targetDate && (milestone.status === "draft" || milestone.status === "sent")) {
+    const daysUntil = (new Date(milestone.targetDate).getTime() - now.getTime()) / MS_PER_DAY;
     if (daysUntil < 0) return "OVERDUE";
-    if (daysUntil <= DUE_SOON_WINDOW_DAYS) return "DUE_SOON";
+    if (milestone.status === "draft" && daysUntil <= DUE_SOON_WINDOW_DAYS) return "DUE_SOON";
   }
   if (milestone.status === "sent") return "AWAITING_REVIEW";
   return null;
@@ -138,21 +142,16 @@ export interface AlertItem {
   href: string;
 }
 
-export function computeAlerts(projects: ProjectWithMilestones[]): AlertItem[] {
+/**
+ * Milestones plan, Phase 8 — dashboard signals rebuilt for the milestone era:
+ * overdue milestones, milestones sitting unrated with the client, projects stuck
+ * awaiting completion confirmation, and projects tracking below the at-risk line.
+ */
+export function computeAlerts(projects: ProjectWithMilestones[], now: Date = new Date()): AlertItem[] {
   const alerts: AlertItem[] = [];
   const allMilestones = projects.flatMap((p) => p.milestones);
 
-  const awaitingCount = allMilestones.filter((m) => m.status === "sent").length;
-  if (awaitingCount > 0) {
-    alerts.push({
-      id: "awaiting-review",
-      severity: "warning",
-      message: `${awaitingCount} milestone${awaitingCount === 1 ? "" : "s"} awaiting client review`,
-      href: "/milestones?status=sent",
-    });
-  }
-
-  const overdueCount = allMilestones.filter((m) => getMilestoneFlag(m) === "OVERDUE").length;
+  const overdueCount = allMilestones.filter((m) => getMilestoneFlag(m, now) === "OVERDUE").length;
   if (overdueCount > 0) {
     alerts.push({
       id: "overdue",
@@ -162,16 +161,43 @@ export function computeAlerts(projects: ProjectWithMilestones[]): AlertItem[] {
     });
   }
 
+  const staleReviewCount = allMilestones.filter(
+    (m) =>
+      m.status === "sent" &&
+      m.sentAt != null &&
+      now.getTime() - m.sentAt.getTime() > STALE_MILESTONE_REVIEW_DAYS * MS_PER_DAY,
+  ).length;
+  if (staleReviewCount > 0) {
+    alerts.push({
+      id: "awaiting-review",
+      severity: "warning",
+      message: `${staleReviewCount} milestone${staleReviewCount === 1 ? "" : "s"} awaiting a client rating for over ${STALE_MILESTONE_REVIEW_DAYS} days`,
+      href: "/milestones?status=sent",
+    });
+  }
+
   for (const project of projects) {
-    const perf = computeProjectPerformance(project);
-    if (perf.isAtRisk) {
+    if (
+      project.executionStatus === "awaiting_completion" &&
+      project.completionRequestedAt != null &&
+      now.getTime() - project.completionRequestedAt.getTime() >= COMPLETION_TIMEOUT_DAYS * MS_PER_DAY
+    ) {
+      alerts.push({
+        id: `completion-timeout-${project.id}`,
+        severity: "warning",
+        message: `${project.name} has been awaiting completion confirmation for over ${COMPLETION_TIMEOUT_DAYS} days`,
+        href: `/projects/${project.id}`,
+      });
+    }
+
+    if (project.liveScore != null && project.liveScore < AT_RISK_RATING_THRESHOLD) {
       alerts.push({
         id: `at-risk-${project.id}`,
         severity: "critical",
-        message: `${project.name} received a rating below ${AT_RISK_RATING_THRESHOLD.toFixed(1)}`,
+        message: `${project.name} is tracking below ${AT_RISK_RATING_THRESHOLD.toFixed(1)} on reviewed milestones`,
         href: `/projects/${project.id}`,
       });
-    } else if (perf.satisfactionDeclined) {
+    } else if (computeProjectPerformance(project).satisfactionDeclined) {
       alerts.push({
         id: `declined-${project.id}`,
         severity: "warning",
