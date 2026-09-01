@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getReleaseDetail } from "@/lib/data";
 import { getReleaseFlag } from "@/lib/derived";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { RATING_CATEGORIES, RELEASE_STATUS_LABELS } from "@/lib/constants";
@@ -15,10 +15,7 @@ export default async function ReleaseDetailPage({
 }) {
   const { id, releaseId } = await params;
 
-  const release = await prisma.release.findUnique({
-    where: { id: releaseId },
-    include: { feedbackRequest: true, project: true },
-  });
+  const release = await getReleaseDetail(releaseId);
 
   if (!release || release.projectId !== id) notFound();
 

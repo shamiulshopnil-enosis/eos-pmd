@@ -1,14 +1,11 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getFeedbackByToken } from "@/lib/data";
 import { VENDOR_NAME } from "@/lib/constants";
 import { StarRating } from "@/components/ui";
 
 export default async function ThanksPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const request = await prisma.feedbackRequest.findUnique({
-    where: { token },
-    include: { release: { include: { project: true } } },
-  });
+  const request = await getFeedbackByToken(token);
   if (!request) notFound();
 
   return (

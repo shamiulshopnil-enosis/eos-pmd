@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getProject } from "@/lib/data";
 import { createRelease } from "@/lib/actions";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function NewReleasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = await prisma.project.findUnique({ where: { id }, select: { id: true, name: true } });
+  const project = await getProject(id);
   if (!project) notFound();
 
   const action = createRelease.bind(null, project.id);

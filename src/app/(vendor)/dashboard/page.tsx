@@ -1,21 +1,20 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { listProjectsWithReleases } from "@/lib/data";
 import {
   computeAlerts,
   computeDashboardKpis,
   computeProjectPerformance,
   computeRatingTrend,
-  type ProjectWithReleases,
 } from "@/lib/derived";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import { Badge, Card, EmptyState, HealthBadge, PageHeader, ProjectStatusBadge, SectionHeading, StatCard } from "@/components/ui";
 import { TrendChart } from "@/components/TrendChart";
 
+// Live metrics — always render against the current database, never a build snapshot.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
-  const projects = (await prisma.project.findMany({
-    include: { releases: { include: { feedbackRequest: true } } },
-    orderBy: { updatedAt: "desc" },
-  })) as ProjectWithReleases[];
+  const projects = await listProjectsWithReleases();
 
   if (projects.length === 0) {
     return (

@@ -2,7 +2,7 @@
 // functions over plain data so they're easy to unit test and reuse between
 // server components, server actions, and the dashboard.
 
-import type { ReleaseModel as Release, FeedbackRequestModel as FeedbackRequest, ProjectModel as Project } from "@/generated/prisma/models";
+import type { Release, FeedbackRequest, Project } from "./types";
 import {
   AT_RISK_RATING_THRESHOLD,
   CLIENT_HEALTH_LABELS,

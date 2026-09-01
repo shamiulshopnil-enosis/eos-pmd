@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { prisma } from "@/lib/prisma";
+import { recentActivities } from "@/lib/data";
 import { ACTIVITY_LABELS, VENDOR_NAME } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
 
@@ -10,16 +10,8 @@ const NAV_ITEMS = [
   { href: "/releases", label: "Releases", icon: "🚀" },
 ];
 
-async function getRecentActivity() {
-  return prisma.activity.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 8,
-    include: { project: { select: { id: true, name: true } } },
-  });
-}
-
 export default async function NavShell({ children }: { children: ReactNode }) {
-  const recentActivity = await getRecentActivity();
+  const recentActivity = await recentActivities(8);
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">

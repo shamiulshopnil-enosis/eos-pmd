@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getRelease } from "@/lib/data";
 import { updateRelease } from "@/lib/actions";
 import { toDateInputValue } from "@/lib/format";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
@@ -11,7 +11,7 @@ export default async function EditReleasePage({
   params: Promise<{ id: string; releaseId: string }>;
 }) {
   const { id, releaseId } = await params;
-  const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  const release = await getRelease(releaseId);
   if (!release || release.projectId !== id) notFound();
 
   const action = updateRelease.bind(null, id, releaseId);

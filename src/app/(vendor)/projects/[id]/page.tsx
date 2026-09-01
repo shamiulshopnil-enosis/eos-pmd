@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { computeProjectPerformance, getReleaseFlag, isEvaluationComplete, type ProjectWithReleases } from "@/lib/derived";
+import { getProjectDetail } from "@/lib/data";
+import { computeProjectPerformance, getReleaseFlag, isEvaluationComplete } from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
 import { PROJECT_STATUS_LABELS, ACTIVITY_LABELS, RATING_CATEGORIES } from "@/lib/constants";
 import { setProjectStatus } from "@/lib/actions";
@@ -22,13 +22,7 @@ import { Select } from "@/components/form";
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const project = (await prisma.project.findUnique({
-    where: { id },
-    include: {
-      releases: { include: { feedbackRequest: true }, orderBy: { createdAt: "asc" } },
-      activities: { orderBy: { createdAt: "desc" }, take: 20, include: { release: { select: { name: true } } } },
-    },
-  })) as (ProjectWithReleases & { activities: Array<{ id: string; type: string; message: string; createdAt: Date; release: { name: string } | null }> }) | null;
+  const project = await getProjectDetail(id);
 
   if (!project) notFound();
 

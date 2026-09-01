@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getFeedbackByToken } from "@/lib/data";
 import { submitEvaluation } from "@/lib/actions";
 import { RATING_CATEGORIES, VENDOR_NAME } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -9,10 +9,7 @@ import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 export default async function ClientFeedbackPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
-  const request = await prisma.feedbackRequest.findUnique({
-    where: { token },
-    include: { release: { include: { project: true } } },
-  });
+  const request = await getFeedbackByToken(token);
 
   if (!request) notFound();
   if (request.status === "COMPLETED") redirect(`/feedback/${token}/thanks`);

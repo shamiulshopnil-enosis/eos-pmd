@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { countReleases, listReleasesWithProject } from "@/lib/data";
 import { getReleaseFlag, isEvaluationComplete } from "@/lib/derived";
 import { formatDate } from "@/lib/format";
 import { RELEASE_STATUS_LABELS } from "@/lib/constants";
@@ -14,13 +14,9 @@ export default async function ReleasesPage({
 }) {
   const { status = "", feedback = "", flag = "" } = await searchParams;
 
-  const totalCount = await prisma.release.count();
+  const totalCount = await countReleases();
 
-  const releases = await prisma.release.findMany({
-    where: status ? { status: status as never } : {},
-    include: { feedbackRequest: true, project: { select: { id: true, name: true, clientCompanyName: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
+  const releases = await listReleasesWithProject({ status });
 
   const filtered = releases.filter((r) => {
     if (feedback && r.feedbackRequest?.status !== feedback) return false;

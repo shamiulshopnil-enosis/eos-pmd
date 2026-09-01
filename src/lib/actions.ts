@@ -3,8 +3,10 @@
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { prisma } from "./prisma";
+import { connectToDatabase } from "./mongoose";
+import { ActivityModel, FeedbackRequestModel, ProjectModel, ReleaseModel } from "./models";
 import { RATING_CATEGORIES } from "./constants";
+import type { ActivityType } from "./types";
 
 // ---------------------------------------------------------------------------
 // form-data helpers
@@ -34,27 +36,14 @@ function optDate(fd: FormData, key: string): Date | null {
 async function logActivity(params: {
   projectId: string;
   releaseId?: string | null;
-  type:
-    | "PROJECT_CREATED"
-    | "PROJECT_UPDATED"
-    | "RELEASE_CREATED"
-    | "RELEASE_UPDATED"
-    | "RELEASE_DELIVERED"
-    | "FEEDBACK_REQUESTED"
-    | "FEEDBACK_REMINDER_SENT"
-    | "FEEDBACK_RECEIVED"
-    | "PROJECT_COMPLETED"
-    | "PUBLICATION_REQUESTED"
-    | "PROJECT_PUBLISHED";
+  type: ActivityType;
   message: string;
 }) {
-  await prisma.activity.create({
-    data: {
-      projectId: params.projectId,
-      releaseId: params.releaseId ?? null,
-      type: params.type,
-      message: params.message,
-    },
+  await ActivityModel.create({
+    projectId: params.projectId,
+    releaseId: params.releaseId ?? null,
+    type: params.type,
+    message: params.message,
   });
 }
 
@@ -63,64 +52,67 @@ async function logActivity(params: {
 // ---------------------------------------------------------------------------
 
 export async function createProject(formData: FormData) {
-  const project = await prisma.project.create({
-    data: {
-      name: str(formData, "name"),
-      clientCompanyName: str(formData, "clientCompanyName"),
-      clientContactName: optStr(formData, "clientContactName"),
-      clientEmail: str(formData, "clientEmail"),
-      services: optStr(formData, "services"),
-      description: optStr(formData, "description"),
-      startDate: optDate(formData, "startDate"),
-      expectedCompletionDate: optDate(formData, "expectedCompletionDate"),
-      teamSize: optInt(formData, "teamSize"),
-      engagementModel: optStr(formData, "engagementModel"),
-      internalRef: optStr(formData, "internalRef"),
-      projectUrl: optStr(formData, "projectUrl"),
-    },
+  await connectToDatabase();
+
+  const project = await ProjectModel.create({
+    name: str(formData, "name"),
+    clientCompanyName: str(formData, "clientCompanyName"),
+    clientContactName: optStr(formData, "clientContactName"),
+    clientEmail: str(formData, "clientEmail"),
+    services: optStr(formData, "services"),
+    description: optStr(formData, "description"),
+    startDate: optDate(formData, "startDate"),
+    expectedCompletionDate: optDate(formData, "expectedCompletionDate"),
+    teamSize: optInt(formData, "teamSize"),
+    engagementModel: optStr(formData, "engagementModel"),
+    internalRef: optStr(formData, "internalRef"),
+    projectUrl: optStr(formData, "projectUrl"),
   });
 
+  const projectId = project._id.toString();
+
   await logActivity({
-    projectId: project.id,
+    projectId,
     type: "PROJECT_CREATED",
     message: `Project "${project.name}" created for ${project.clientCompanyName}`,
   });
 
   revalidatePath("/projects");
-  redirect(`/projects/${project.id}`);
+  redirect(`/projects/${projectId}`);
 }
 
 export async function updateProject(projectId: string, formData: FormData) {
-  const project = await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      name: str(formData, "name"),
-      clientCompanyName: str(formData, "clientCompanyName"),
-      clientContactName: optStr(formData, "clientContactName"),
-      clientEmail: str(formData, "clientEmail"),
-      services: optStr(formData, "services"),
-      description: optStr(formData, "description"),
-      startDate: optDate(formData, "startDate"),
-      expectedCompletionDate: optDate(formData, "expectedCompletionDate"),
-      actualCompletionDate: optDate(formData, "actualCompletionDate"),
-      teamSize: optInt(formData, "teamSize"),
-      engagementModel: optStr(formData, "engagementModel"),
-      internalRef: optStr(formData, "internalRef"),
-      projectUrl: optStr(formData, "projectUrl"),
-      status: str(formData, "status") as never,
-    },
+  await connectToDatabase();
+
+  await ProjectModel.findByIdAndUpdate(projectId, {
+    name: str(formData, "name"),
+    clientCompanyName: str(formData, "clientCompanyName"),
+    clientContactName: optStr(formData, "clientContactName"),
+    clientEmail: str(formData, "clientEmail"),
+    services: optStr(formData, "services"),
+    description: optStr(formData, "description"),
+    startDate: optDate(formData, "startDate"),
+    expectedCompletionDate: optDate(formData, "expectedCompletionDate"),
+    actualCompletionDate: optDate(formData, "actualCompletionDate"),
+    teamSize: optInt(formData, "teamSize"),
+    engagementModel: optStr(formData, "engagementModel"),
+    internalRef: optStr(formData, "internalRef"),
+    projectUrl: optStr(formData, "projectUrl"),
+    status: str(formData, "status"),
   });
 
   await logActivity({ projectId, type: "PROJECT_UPDATED", message: `Project details updated` });
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
-  redirect(`/projects/${project.id}`);
+  redirect(`/projects/${projectId}`);
 }
 
 export async function setProjectStatus(projectId: string, formData: FormData) {
+  await connectToDatabase();
+
   const status = str(formData, "status");
-  await prisma.project.update({ where: { id: projectId }, data: { status: status as never } });
+  await ProjectModel.findByIdAndUpdate(projectId, { status });
   await logActivity({
     projectId,
     type: status === "COMPLETED" ? "PROJECT_COMPLETED" : "PROJECT_UPDATED",
@@ -136,52 +128,53 @@ export async function setProjectStatus(projectId: string, formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function createRelease(projectId: string, formData: FormData) {
-  const release = await prisma.release.create({
-    data: {
-      projectId,
-      name: str(formData, "name"),
-      versionLabel: optStr(formData, "versionLabel"),
-      description: optStr(formData, "description"),
-      objectives: optStr(formData, "objectives"),
-      deliverables: optStr(formData, "deliverables"),
-      plannedDeliveryDate: optDate(formData, "plannedDeliveryDate"),
-      startDate: optDate(formData, "startDate"),
-      demoUrl: optStr(formData, "demoUrl"),
-      internalNotes: optStr(formData, "internalNotes"),
-      clientFacingNotes: optStr(formData, "clientFacingNotes"),
-      teamSize: optInt(formData, "teamSize"),
-    },
+  await connectToDatabase();
+
+  const release = await ReleaseModel.create({
+    projectId,
+    name: str(formData, "name"),
+    versionLabel: optStr(formData, "versionLabel"),
+    description: optStr(formData, "description"),
+    objectives: optStr(formData, "objectives"),
+    deliverables: optStr(formData, "deliverables"),
+    plannedDeliveryDate: optDate(formData, "plannedDeliveryDate"),
+    startDate: optDate(formData, "startDate"),
+    demoUrl: optStr(formData, "demoUrl"),
+    internalNotes: optStr(formData, "internalNotes"),
+    clientFacingNotes: optStr(formData, "clientFacingNotes"),
+    teamSize: optInt(formData, "teamSize"),
   });
+
+  const releaseId = release._id.toString();
 
   await logActivity({
     projectId,
-    releaseId: release.id,
+    releaseId,
     type: "RELEASE_CREATED",
     message: `Release "${release.name}" created`,
   });
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/releases");
-  redirect(`/projects/${projectId}/releases/${release.id}`);
+  redirect(`/projects/${projectId}/releases/${releaseId}`);
 }
 
 export async function updateRelease(projectId: string, releaseId: string, formData: FormData) {
-  await prisma.release.update({
-    where: { id: releaseId },
-    data: {
-      name: str(formData, "name"),
-      versionLabel: optStr(formData, "versionLabel"),
-      description: optStr(formData, "description"),
-      objectives: optStr(formData, "objectives"),
-      deliverables: optStr(formData, "deliverables"),
-      plannedDeliveryDate: optDate(formData, "plannedDeliveryDate"),
-      actualDeliveryDate: optDate(formData, "actualDeliveryDate"),
-      startDate: optDate(formData, "startDate"),
-      demoUrl: optStr(formData, "demoUrl"),
-      internalNotes: optStr(formData, "internalNotes"),
-      clientFacingNotes: optStr(formData, "clientFacingNotes"),
-      teamSize: optInt(formData, "teamSize"),
-    },
+  await connectToDatabase();
+
+  await ReleaseModel.findByIdAndUpdate(releaseId, {
+    name: str(formData, "name"),
+    versionLabel: optStr(formData, "versionLabel"),
+    description: optStr(formData, "description"),
+    objectives: optStr(formData, "objectives"),
+    deliverables: optStr(formData, "deliverables"),
+    plannedDeliveryDate: optDate(formData, "plannedDeliveryDate"),
+    actualDeliveryDate: optDate(formData, "actualDeliveryDate"),
+    startDate: optDate(formData, "startDate"),
+    demoUrl: optStr(formData, "demoUrl"),
+    internalNotes: optStr(formData, "internalNotes"),
+    clientFacingNotes: optStr(formData, "clientFacingNotes"),
+    teamSize: optInt(formData, "teamSize"),
   });
 
   await logActivity({ projectId, releaseId, type: "RELEASE_UPDATED", message: `Release details updated` });
@@ -194,16 +187,17 @@ export async function updateRelease(projectId: string, releaseId: string, formDa
 
 /** PRD §8 — manual status transition; auto-stamps Actual Delivery Date on first Delivered. */
 export async function setReleaseStatus(projectId: string, releaseId: string, formData: FormData) {
-  const status = str(formData, "status");
-  const release = await prisma.release.findUniqueOrThrow({ where: { id: releaseId } });
+  await connectToDatabase();
 
-  await prisma.release.update({
-    where: { id: releaseId },
-    data: {
-      status: status as never,
-      actualDeliveryDate: status === "DELIVERED" && !release.actualDeliveryDate ? new Date() : undefined,
-    },
-  });
+  const status = str(formData, "status");
+  const release = await ReleaseModel.findById(releaseId);
+  if (!release) throw new Error("Release not found.");
+
+  release.status = status as typeof release.status;
+  if (status === "DELIVERED" && !release.actualDeliveryDate) {
+    release.actualDeliveryDate = new Date();
+  }
+  await release.save();
 
   await logActivity({
     projectId,
@@ -224,17 +218,29 @@ export async function setReleaseStatus(projectId: string, releaseId: string, for
 
 /** Vendor requests feedback on a delivered release. Creates the secure invitation. */
 export async function requestFeedback(projectId: string, releaseId: string, formData: FormData) {
-  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+  await connectToDatabase();
+
+  const project = await ProjectModel.findById(projectId);
+  if (!project) throw new Error("Project not found.");
   const clientEmail = optStr(formData, "clientEmail") ?? project.clientEmail;
   const token = randomUUID();
 
-  await prisma.feedbackRequest.upsert({
-    where: { releaseId },
-    create: { releaseId, clientEmail, token },
-    update: { clientEmail, token, status: "PENDING", sentAt: new Date(), remindersSent: 0, completedAt: null },
-  });
+  await FeedbackRequestModel.findOneAndUpdate(
+    { releaseId },
+    {
+      $set: {
+        clientEmail,
+        token,
+        status: "PENDING",
+        sentAt: new Date(),
+        remindersSent: 0,
+        completedAt: null,
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
 
-  await prisma.release.update({ where: { id: releaseId }, data: { status: "FEEDBACK_REQUESTED" } });
+  await ReleaseModel.findByIdAndUpdate(releaseId, { status: "FEEDBACK_REQUESTED" });
 
   await logActivity({
     projectId,
@@ -251,13 +257,16 @@ export async function requestFeedback(projectId: string, releaseId: string, form
 
 /** PRD §11 — vendor can resend, never edit, a pending request. */
 export async function resendFeedback(projectId: string, releaseId: string) {
-  const existing = await prisma.feedbackRequest.findUniqueOrThrow({ where: { releaseId } });
+  await connectToDatabase();
+
+  const existing = await FeedbackRequestModel.findOne({ releaseId });
+  if (!existing) throw new Error("No feedback request to resend.");
   if (existing.status === "COMPLETED") return; // integrity: nothing to resend once submitted
 
-  await prisma.feedbackRequest.update({
-    where: { releaseId },
-    data: { token: randomUUID(), sentAt: new Date(), remindersSent: { increment: 1 } },
-  });
+  existing.token = randomUUID();
+  existing.sentAt = new Date();
+  existing.remindersSent += 1;
+  await existing.save();
 
   await logActivity({
     projectId,
@@ -271,7 +280,9 @@ export async function resendFeedback(projectId: string, releaseId: string) {
 
 /** Client-side submission — the only mutation a client can perform, and only once. */
 export async function submitEvaluation(token: string, formData: FormData) {
-  const request = await prisma.feedbackRequest.findUnique({ where: { token } });
+  await connectToDatabase();
+
+  const request = await FeedbackRequestModel.findOne({ token });
   if (!request) throw new Error("This feedback link is invalid.");
   if (request.status === "COMPLETED") {
     redirect(`/feedback/${token}/thanks`);
@@ -280,37 +291,32 @@ export async function submitEvaluation(token: string, formData: FormData) {
   const requiredMissing = RATING_CATEGORIES.filter((c) => c.required).some((c) => optInt(formData, c.key) == null);
   if (requiredMissing) throw new Error("Please rate every required category.");
 
-  const ratingData: Record<string, number | null> = {};
   for (const cat of RATING_CATEGORIES) {
-    ratingData[cat.key] = optInt(formData, cat.key);
+    request.set(cat.key, optInt(formData, cat.key));
   }
 
-  const reviewerEmail = optStr(formData, "reviewerEmail") ?? request.clientEmail;
+  request.comments = optStr(formData, "comments");
+  request.reviewerEmail = optStr(formData, "reviewerEmail") ?? request.clientEmail;
+  request.status = "COMPLETED";
+  request.completedAt = new Date();
+  await request.save();
 
-  await prisma.feedbackRequest.update({
-    where: { token },
-    data: {
-      ...ratingData,
-      comments: optStr(formData, "comments"),
-      reviewerEmail,
-      status: "COMPLETED",
-      completedAt: new Date(),
-    },
-  });
-
-  await prisma.release.update({ where: { id: request.releaseId }, data: { status: "REVIEWED" } });
-
-  const release = await prisma.release.findUniqueOrThrow({ where: { id: request.releaseId } });
+  const release = await ReleaseModel.findByIdAndUpdate(
+    request.releaseId,
+    { status: "REVIEWED" },
+    { new: true },
+  );
+  if (!release) throw new Error("Release not found.");
 
   await logActivity({
-    projectId: release.projectId,
-    releaseId: release.id,
+    projectId: release.projectId.toString(),
+    releaseId: release._id.toString(),
     type: "FEEDBACK_RECEIVED",
-    message: `Client feedback received for "${release.name}" (${ratingData.overallSatisfaction}/5 overall)`,
+    message: `Client feedback received for "${release.name}" (${request.overallSatisfaction}/5 overall)`,
   });
 
-  revalidatePath(`/projects/${release.projectId}`);
-  revalidatePath(`/projects/${release.projectId}/releases/${release.id}`);
+  revalidatePath(`/projects/${release.projectId.toString()}`);
+  revalidatePath(`/projects/${release.projectId.toString()}/releases/${release._id.toString()}`);
   revalidatePath("/releases");
   revalidatePath("/dashboard");
   redirect(`/feedback/${token}/thanks`);
@@ -321,23 +327,22 @@ export async function submitEvaluation(token: string, formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function publishProject(projectId: string, formData: FormData) {
+  await connectToDatabase();
+
   await logActivity({ projectId, type: "PUBLICATION_REQUESTED", message: "Publication requested by vendor" });
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      visibility: "PUBLIC",
-      publishedAt: new Date(),
-      publicSummary: optStr(formData, "publicSummary"),
-      publicKeyChallenges: optStr(formData, "publicKeyChallenges"),
-      publicSolution: optStr(formData, "publicSolution"),
-      publicOutcome: optStr(formData, "publicOutcome"),
-      publicTechStack: optStr(formData, "publicTechStack"),
-      publicPlatforms: optStr(formData, "publicPlatforms"),
-      publicBudget: optStr(formData, "publicBudget"),
-      publicImageUrl: optStr(formData, "publicImageUrl"),
-      publicPerformanceConsent: formData.get("publicPerformanceConsent") === "on",
-    },
+  await ProjectModel.findByIdAndUpdate(projectId, {
+    visibility: "PUBLIC",
+    publishedAt: new Date(),
+    publicSummary: optStr(formData, "publicSummary"),
+    publicKeyChallenges: optStr(formData, "publicKeyChallenges"),
+    publicSolution: optStr(formData, "publicSolution"),
+    publicOutcome: optStr(formData, "publicOutcome"),
+    publicTechStack: optStr(formData, "publicTechStack"),
+    publicPlatforms: optStr(formData, "publicPlatforms"),
+    publicBudget: optStr(formData, "publicBudget"),
+    publicImageUrl: optStr(formData, "publicImageUrl"),
+    publicPerformanceConsent: formData.get("publicPerformanceConsent") === "on",
   });
 
   await logActivity({ projectId, type: "PROJECT_PUBLISHED", message: "Project published to public portfolio" });
@@ -348,7 +353,9 @@ export async function publishProject(projectId: string, formData: FormData) {
 }
 
 export async function unpublishProject(projectId: string) {
-  await prisma.project.update({ where: { id: projectId }, data: { visibility: "PRIVATE", publishedAt: null } });
+  await connectToDatabase();
+
+  await ProjectModel.findByIdAndUpdate(projectId, { visibility: "PRIVATE", publishedAt: null });
   await logActivity({ projectId, type: "PROJECT_UPDATED", message: "Project reverted to private" });
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");

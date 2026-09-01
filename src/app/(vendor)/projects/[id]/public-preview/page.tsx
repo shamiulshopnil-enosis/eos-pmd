@@ -1,16 +1,13 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { computeProjectPerformance, isEvaluationComplete, type ProjectWithReleases } from "@/lib/derived";
+import { getProjectWithReleases } from "@/lib/data";
+import { computeProjectPerformance, isEvaluationComplete } from "@/lib/derived";
 import { unpublishProject } from "@/lib/actions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
 export default async function PublicPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = (await prisma.project.findUnique({
-    where: { id },
-    include: { releases: { include: { feedbackRequest: true } } },
-  })) as ProjectWithReleases | null;
+  const project = await getProjectWithReleases(id);
   if (!project) notFound();
 
   const perf = computeProjectPerformance(project);

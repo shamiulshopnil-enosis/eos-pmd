@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { computeProjectPerformance, isEvaluationComplete, type ProjectWithReleases } from "@/lib/derived";
+import { getProjectWithReleases } from "@/lib/data";
+import { computeProjectPerformance, isEvaluationComplete } from "@/lib/derived";
 import { publishProject } from "@/lib/actions";
 import { formatPercent, formatRating } from "@/lib/format";
 import { Card, PageHeader } from "@/components/ui";
@@ -8,10 +8,7 @@ import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 
 export default async function PublishProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const project = (await prisma.project.findUnique({
-    where: { id },
-    include: { releases: { include: { feedbackRequest: true } } },
-  })) as ProjectWithReleases | null;
+  const project = await getProjectWithReleases(id);
   if (!project) notFound();
 
   const perf = computeProjectPerformance(project);

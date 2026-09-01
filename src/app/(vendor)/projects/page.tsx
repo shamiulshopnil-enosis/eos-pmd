@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { computeProjectPerformance, type ProjectWithReleases } from "@/lib/derived";
+import { countProjects, listProjectsWithReleases } from "@/lib/data";
+import { computeProjectPerformance } from "@/lib/derived";
 import { PROJECT_STATUS_LABELS, CLIENT_HEALTH_LABELS } from "@/lib/constants";
 import { formatRating } from "@/lib/format";
 import { Card, EmptyState, HealthBadge, PageHeader, ProjectStatusBadge, Badge } from "@/components/ui";
@@ -13,23 +13,9 @@ export default async function ProjectsPage({
 }) {
   const { q = "", status = "", health = "" } = await searchParams;
 
-  const totalCount = await prisma.project.count();
+  const totalCount = await countProjects();
 
-  const allProjects = (await prisma.project.findMany({
-    include: { releases: { include: { feedbackRequest: true } } },
-    orderBy: { updatedAt: "desc" },
-    where: {
-      ...(status ? { status: status as never } : {}),
-      ...(q
-        ? {
-            OR: [
-              { name: { contains: q } },
-              { clientCompanyName: { contains: q } },
-            ],
-          }
-        : {}),
-    },
-  })) as ProjectWithReleases[];
+  const allProjects = await listProjectsWithReleases({ status, q });
 
   const filtered = allProjects
     .map((project) => ({ project, perf: computeProjectPerformance(project) }))
