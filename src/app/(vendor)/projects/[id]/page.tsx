@@ -6,7 +6,7 @@ import { isVendorOwner, isVendorTeamMember } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
 import { PROJECT_STATUS_LABELS, ACTIVITY_LABELS, MILESTONE_RATING_LABEL } from "@/lib/constants";
-import { setProjectStatus, submitForApproval } from "@/lib/actions";
+import { requestCompletion, setProjectStatus, submitForApproval } from "@/lib/actions";
 import {
   AdminStatusBadge,
   Badge,
@@ -69,6 +69,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 >
                   Manage Team
                 </Link>
+                {project.executionStatus === "ongoing" ? (
+                  <form action={requestCompletion.bind(null, project.id)}>
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Request Completion
+                    </button>
+                  </form>
+                ) : project.executionStatus === "awaiting_completion" ? (
+                  <span className="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    Awaiting client confirmation
+                  </span>
+                ) : null}
               </>
             ) : null}
             {isWhole ? null : (

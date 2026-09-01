@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
 import { isVendorOwner, isVendorTeamMember } from "@/lib/permissions";
 import { computeProjectPerformance, isMilestoneReviewed } from "@/lib/derived";
+import { meetsPublicThreshold } from "@/lib/scoring";
+import { minReviewThreshold } from "@/lib/constants";
 import { unpublishProject } from "@/lib/actions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -15,7 +17,10 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
 
   const perf = computeProjectPerformance(project);
   const reviewedCount = project.milestones.filter(isMilestoneReviewed).length;
-  const showPerformance = project.publicPerformanceConsent && reviewedCount > 0;
+  const totalMilestones = project.milestones.length;
+  const threshold = minReviewThreshold(totalMilestones);
+  const thresholdMet = meetsPublicThreshold(project);
+  const showPerformance = project.publicPerformanceConsent && thresholdMet;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -73,6 +78,14 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
               </p>
               <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
                 Aggregate only — individual milestone ratings and comments stay private (PRD §21).
+              </p>
+            </div>
+          ) : project.publicPerformanceConsent ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Delivery in Progress</div>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {reviewedCount} of {totalMilestones} milestones reviewed. The performance summary becomes public once{" "}
+                {threshold} {threshold === 1 ? "is" : "are"} reviewed (spec §6.7).
               </p>
             </div>
           ) : null}

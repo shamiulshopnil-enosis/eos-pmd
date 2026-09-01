@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
 import { isVendorOwner } from "@/lib/permissions";
 import { computeProjectPerformance, isMilestoneReviewed } from "@/lib/derived";
+import { meetsPublicThreshold } from "@/lib/scoring";
+import { minReviewThreshold } from "@/lib/constants";
 import { publishProject } from "@/lib/actions";
 import { formatPercent, formatRating } from "@/lib/format";
 import { Card, PageHeader } from "@/components/ui";
@@ -16,6 +18,9 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
 
   const perf = computeProjectPerformance(project);
   const reviewedCount = project.milestones.filter(isMilestoneReviewed).length;
+  const totalMilestones = project.milestones.length;
+  const threshold = minReviewThreshold(totalMilestones);
+  const thresholdMet = meetsPublicThreshold(project);
   const action = publishProject.bind(null, project.id);
 
   return (
@@ -74,9 +79,16 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
               </p>
             ) : (
               <>
-                <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-                  {reviewedCount} Milestone{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Response Rate
-                </p>
+                {thresholdMet ? (
+                  <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+                    {reviewedCount} Milestone{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Response Rate
+                  </p>
+                ) : (
+                  <p className="mb-3 text-sm text-amber-700 dark:text-amber-300">
+                    {reviewedCount} of {totalMilestones} milestones reviewed — below the {threshold}-milestone threshold, so
+                    the summary stays hidden on the public page until then (spec §6.7). You can still record consent now.
+                  </p>
+                )}
                 <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <input type="checkbox" name="publicPerformanceConsent" className="mt-0.5" defaultChecked={project.publicPerformanceConsent} />
                   <span>

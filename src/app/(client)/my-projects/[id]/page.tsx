@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getProjectDetail } from "@/lib/data";
 import { clientRole, isClientContact } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
-import { editOwnMilestoneRating, submitMilestoneRating } from "@/lib/actions";
+import { confirmCompletion, editOwnMilestoneRating, submitMilestoneRating } from "@/lib/actions";
 import { formatDate, formatDateTime, formatRating } from "@/lib/format";
 import { ACTIVITY_LABELS, MILESTONE_RATING_LABEL, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
@@ -62,6 +62,31 @@ export default async function ClientPmdPage({ params }: { params: Promise<{ id: 
           ) : null
         }
       />
+
+      {project.executionStatus === "awaiting_completion" ? (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+          <div className="text-sm font-semibold text-amber-800 dark:text-amber-200">Completion requested</div>
+          <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+            The vendor has marked this project as delivered. Confirming locks the project&apos;s final score at{" "}
+            {formatRating(perf.avgRating)}
+            {perf.avgRating == null ? " (unrated)" : ""}.
+          </p>
+          {isPrimary ? (
+            <form action={confirmCompletion.bind(null, id)} className="mt-3">
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Confirm completion
+              </button>
+            </form>
+          ) : (
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              Awaiting the primary contact&apos;s confirmation.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card className="p-4">

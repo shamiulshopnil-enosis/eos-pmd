@@ -225,6 +225,19 @@ export async function listProjectsForAdmin(
   return docs.map((p) => serializeProject(p as unknown as Raw));
 }
 
+/** Projects stuck in `awaiting_completion` past the client-response window (spec §6.8 step 3). */
+export async function listProjectsAwaitingCompletionTimeout(timeoutDays: number): Promise<Project[]> {
+  await connectToDatabase();
+  const cutoff = new Date(Date.now() - timeoutDays * 24 * 60 * 60 * 1000);
+  const docs = await ProjectModel.find({
+    executionStatus: "awaiting_completion",
+    completionRequestedAt: { $lte: cutoff },
+  })
+    .sort({ completionRequestedAt: 1 })
+    .lean();
+  return docs.map((p) => serializeProject(p as unknown as Raw));
+}
+
 export async function getProjectWithMilestones(id: string): Promise<ProjectWithMilestones | null> {
   const project = await getProject(id);
   if (!project) return null;

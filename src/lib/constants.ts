@@ -30,6 +30,13 @@ export const MILESTONE_RATING_LABEL = "Quality of Deliverables";
  */
 export const RATING_SELF_CORRECTION_HOURS = 48;
 
+/**
+ * Spec §6.8 / §10: if the client has not confirmed completion within this many
+ * days of the vendor's request, an admin can force-complete. Reuses the existing
+ * EOS endorsement-link expiry window.
+ */
+export const COMPLETION_TIMEOUT_DAYS = 7;
+
 export const PROJECT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Active",
   ON_HOLD: "On Hold",

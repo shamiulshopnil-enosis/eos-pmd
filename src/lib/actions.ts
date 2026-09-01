@@ -8,16 +8,19 @@ import { getProject } from "./data";
 import { applyInvitationAcceptance } from "./invitations";
 import {
   assertPermission,
+  canConfirmCompletion,
   canEditMilestone,
   canInviteCollaborator,
   canInviteTeammate,
   canManageProject,
   canRateMilestone,
+  canRequestCompletion,
   canSendMilestone,
 } from "./permissions";
 import { ActivityModel, InvitationModel, MilestoneModel, ProjectModel } from "./models";
 import { sanitizeMilestoneHtml } from "./richtext";
-import { RATING_SELF_CORRECTION_HOURS } from "./constants";
+import { runningAverage } from "./scoring";
+import { COMPLETION_TIMEOUT_DAYS, minReviewThreshold, RATING_SELF_CORRECTION_HOURS } from "./constants";
 import type { ActivityType, Project } from "./types";
 import type { SessionUser } from "./session";
 
@@ -75,6 +78,33 @@ async function requirePermission(
   if (!project) throw new Error("Project not found.");
   assertPermission(check(user, project), message);
   return { user, project };
+}
+
+/**
+ * Keep the project's stored score fields in sync (Milestones plan, Phase 5 —
+ * spec §6.6). Called after any change to the reviewed set or the milestone count.
+ * `finalScore` is only touched at completion (Phase 6).
+ */
+async function recomputeProjectScore(projectId: string): Promise<void> {
+  const milestones = await MilestoneModel.find({ projectId }).select("status rating").lean();
+  const reviewed = milestones.filter((m) => m.status === "reviewed" && m.rating != null);
+  await ProjectModel.updateOne(
+    { _id: projectId },
+    {
+      $set: {
+        liveScore: runningAverage(milestones),
+        reviewedMilestoneCount: reviewed.length,
+        minReviewThreshold: minReviewThreshold(milestones.length),
+      },
+    },
+  );
+}
+
+/** After completion, a project's milestones and ratings are locked (spec §6.8). */
+function assertActiveProject(project: Project): void {
+  if (project.executionStatus === "completed") {
+    throw new Error("This project is completed. Its milestones and ratings are locked.");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +186,7 @@ export async function createProject(formData: FormData) {
       status: "draft",
     });
   }
+  await recomputeProjectScore(projectId);
 
   await logActivity({
     projectId,
@@ -271,7 +302,8 @@ export async function setProjectStatus(projectId: string, formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function createMilestone(projectId: string, formData: FormData) {
-  await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.create({
@@ -283,6 +315,7 @@ export async function createMilestone(projectId: string, formData: FormData) {
   });
 
   const milestoneId = String(milestone._id);
+  await recomputeProjectScore(projectId);
 
   await logActivity({
     projectId,
@@ -297,7 +330,8 @@ export async function createMilestone(projectId: string, formData: FormData) {
 }
 
 export async function updateMilestone(projectId: string, milestoneId: string, formData: FormData) {
-  await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -320,7 +354,8 @@ export async function updateMilestone(projectId: string, milestoneId: string, fo
 }
 
 export async function deleteMilestone(projectId: string, milestoneId: string) {
-  await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -329,12 +364,12 @@ export async function deleteMilestone(projectId: string, milestoneId: string) {
     throw new Error("This milestone is locked while it is with the client for review.");
   }
 
-  const project = await ProjectModel.findById(projectId).select("projectType");
-  if (project?.projectType === "whole") {
+  if (project.projectType === "whole") {
     throw new Error("A Whole Project must always keep its single milestone.");
   }
 
   await MilestoneModel.findByIdAndDelete(milestoneId);
+  await recomputeProjectScore(projectId);
   await logActivity({ projectId, type: "RELEASE_UPDATED", message: `Milestone "${milestone.title}" removed` });
 
   revalidatePath(`/projects/${projectId}`);
@@ -344,7 +379,8 @@ export async function deleteMilestone(projectId: string, milestoneId: string) {
 
 /** Move a draft milestone to the client for review. One milestone per project at a time (spec §5.3). */
 export async function sendMilestoneForReview(projectId: string, milestoneId: string) {
-  await requirePermission(projectId, canSendMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canSendMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -379,7 +415,8 @@ export async function sendMilestoneForReview(projectId: string, milestoneId: str
 
 /** Pull a milestone back from the client before it has been reviewed (mirrors "Cancel Endorsement Request"). */
 export async function reopenMilestone(projectId: string, milestoneId: string) {
-  await requirePermission(projectId, canSendMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canSendMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -425,7 +462,8 @@ function revalidateReview(projectId: string, milestoneId: string) {
 
 /** Primary Contact submits the one-and-only rating for the milestone that is with them. */
 export async function submitMilestoneRating(projectId: string, milestoneId: string, formData: FormData) {
-  await requirePermission(projectId, canRateMilestone, "Only the primary client contact can rate milestones.");
+  const { project } = await requirePermission(projectId, canRateMilestone, "Only the primary client contact can rate milestones.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -440,6 +478,7 @@ export async function submitMilestoneRating(projectId: string, milestoneId: stri
   milestone.ratingSubmittedAt = now;
   milestone.reviewedAt = now;
   await milestone.save();
+  await recomputeProjectScore(projectId);
 
   await logActivity({
     projectId,
@@ -456,7 +495,8 @@ export async function submitMilestoneRating(projectId: string, milestoneId: stri
  * window, or any time after the vendor has requested a reconsideration.
  */
 export async function editOwnMilestoneRating(projectId: string, milestoneId: string, formData: FormData) {
-  await requirePermission(projectId, canRateMilestone, "Only the primary client contact can edit this rating.");
+  const { project } = await requirePermission(projectId, canRateMilestone, "Only the primary client contact can edit this rating.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -474,6 +514,7 @@ export async function editOwnMilestoneRating(projectId: string, milestoneId: str
   milestone.rating = rating;
   milestone.comment = optStr(formData, "comment");
   await milestone.save();
+  await recomputeProjectScore(projectId);
 
   await logActivity({
     projectId,
@@ -490,7 +531,8 @@ export async function editOwnMilestoneRating(projectId: string, milestoneId: str
  * (spec §6.5) — the client always makes the final call.
  */
 export async function requestRatingReconsideration(projectId: string, milestoneId: string) {
-  await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  const { project } = await requirePermission(projectId, canEditMilestone, "You are not a member of this project's vendor team.");
+  assertActiveProject(project);
   await connectToDatabase();
 
   const milestone = await MilestoneModel.findById(milestoneId);
@@ -511,6 +553,104 @@ export async function requestRatingReconsideration(projectId: string, milestoneI
   });
 
   revalidateReview(projectId, milestoneId);
+}
+
+// ---------------------------------------------------------------------------
+// Completion (Milestones plan, Phase 6 — spec §5.2, §6.8)
+// ---------------------------------------------------------------------------
+
+function revalidateCompletion(projectId: string) {
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/my-projects/${projectId}`);
+  revalidatePath("/my-projects");
+  revalidatePath("/projects");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/projects");
+}
+
+/** Step 1 (spec §6.8): vendor Owner asks the client to confirm the project is delivered. */
+export async function requestCompletion(projectId: string) {
+  const { project } = await requirePermission(projectId, canRequestCompletion, "Only a project owner can request completion.");
+  await connectToDatabase();
+
+  if (project.executionStatus !== "ongoing") {
+    throw new Error("Completion can only be requested while the project is ongoing.");
+  }
+  const sent = await MilestoneModel.exists({ projectId, status: "sent" });
+  if (sent) {
+    throw new Error("A milestone is still with the client. Wait for that review before requesting completion.");
+  }
+
+  await ProjectModel.findByIdAndUpdate(projectId, {
+    executionStatus: "awaiting_completion",
+    completionRequestedAt: new Date(),
+  });
+  await logActivity({
+    projectId,
+    type: "PROJECT_UPDATED",
+    message: "Vendor requested project completion — awaiting client confirmation",
+  });
+
+  revalidateCompletion(projectId);
+}
+
+/** Step 2 (spec §6.8): the client's Primary Contact confirms; the running average locks in. */
+export async function confirmCompletion(projectId: string) {
+  await requirePermission(projectId, canConfirmCompletion, "Only the primary client contact can confirm completion.");
+  await connectToDatabase();
+
+  await recomputeProjectScore(projectId);
+  const doc = await ProjectModel.findById(projectId);
+  if (!doc) throw new Error("Project not found.");
+  if (doc.executionStatus !== "awaiting_completion") {
+    throw new Error("This project is not awaiting completion confirmation.");
+  }
+
+  doc.executionStatus = "completed";
+  doc.completionConfirmedByClient = true;
+  doc.finalScore = doc.liveScore ?? null;
+  await doc.save();
+
+  await logActivity({
+    projectId,
+    type: "PROJECT_COMPLETED",
+    message: `Client confirmed completion — final score locked${doc.finalScore != null ? ` at ${doc.finalScore.toFixed(1)}` : " (unrated)"}`,
+  });
+
+  revalidateCompletion(projectId);
+}
+
+/** Step 3 (spec §6.8): after the timeout window, an admin force-completes using whatever ratings exist. */
+export async function forceCompleteProject(projectId: string) {
+  await requireUser("admin");
+  await connectToDatabase();
+
+  await recomputeProjectScore(projectId);
+  const doc = await ProjectModel.findById(projectId);
+  if (!doc) throw new Error("Project not found.");
+  if (doc.executionStatus !== "awaiting_completion") {
+    throw new Error("This project is not awaiting completion.");
+  }
+  const cutoff = Date.now() - COMPLETION_TIMEOUT_DAYS * 24 * 60 * 60 * 1000;
+  if (!doc.completionRequestedAt || doc.completionRequestedAt.getTime() > cutoff) {
+    throw new Error(`The client still has time to respond (${COMPLETION_TIMEOUT_DAYS}-day window).`);
+  }
+
+  doc.executionStatus = "completed";
+  doc.completionForcedByAdmin = true;
+  doc.finalScore = doc.liveScore ?? null;
+  await doc.save();
+
+  await logActivity({
+    projectId,
+    type: "PROJECT_COMPLETED",
+    message: `Admin force-completed after the ${COMPLETION_TIMEOUT_DAYS}-day timeout${
+      doc.finalScore != null ? ` — final score ${doc.finalScore.toFixed(1)}` : " (unrated)"
+    }`,
+  });
+
+  revalidateCompletion(projectId);
+  revalidatePath(`/admin/projects/${projectId}`);
 }
 
 // ---------------------------------------------------------------------------

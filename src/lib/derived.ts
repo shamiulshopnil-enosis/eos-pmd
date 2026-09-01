@@ -1,10 +1,11 @@
 // Derived indicators and metric calculations. Pure functions over plain data so
 // they're easy to reuse between server components, server actions, and the
-// dashboard. Milestones plan, Phase 2: these now run off Milestone data (single
-// `rating` per milestone) instead of the old per-release FeedbackRequest. The
-// PCS / public-threshold layer arrives in Phase 5.
+// dashboard. Milestones plan, Phase 2: these run off Milestone data (single
+// `rating` per milestone). The running-average / public-threshold definitions
+// live in ./scoring (Phase 5); this module composes them into UI-shaped views.
 
 import type { Milestone, ProjectWithMilestones } from "./types";
+import { runningAverage } from "./scoring";
 import {
   AT_RISK_RATING_THRESHOLD,
   CLIENT_HEALTH_LABELS,
@@ -78,7 +79,7 @@ export interface ProjectPerformance {
 export function computeProjectPerformance(project: ProjectWithMilestones): ProjectPerformance {
   const reviewed = reviewedMilestones(project);
   const ratings = reviewed.map((m) => m.rating as number);
-  const avgRating = average(ratings);
+  const avgRating = runningAverage(project.milestones);
   const latestRating = ratings[0] ?? null;
   const previousRating = ratings[1] ?? null;
 

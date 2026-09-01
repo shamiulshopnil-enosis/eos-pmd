@@ -181,7 +181,9 @@ async function main() {
     ...people("dana.okafor@northpeak.example", "Dana Okafor"),
     projectType: "milestone",
     adminStatus: "published",
-    executionStatus: "ongoing",
+    // Vendor requested completion 8 days ago; client hasn't confirmed -> admin timeout queue (spec §6.8).
+    executionStatus: "awaiting_completion",
+    completionRequestedAt: daysAgo(8),
     minReviewThreshold: 1,
   });
 
@@ -297,9 +299,27 @@ async function main() {
     message: `Project "${p4.name}" created for ${p4.clientCompanyName}`,
   });
 
+  // Keep the stored score fields in sync with the seeded milestones (Phase 5).
+  for (const p of [p1, p2, p3, p4]) {
+    const ms = await MilestoneModel.find({ projectId: p._id }).select("status rating").lean();
+    const reviewed = ms.filter((m) => m.status === "reviewed" && m.rating != null);
+    await ProjectModel.updateOne(
+      { _id: p._id },
+      {
+        $set: {
+          liveScore: reviewed.length
+            ? reviewed.reduce((s, m) => s + (m.rating as number), 0) / reviewed.length
+            : null,
+          reviewedMilestoneCount: reviewed.length,
+          minReviewThreshold: Math.min(2, Math.ceil(0.25 * ms.length)),
+        },
+      },
+    );
+  }
+
   console.log("Seed complete:");
   console.log(`  ${p1.name} (published, milestone 4 with the client)`);
-  console.log(`  ${p2.name} (declining / at-risk, milestone 3 overdue)`);
+  console.log(`  ${p2.name} (declining / at-risk; completion requested 8 days ago, awaiting client)`);
   console.log(`  ${p3.name} (completed, strong history)`);
   console.log(`  ${p4.name} (empty, pending admin approval)`);
 }
