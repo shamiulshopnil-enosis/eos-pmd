@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EOS Performance Monitoring & Release-Based Client Feedback — MVP
 
-## Getting Started
+A working prototype of the workflow described in [`PRD.md`](./PRD.md) §31 (MVP Scope):
+private project → release → client feedback request → client evaluation (no login) →
+Performance Monitoring Dashboard → optional publish to a public project page.
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router) + TypeScript + Prisma 7 + SQLite (`better-sqlite3` driver
+adapter) + Tailwind CSS 4. Server Components for reads, Server Actions for every
+mutation — no separate REST/API layer.
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:seed   # resets dev.db to a demo dataset (4 projects, mixed statuses)
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run build` runs a production build; `npx prisma studio` opens a DB browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What's in the demo data
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run `npm run db:seed` any time to reset to this state:
 
-## Learn More
+- **E-commerce Platform Development** (Gravity77 Pty Ltd) — 5 releases, already
+  **published**. Open `/feedback/demo-pending-feedback` to submit a live client
+  evaluation for its release awaiting feedback and watch the dashboard update.
+- **Internal Tools Revamp** (NorthPeak Logistics) — declining ratings, one
+  overdue release. Drives the At-Risk / declining-satisfaction alerts.
+- **Marketing Site Redesign** (BrightWave Media) — completed, consistently
+  5-star history.
+- **New Client Onboarding Portal** (Delta Freight Co) — no releases yet, to
+  show the empty states (PRD §29).
 
-To learn more about Next.js, take a look at the following resources:
+## Scope notes (read alongside PRD.md)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This is a **single-vendor prototype with no authentication** — there's no
+company/user/role model, just the workflow itself. Everything under
+[`src/app/(vendor)`](./src/app/(vendor)) is the vendor-facing app (dashboard,
+projects, releases); [`src/app/feedback`](./src/app/feedback) is the
+client-facing, unauthenticated evaluation flow, deliberately outside the
+vendor nav shell.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+"Sending" a feedback request doesn't send email — there's no SMTP configured,
+so the release page shows the secure `/feedback/[token]` link directly for you
+to copy, which stands in for the email invitation in PRD §9.
 
-## Deploy on Vercel
+Publishing (PRD §18–21) is implemented as a visibility flag plus a handful of
+extra `public*` fields on `Project`, previewed at `/projects/[id]/public-preview`
+in the layout described in `PRD.md` Appendix A.2. It does not touch a real
+public directory, Explore Projects, PCS scoring, or the existing Client
+Endorsement feature — those belong to the existing EOS product this feature
+extends, which this prototype doesn't have access to.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See inline `PRD §N` comments throughout `prisma/schema.prisma` and
+`src/lib/*.ts` for where each requirement is implemented.

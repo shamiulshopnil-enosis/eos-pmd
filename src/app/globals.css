@@ -24,3 +24,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* CSS-only 1-5 star rating (see RatingInput.tsx). Relies on real DOM sibling
+   order (radios rendered 5→1, then visually flipped), so it works for any
+   field name without Tailwind needing to know the class ahead of time. */
+.star-rating {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  gap: 0.25rem;
+}
+.star-rating label {
+  cursor: pointer;
+  font-size: 1.875rem;
+  line-height: 1;
+  color: #cbd5e1;
+}
+@media (prefers-color-scheme: dark) {
+  .star-rating label {
+    color: #334155;
+  }
+}
+.star-rating input:checked ~ label {
+  color: #fbbf24;
+}
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+  color: #fcd34d;
+}

@@ -1,0 +1,165 @@
+// EOS Performance Monitoring & Release-Based Client Feedback — MVP schema
+// See ../PRD.md for the full requirements this implements (MVP scope: PRD §31).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum ProjectVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum ReleaseStatus {
+  DRAFT
+  IN_PROGRESS
+  DELIVERED
+  FEEDBACK_REQUESTED
+  REVIEWED
+  CLOSED
+}
+
+enum FeedbackRequestStatus {
+  PENDING
+  COMPLETED
+}
+
+enum ActivityType {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  RELEASE_CREATED
+  RELEASE_UPDATED
+  RELEASE_DELIVERED
+  FEEDBACK_REQUESTED
+  FEEDBACK_REMINDER_SENT
+  FEEDBACK_RECEIVED
+  PROJECT_COMPLETED
+  PUBLICATION_REQUESTED
+  PROJECT_PUBLISHED
+}
+
+/// Private client project (PRD §5). Public projects are out of scope for this
+/// prototype — see PRD §18-21 for the conversion workflow this leaves room for.
+model Project {
+  id                     String            @id @default(cuid())
+  name                   String
+  clientCompanyName      String
+  clientContactName      String?
+  clientEmail            String
+  services               String? // comma-separated tags for MVP simplicity
+  description            String?
+  startDate              DateTime?
+  expectedCompletionDate DateTime?
+  actualCompletionDate   DateTime?
+  status                 ProjectStatus     @default(ACTIVE)
+  teamSize               Int?
+  engagementModel        String?
+  internalRef            String?
+  projectUrl             String?
+  visibility             ProjectVisibility @default(PRIVATE)
+
+  // --- Publication (PRD §18-21): additional fields only needed once a vendor
+  // chooses to convert this private project into a public one. Individual
+  // release ratings/comments are never copied here — only the aggregate
+  // "Verified Delivery Performance" summary is eligible for display, and only
+  // once publicPerformanceConsent is recorded. ---
+  publicSummary            String?
+  publicKeyChallenges      String?
+  publicSolution           String?
+  publicOutcome            String?
+  publicTechStack          String?
+  publicPlatforms          String?
+  publicBudget             String?
+  publicImageUrl           String?
+  publicPerformanceConsent Boolean   @default(false)
+  publishedAt              DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  releases   Release[]
+  activities Activity[]
+}
+
+/// A delivery/milestone within a project (PRD §7).
+model Release {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name                String
+  versionLabel        String?
+  description         String?
+  objectives          String?
+  deliverables        String?
+  plannedDeliveryDate DateTime?
+  actualDeliveryDate  DateTime?
+  startDate           DateTime?
+  status              ReleaseStatus @default(DRAFT)
+  demoUrl             String?
+  internalNotes       String? // never exposed to client (PRD §24)
+  clientFacingNotes   String?
+  teamSize            Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  feedbackRequest FeedbackRequest?
+  activities      Activity[]
+}
+
+/// One feedback cycle per release: the secure client invitation (PRD §9) and,
+/// once submitted, the evaluation itself (PRD §10-11). Kept as a single row
+/// per release since only one feedback cycle is active per release at a time;
+/// resending regenerates the token and increments remindersSent rather than
+/// creating a new row, so a vendor can never overwrite a submitted rating.
+model FeedbackRequest {
+  id        String  @id @default(cuid())
+  releaseId String  @unique
+  release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  clientEmail   String
+  token         String                @unique
+  status        FeedbackRequestStatus @default(PENDING)
+  sentAt        DateTime              @default(now())
+  remindersSent Int                   @default(0)
+  completedAt   DateTime?
+
+  // --- Evaluation, filled only by the client on submit (PRD §10-11) ---
+  overallSatisfaction         Int?
+  qualityOfDeliverables       Int?
+  timeliness                  Int?
+  communication               Int?
+  understandingOfRequirements Int?
+  deliveryAgainstScope        Int?
+  wouldContinue               Int?
+  comments                    String?
+  reviewerEmail               String?
+  verified                    Boolean @default(true)
+  flagged                     Boolean @default(false)
+}
+
+/// Append-only audit trail (PRD §26).
+model Activity {
+  id        String       @id @default(cuid())
+  projectId String
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  releaseId String?
+  release   Release?     @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  type      ActivityType
+  message   String
+  createdAt DateTime     @default(now())
+}
