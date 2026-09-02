@@ -13,9 +13,7 @@ import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
 import {
   PROJECT_STATUS_LABELS,
-  ACTIVITY_LABELS,
   CAPSTONE_TIER_LABELS,
-  MILESTONE_RATING_LABEL,
   RATING_SELF_CORRECTION_HOURS,
 } from "@/lib/constants";
 import {
@@ -40,12 +38,13 @@ import {
   ProjectStatusBadge,
   ProjectTypeBadge,
   SectionHeading,
-  StarRating,
 } from "@/components/ui";
 import { Select } from "@/components/form";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 import MilestoneReviewForm from "@/components/MilestoneReviewForm";
+import ActivityLogModal from "@/components/ActivityLogModal";
+import ProjectMilestoneTable from "@/components/ProjectMilestoneTable";
 
 const WINDOW_MS = RATING_SELF_CORRECTION_HOURS * 60 * 60 * 1000;
 const withinCorrectionWindow = (at: Date | null) =>
@@ -65,7 +64,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!del && !rev && user.role !== "admin") notFound();
 
   const perf = computeProjectPerformance(project);
-  const reviewedMilestones = project.milestones.filter(isMilestoneReviewed);
   const isWhole = project.projectType === "whole";
 
   return (
@@ -91,12 +89,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         back={{ href: "/projects", label: "Back to Projects" }}
         action={
           <div className="flex flex-wrap gap-2">
+            <ActivityLogModal activities={project.activities} />
             {delLead || revLead ? (
               <Link
                 href={`/projects/${project.id}/team`}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Manage Team
+                Manage People
               </Link>
             ) : null}
             {delLead ? (
@@ -311,48 +310,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             actionLabel={del && !isWhole ? "Add Milestone" : undefined}
           />
         ) : del ? (
-          <Card className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Milestone</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Target Date</th>
-                  <th className="px-4 py-3 font-medium">Reviewed</th>
-                  <th className="px-4 py-3 font-medium text-right">Rating</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {project.milestones.map((milestone) => (
-                  <tr key={milestone.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/projects/${project.id}/milestones/${milestone.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        {milestone.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <MilestoneStatusBadge status={milestone.status} />
-                        <FlagBadge flag={getMilestoneFlag(milestone)} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(milestone.targetDate)}</td>
-                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(milestone.reviewedAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {isMilestoneReviewed(milestone) ? (
-                        <StarRating value={milestone.rating} />
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+          <ProjectMilestoneTable projectId={project.id} milestones={project.milestones} />
         ) : (
           <div className="space-y-3">
             {project.milestones.map((m) => {
@@ -369,7 +327,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       <MilestoneStatusBadge status={m.status} />
                       <FlagBadge flag={getMilestoneFlag(m)} />
                     </span>
-                    <span className="text-xs text-slate-400">Target {formatDate(m.targetDate)}</span>
+                    <span className="text-xs text-slate-400">
+                      {m.startDate ? `${formatDate(m.startDate)} – ` : ""}
+                      Due {formatDate(m.dueDate)}
+                    </span>
                   </div>
 
                   {m.description ? (
@@ -475,63 +436,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
       ) : null}
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {del ? (
-          <div>
-            <SectionHeading>Client Review History</SectionHeading>
-            {reviewedMilestones.length === 0 ? (
-              <EmptyState
-                title="No client ratings yet"
-                description="Send a milestone for client review to start measuring client satisfaction."
-              />
-            ) : (
-              <div className="space-y-3">
-                {reviewedMilestones.map((milestone) => (
-                  <Card key={milestone.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-800 dark:text-slate-100">{milestone.title}</span>
-                      <StarRating value={milestone.rating} />
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400">{MILESTONE_RATING_LABEL}</div>
-                    {milestone.comment ? (
-                      <p className="mt-2 text-sm italic text-slate-600 dark:text-slate-300">
-                        &ldquo;{milestone.comment}&rdquo;
-                      </p>
-                    ) : null}
-                    <div className="mt-2 text-xs text-slate-400">Reviewed {formatDateTime(milestone.reviewedAt)}</div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        <div className={del ? "" : "lg:col-span-2"}>
-          <SectionHeading>Activity History</SectionHeading>
-          <Card className="p-4">
-            {project.activities.length === 0 ? (
-              <p className="text-sm text-slate-400">No activity yet.</p>
-            ) : (
-              <ol className="space-y-3">
-                {project.activities.map((a) => (
-                  <li key={a.id} className="text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-700 dark:text-slate-200">
-                        {ACTIVITY_LABELS[a.type] ?? a.type}
-                      </span>
-                      <span className="text-xs text-slate-400">{formatDateTime(a.createdAt)}</span>
-                    </div>
-                    <div className="text-slate-500 dark:text-slate-400">
-                      {a.message}
-                      {a.milestone ? <span className="text-slate-400"> · {a.milestone.title}</span> : null}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

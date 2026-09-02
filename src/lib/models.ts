@@ -73,8 +73,9 @@ const capstoneEndorsementSchema = new Schema(
   { _id: false },
 );
 
-// Team Management feature — vendor-owned people directory, named teams over it,
-// and a global client-company directory. Kept in sync with api/src/schemas.
+// Legacy directories — kept registered so the numbered offline migrations
+// (scripts/migrations) can still read/rename old rows. The live app no longer
+// uses these; see the Company / CompanyMember models below.
 const VENDOR_MEMBER_ROLE = ["owner", "member"] as const;
 
 const vendorMemberSchema = new Schema(
@@ -126,10 +127,13 @@ const companyMemberSchema = new Schema(
 );
 companyMemberSchema.index({ companyId: 1, email: 1 }, { unique: true });
 
+// Legacy — the Teams concept was removed (migration 011 flattens team members
+// onto each project and drops the collection). Kept registered only so the
+// pre-011 migrations that touch `teams` still compile.
 const teamSchema = new Schema(
   {
     companyId: { type: Schema.Types.ObjectId, ref: "Company", index: true },
-    ownerUserId: { type: Schema.Types.ObjectId, ref: "User" }, // legacy
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User" },
     name: { type: String, required: true, trim: true },
     memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
   },
@@ -174,9 +178,7 @@ const projectSchema = new Schema(
     clientContacts: { type: [clientContactSchema], default: [] },
 
     // --- company-unification live-reference staffing (delivery + receiving) ---
-    assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
     assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
-    receivingTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
     receivingMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
 
     // --- Milestones plan, Phase 7 ---
@@ -238,7 +240,8 @@ const milestoneSchema = new Schema(
     title: { type: String, required: true }, // plain text
     description: { type: String, default: "" }, // sanitized rich-text HTML (bold + lists)
     url: { type: String, default: null }, // optional link
-    targetDate: { type: Date, default: null },
+    startDate: { type: Date, default: null },
+    dueDate: { type: Date, default: null },
     status: { type: String, enum: MILESTONE_STATUS, default: "draft" },
     assignees: { type: [milestoneAssigneeSchema], default: [] },
     attachments: { type: [milestoneAttachmentSchema], default: [] },

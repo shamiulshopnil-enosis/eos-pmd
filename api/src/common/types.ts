@@ -51,16 +51,6 @@ export interface CompanyMember {
   updatedAt: Date;
 }
 
-export interface Team {
-  id: string;
-  companyId: string;
-  name: string;
-  memberIds: string[];
-  members: CompanyMember[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 /**
  * The requesting user's derived access to a project (company-unification PR2).
  * Attached to a serialized Project when a user context is available.
@@ -68,8 +58,8 @@ export interface Team {
 export interface ProjectAccess {
   deliveryRole: CompanyRole | null; // user's role in deliveringCompanyId
   reviewRole: CompanyRole | null; // user's role in receivingCompanyId
-  assignedDelivery: boolean; // on an assigned delivery team / individually assigned
-  assignedReview: boolean; // on an assigned review team / individually assigned
+  assignedDelivery: boolean; // individually assigned on the delivery side
+  assignedReview: boolean; // individually assigned on the review side
 }
 
 export interface Project {
@@ -106,10 +96,8 @@ export interface Project {
 
   vendorTeam: VendorTeamMember[]; // effective delivery people (resolved)
   clientContacts: ClientContact[]; // effective review people (resolved)
-  assignedTeamIds: string[];
-  assignedMemberIds: string[];
-  receivingTeamIds: string[];
-  receivingMemberIds: string[];
+  assignedMemberIds: string[]; // delivering-company people on the project
+  receivingMemberIds: string[]; // receiving-company people on the project
   myAccess?: ProjectAccess;
   capstone: CapstoneEndorsement | null;
 
@@ -162,7 +150,8 @@ export interface Milestone {
   title: string;
   description: string;
   url: string | null;
-  targetDate: Date | null;
+  startDate: Date | null;
+  dueDate: Date | null;
   status: MilestoneStatus;
   assignees: MilestoneAssignee[];
   attachments: MilestoneAttachment[];

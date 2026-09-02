@@ -175,7 +175,8 @@ export class MilestonesService {
       title: str(body, "title"),
       description: sanitizeMilestoneHtml(str(body, "description")),
       url: optStr(body, "url"),
-      targetDate: optDate(body, "targetDate"),
+      startDate: optDate(body, "startDate"),
+      dueDate: optDate(body, "dueDate"),
       assignees: this.resolveAssignees(project, strList(body, "assigneeEmails")),
       status: "draft",
     });
@@ -215,7 +216,8 @@ export class MilestonesService {
     existing.title = str(body, "title");
     existing.description = sanitizeMilestoneHtml(str(body, "description"));
     existing.url = optStr(body, "url");
-    existing.targetDate = optDate(body, "targetDate");
+    existing.startDate = optDate(body, "startDate");
+    existing.dueDate = optDate(body, "dueDate");
     if (body.assigneeEmails !== undefined) {
       existing.assignees = this.resolveAssignees(project, strList(body, "assigneeEmails"));
     }

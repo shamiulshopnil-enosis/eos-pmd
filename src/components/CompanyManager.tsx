@@ -1,29 +1,24 @@
 import {
   addCompanyMember,
-  createTeam,
-  deleteTeam,
   removeCompanyMember,
   renameCompany,
   updateCompanyMember,
-  updateTeam,
 } from "@/lib/actions";
-import type { Company, CompanyMember, Team } from "@/lib/types";
-import { Badge, Card, EmptyState, SectionHeading } from "@/components/ui";
+import type { Company, CompanyMember } from "@/lib/types";
+import { Badge, Card, SectionHeading } from "@/components/ui";
 import { Field, Select, TextInput } from "@/components/form";
 
 /**
- * People + teams management for one company. Rendered on both the vendor
- * ("My Company") and client ("Company") workspaces — the actions and
- * shape are identical, only the surrounding layout differs.
+ * People management for one company — the company's directory of members.
+ * Rendered on the "My Company" workspace. Individual people are assigned to
+ * projects from the project's own People page.
  */
 export default function CompanyManager({
   company,
   members,
-  teams,
 }: {
   company: Company;
   members: CompanyMember[];
-  teams: Team[];
 }) {
   return (
     <>
@@ -44,7 +39,7 @@ export default function CompanyManager({
         </form>
       </Card>
 
-      <Card className="mb-6 p-5">
+      <Card className="p-5">
         <SectionHeading>People</SectionHeading>
         {members.length === 0 ? (
           <p className="mb-4 text-sm text-slate-400">No people yet. Add your first teammate below.</p>
@@ -119,90 +114,10 @@ export default function CompanyManager({
             Add person
           </button>
         </form>
-      </Card>
-
-      <Card className="p-5">
-        <SectionHeading>Teams</SectionHeading>
-        {teams.length === 0 ? (
-          <EmptyState
-            title="No teams yet"
-            description="Create a team below and pick its members. You can assign a whole team to a project."
-          />
-        ) : (
-          <ul className="mb-6 space-y-4">
-            {teams.map((team) => (
-              <li key={team.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-                <form action={updateTeam.bind(null, team.id)} className="space-y-3">
-                  <input type="hidden" name="memberIds" value="" />
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div className="w-64">
-                      <Field label="Team name" required>
-                        <TextInput name="name" required defaultValue={team.name} />
-                      </Field>
-                    </div>
-                    <button type="submit" className="text-xs font-medium text-blue-600 hover:underline">
-                      Save changes
-                    </button>
-                  </div>
-                  {members.length === 0 ? (
-                    <p className="text-xs text-slate-400">Add people above to staff this team.</p>
-                  ) : (
-                    <fieldset className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                      {members.map((m) => (
-                        <label
-                          key={m.id}
-                          className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
-                        >
-                          <input
-                            type="checkbox"
-                            name="memberIds"
-                            value={m.id}
-                            defaultChecked={team.memberIds.includes(m.id)}
-                          />
-                          {m.name ? `${m.name} · ` : ""}
-                          {m.email}
-                        </label>
-                      ))}
-                    </fieldset>
-                  )}
-                </form>
-                <form action={deleteTeam.bind(null, team.id)} className="mt-2">
-                  <button
-                    type="submit"
-                    className="text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
-                  >
-                    Delete team
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <form action={createTeam} className="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <div className="w-64">
-            <Field label="New team name" required>
-              <TextInput name="name" required placeholder="e.g. Platform Squad" />
-            </Field>
-          </div>
-          {members.length > 0 ? (
-            <fieldset className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-              {members.map((m) => (
-                <label key={m.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                  <input type="checkbox" name="memberIds" value={m.id} />
-                  {m.name ? `${m.name} · ` : ""}
-                  {m.email}
-                </label>
-              ))}
-            </fieldset>
-          ) : null}
-          <button
-            type="submit"
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Create team
-          </button>
-        </form>
+        <p className="mt-3 text-xs text-slate-400">
+          A person becomes active the first time they sign in with this email. Assign people to
+          individual projects from each project&apos;s People page.
+        </p>
       </Card>
     </>
   );

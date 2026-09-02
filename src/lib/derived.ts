@@ -25,10 +25,10 @@ export type { ProjectWithMilestones } from "./types";
 export type MilestoneFlag = "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null;
 
 export function getMilestoneFlag(milestone: Milestone, now: Date = new Date()): MilestoneFlag {
-  // A target date can lapse while the milestone is still a draft or already with
+  // A due date can lapse while the milestone is still a draft or already with
   // the client (Milestones plan, Phase 8 — spec §8-style delivery signal).
-  if (milestone.targetDate && (milestone.status === "draft" || milestone.status === "sent")) {
-    const daysUntil = (new Date(milestone.targetDate).getTime() - now.getTime()) / MS_PER_DAY;
+  if (milestone.dueDate && (milestone.status === "draft" || milestone.status === "sent")) {
+    const daysUntil = (new Date(milestone.dueDate).getTime() - now.getTime()) / MS_PER_DAY;
     if (daysUntil < 0) return "OVERDUE";
     if (milestone.status === "draft" && daysUntil <= DUE_SOON_WINDOW_DAYS) return "DUE_SOON";
   }
