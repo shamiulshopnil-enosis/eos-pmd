@@ -1,25 +1,64 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Panel } from "primereact/panel";
+import { Button } from "primereact/button";
+import { Dropdown } from "primereact/dropdown";
+import { Calendar } from "primereact/calendar";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
+import { InputText } from "primereact/inputtext";
 
-// Shared building blocks for the live (client-side) filter panels on the
-// Projects and Milestones lists. Each control is uncontrolled-looking but driven
-// by the parent's filter state; changes apply instantly, no submit.
+// Shared building blocks for the live filter panels on the Projects and
+// Milestones lists. Every control is a PrimeReact widget; changes apply
+// instantly, no submit.
 
-export function FilterBar({ children, onClear, active }: { children: ReactNode; onClear: () => void; active: boolean }) {
+const fieldLabel = "text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted";
+
+export function FilterBar({
+  children,
+  onClear,
+  active,
+  count,
+}: {
+  children: ReactNode;
+  onClear: () => void;
+  active: boolean;
+  count?: number;
+}) {
   return (
-    <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/40">
-      {children}
-      {active ? (
-        <button
-          type="button"
-          onClick={onClear}
-          className="ml-auto self-center text-sm font-medium text-slate-500 hover:text-slate-700 hover:underline dark:hover:text-slate-300"
-        >
-          Clear all
-        </button>
-      ) : null}
-    </div>
+    <Panel
+      toggleable
+      collapsed={!active}
+      className="eos-filter-panel mb-5"
+      headerTemplate={(options) => (
+        <div className="flex items-center gap-2 px-3 py-2.5 text-sm">
+          <button type="button" className={options.togglerClassName} onClick={options.onTogglerClick}>
+            <span className={options.togglerIconClassName} />
+          </button>
+          <i className="pi pi-sliders-h text-ink-muted" />
+          <span className="font-medium text-ink">Filters</span>
+          {active ? (
+            <span className="font-mono text-xs tabular-nums text-link">
+              {typeof count === "number" ? `${count} active` : "active"}
+            </span>
+          ) : null}
+          {active ? (
+            <Button
+              type="button"
+              text
+              size="small"
+              className="ml-auto"
+              icon="pi pi-times"
+              label="Clear"
+              onClick={onClear}
+            />
+          ) : null}
+        </div>
+      )}
+    >
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">{children}</div>
+    </Panel>
   );
 }
 
@@ -37,15 +76,17 @@ export function FilterText({
   width?: string;
 }) {
   return (
-    <label className={`${width} text-xs font-medium text-slate-500 dark:text-slate-400`}>
+    <label className={`${width} ${fieldLabel}`}>
       {label}
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-      />
+      <IconField iconPosition="left" className="mt-1 block">
+        <InputIcon className="pi pi-search" />
+        <InputText
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full"
+        />
+      </IconField>
     </label>
   );
 }
@@ -64,22 +105,20 @@ export function FilterSelect({
   width?: string;
 }) {
   return (
-    <label className={`${width} text-xs font-medium text-slate-500 dark:text-slate-400`}>
+    <label className={`${width} ${fieldLabel}`}>
       {label}
-      <select
+      <Dropdown
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-      >
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
+        onChange={(e) => onChange(e.value ?? "")}
+        options={options.map(([v, l]) => ({ value: v, label: l }))}
+        className="mt-1 w-full"
+      />
     </label>
   );
 }
+
+const iso = (d: Date | null | undefined) =>
+  d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : "";
 
 export function FilterDateRange({
   label,
@@ -95,55 +134,28 @@ export function FilterDateRange({
   onTo: (v: string) => void;
 }) {
   return (
-    <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+    <div className={fieldLabel}>
       {label}
       <div className="mt-1 flex items-center gap-1">
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => onFrom(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        <Calendar
+          value={from ? new Date(from) : null}
+          onChange={(e) => onFrom(iso(e.value as Date | null))}
+          dateFormat="yy-mm-dd"
+          showButtonBar
+          placeholder="from"
+          className="w-36"
         />
-        <span className="text-slate-400">–</span>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => onTo(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        <span className="text-ink-muted">–</span>
+        <Calendar
+          value={to ? new Date(to) : null}
+          onChange={(e) => onTo(iso(e.value as Date | null))}
+          dateFormat="yy-mm-dd"
+          showButtonBar
+          placeholder="to"
+          className="w-36"
         />
       </div>
     </div>
-  );
-}
-
-export function SortHeader<K extends string>({
-  label,
-  sortKey,
-  active,
-  dir,
-  onSort,
-  align = "left",
-}: {
-  label: string;
-  sortKey: K;
-  active: boolean;
-  dir: "asc" | "desc";
-  onSort: (k: K) => void;
-  align?: "left" | "right";
-}) {
-  return (
-    <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : ""}`}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
-      >
-        {label}
-        <span className={active ? "text-slate-600 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"}>
-          {active ? (dir === "asc" ? "▲" : "▼") : "↕"}
-        </span>
-      </button>
-    </th>
   );
 }
 

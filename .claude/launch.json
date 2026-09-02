@@ -2,17 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "eos-pmd",
+      "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
-    },
-    {
-      "name": "eos-pmd-api",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "api",
-      "port": 4000
+      "runtimeArgs": ["run", "dev", "--", "-p", "3100"],
+      "port": 3100
     }
   ]
 }

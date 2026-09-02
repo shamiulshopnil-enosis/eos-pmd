@@ -7,6 +7,7 @@ import { CAPSTONE_ATTRIBUTE_POOL, MAX_CAPSTONE_ATTRIBUTES } from "@/lib/attribut
 import { CAPSTONE_TIER_LABELS } from "@/lib/constants";
 import { Card, PageHeader, SectionHeading } from "@/components/ui";
 import { Field, SubmitButton, TextArea } from "@/components/form";
+import { CheckboxGroup, SingleCheckbox } from "@/components/CheckboxField";
 
 export default async function CapstonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,20 +34,10 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
         <form action={submitCapstone.bind(null, id)} className="space-y-6">
           <div>
             <SectionHeading>Pick up to {MAX_CAPSTONE_ATTRIBUTES} attributes</SectionHeading>
-            <p className="mb-3 text-xs text-slate-400">
+            <p className="mb-3 text-xs text-ink-muted">
               These options reflect the project&apos;s final delivery score ({CAPSTONE_TIER_LABELS[capstone.tier]}).
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {pool.map((attr) => (
-                <label
-                  key={attr}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
-                >
-                  <input type="checkbox" name="attributes" value={attr} />
-                  <span>{attr}</span>
-                </label>
-              ))}
-            </div>
+            <CheckboxGroup name="attributes" options={pool} />
           </div>
 
           <Field label="Testimonial" required>
@@ -58,12 +49,11 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
             />
           </Field>
 
-          <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" name="anonymous" className="mt-0.5" />
-            <span>Publish this endorsement without my name or company.</span>
-          </label>
+          <SingleCheckbox name="anonymous">
+            Publish this endorsement without my name or company.
+          </SingleCheckbox>
 
-          <div className="border-t border-slate-100 pt-5 dark:border-slate-800">
+          <div className="border-t border-rule pt-5">
             <SubmitButton>Submit endorsement</SubmitButton>
           </div>
         </form>

@@ -1,11 +1,17 @@
+"use client";
+
+import { useState } from "react";
+import { RadioButton } from "primereact/radiobutton";
 import { MILESTONE_REVIEW_DIMENSIONS } from "@/lib/constants";
 import type { MilestoneReview } from "@/lib/types";
 import { Field, SubmitButton, TextArea } from "@/components/form";
 
 /**
  * The client milestone review form — the five Enosis feedback dimensions on
- * their labelled 5-point scales plus one overall comment. Submitted via a bound
- * server action (submit or edit-own).
+ * their labelled 5-point scales plus one overall comment. Each option is a
+ * PrimeReact <RadioButton> inside a full-width tappable row; the selected value
+ * for every dimension is mirrored into a hidden input so the bound server
+ * action still reads plain FormData.
  */
 export default function MilestoneReviewForm({
   action,
@@ -20,23 +26,44 @@ export default function MilestoneReviewForm({
   defaultReview?: MilestoneReview | null;
   defaultComment?: string;
 }) {
+  const [values, setValues] = useState<Record<string, number | null>>(() => {
+    const seed: Record<string, number | null> = {};
+    for (const dim of MILESTONE_REVIEW_DIMENSIONS) {
+      seed[dim.key] = defaultReview ? defaultReview[dim.key] : null;
+    }
+    return seed;
+  });
+
   return (
-    <form action={action} className="mt-3 space-y-5 border-t border-slate-100 pt-3 dark:border-slate-800">
-      {intro ? <p className="text-sm text-slate-500 dark:text-slate-400">{intro}</p> : null}
+    <form action={action} className="mt-3 space-y-6 border-t border-rule pt-4">
+      {intro ? <p className="text-sm text-ink-muted">{intro}</p> : null}
       {MILESTONE_REVIEW_DIMENSIONS.map((dim, i) => {
-        const current = defaultReview ? defaultReview[dim.key] : null;
+        const current = values[dim.key];
         return (
-          <fieldset key={dim.key} className="space-y-1.5">
-            <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              {i + 1}. {dim.question} <span className="text-rose-500">*</span>
+          <fieldset key={dim.key} className="space-y-2">
+            <input type="hidden" name={dim.key} value={current ?? ""} required />
+            <legend className="text-sm font-medium text-ink">
+              <span className="font-mono text-ink-muted">{i + 1}.</span> {dim.question}{" "}
+              <span className="text-rag-bad">*</span>
             </legend>
-            <div className="space-y-1">
+            <div className="grid gap-1.5 sm:grid-cols-5">
               {dim.options.map((opt, idx) => {
                 const value = 5 - idx;
+                const checked = current === value;
                 return (
-                  <label key={opt} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <input type="radio" name={dim.key} value={value} required defaultChecked={current === value} />
-                    {opt}
+                  <label
+                    key={opt}
+                    className={`flex cursor-pointer items-center gap-2 rounded-ledger border px-3 py-2.5 text-sm transition-colors sm:flex-col sm:gap-1.5 sm:px-2 sm:py-3 sm:text-center ${
+                      checked
+                        ? "border-ink bg-band font-medium text-ink"
+                        : "border-rule text-ink-muted hover:border-rule-strong hover:text-ink"
+                    }`}
+                  >
+                    <RadioButton
+                      checked={checked}
+                      onChange={() => setValues((v) => ({ ...v, [dim.key]: value }))}
+                    />
+                    <span className="leading-tight">{opt}</span>
                   </label>
                 );
               })}

@@ -21,13 +21,13 @@ export function LoginForm({ next }: { next: string }) {
       {onCodeStep ? (
         <>
           <input type="hidden" name="email" value={state.email ?? ""} />
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            We sent a 6-digit code to <span className="font-medium">{state.email}</span>.
+          <p className="text-sm text-ink-muted">
+            We sent a 6-digit code to <span className="font-medium text-ink">{state.email}</span>.
           </p>
           {state.devCode ? (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-sm text-ink-muted">
               No email is sent in this prototype. Your code is{" "}
-              <span className="font-mono font-semibold tracking-widest">{state.devCode}</span>.
+              <span className="font-mono text-base font-semibold tracking-[0.2em] text-ink">{state.devCode}</span>.
             </p>
           ) : null}
           <Field label="6-digit code" required>
@@ -39,6 +39,7 @@ export function LoginForm({ next }: { next: string }) {
               placeholder="000000"
               autoFocus
               required
+              className="font-mono tracking-[0.3em]"
             />
           </Field>
         </>
@@ -48,12 +49,12 @@ export function LoginForm({ next }: { next: string }) {
         </Field>
       )}
 
-      {state.error ? <p className="text-sm text-rose-600 dark:text-rose-400">{state.error}</p> : null}
+      {state.error ? <p className="text-sm text-rag-bad">{state.error}</p> : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         <SubmitButton>{pending ? "Working…" : onCodeStep ? "Sign in" : "Send code"}</SubmitButton>
         {onCodeStep ? (
-          <a href="/login" className="text-sm text-slate-500 hover:underline">
+          <a href="/login" className="text-sm text-link hover:text-link-strong">
             Use a different email
           </a>
         ) : null}

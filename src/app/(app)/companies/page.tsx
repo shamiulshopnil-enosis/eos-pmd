@@ -16,13 +16,13 @@ export default async function CompaniesPage() {
       <Card className="p-5">
         <SectionHeading>Directory ({all.length})</SectionHeading>
         {all.length === 0 ? (
-          <p className="text-sm text-slate-400">No companies yet.</p>
+          <p className="text-sm text-ink-muted">No companies yet.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+          <ul className="divide-y divide-rule text-sm">
             {all.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <div>
-                  <div className="font-medium text-slate-800 dark:text-slate-100">
+                  <div className="font-medium text-ink">
                     {o.name}
                     {o.id === mine.id ? (
                       <span className="ml-2">
@@ -31,7 +31,7 @@ export default async function CompaniesPage() {
                     ) : null}
                   </div>
                   {o.primaryContact ? (
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-xs text-ink-muted">
                       {o.primaryContact.name ? `${o.primaryContact.name} · ` : ""}
                       {o.primaryContact.email}
                     </div>

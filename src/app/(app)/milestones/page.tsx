@@ -14,10 +14,12 @@ export default async function MilestonesPage() {
       <div>
         <PageHeader title="Milestones" description="All milestones across every project." />
         <EmptyState
+          icon="flag"
           title="No milestones yet"
           description="Open a project and add its first milestone to start tracking delivery."
           actionHref="/projects"
-          actionLabel="Go to Projects"
+          actionLabel="Go to projects"
+          actionIcon="arrow_forward"
         />
       </div>
     );

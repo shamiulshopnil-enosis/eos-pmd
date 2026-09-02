@@ -6,6 +6,7 @@ import { canManageDeliveryStaffing, canManageReview } from "@/lib/permissions";
 import { setProjectStaffing, setReviewStaffing } from "@/lib/actions";
 import type { CompanyMember } from "@/lib/types";
 import { Badge, Card, PageHeader, SectionHeading } from "@/components/ui";
+import { SubmitButton } from "@/components/form";
 import PeoplePicker from "@/components/PeoplePicker";
 
 export default async function ProjectPeoplePage({ params }: { params: Promise<{ id: string }> }) {
@@ -58,7 +59,7 @@ export default async function ProjectPeoplePage({ params }: { params: Promise<{ 
       <Card className="p-5">
         <SectionHeading>Client Contacts (effective)</SectionHeading>
         {project.clientContacts.length === 0 ? (
-          <p className="text-sm text-slate-400">The client company has not staffed this project yet.</p>
+          <p className="text-sm text-ink-muted">The client company has not staffed this project yet.</p>
         ) : (
           <PeopleList people={project.clientContacts} leadTone="primary" />
         )}
@@ -82,9 +83,9 @@ function StaffingCard({
     <Card className="mb-6 p-5">
       <SectionHeading>{title}</SectionHeading>
       {members.length === 0 ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           Your company has no people yet.{" "}
-          <Link href="/team" className="text-blue-600 hover:underline">
+          <Link href="/team" className="text-link hover:underline">
             Add people under My Company
           </Link>
           .
@@ -92,12 +93,7 @@ function StaffingCard({
       ) : (
         <form action={action} className="space-y-3">
           <PeoplePicker members={members} name="memberIds" defaultSelectedIds={selectedMemberIds} />
-          <button
-            type="submit"
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Save
-          </button>
+          <SubmitButton>Save</SubmitButton>
         </form>
       )}
     </Card>
@@ -112,10 +108,10 @@ function PeopleList({
   leadTone: string;
 }) {
   return (
-    <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+    <ul className="divide-y divide-rule text-sm">
       {people.map((p) => (
         <li key={p.email} className="flex items-center justify-between py-2">
-          <span className="text-slate-700 dark:text-slate-200">
+          <span className="text-ink">
             {p.name ? `${p.name} · ` : ""}
             {p.email}
           </span>

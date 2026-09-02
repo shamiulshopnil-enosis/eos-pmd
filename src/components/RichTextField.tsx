@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Button } from "primereact/button";
 
 /**
  * Minimal rich-text editor for milestone descriptions: bold + bulleted list only.
@@ -32,14 +33,29 @@ export function RichTextField({
   const isEmpty = html.replace(/<[^>]*>/g, "").trim() === "";
 
   return (
-    <div className="rounded-lg border border-slate-300 dark:border-slate-700">
-      <div className="flex gap-1 border-b border-slate-200 p-1.5 dark:border-slate-700">
-        <ToolbarButton onClick={() => exec("bold")} label="Bold">
+    <div className="rounded-ledger border border-rule">
+      <div className="flex gap-1 border-b border-rule p-1.5">
+        <Button
+          type="button"
+          text
+          severity="secondary"
+          size="small"
+          aria-label="Bold"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => exec("bold")}
+        >
           <span className="font-bold">B</span>
-        </ToolbarButton>
-        <ToolbarButton onClick={() => exec("insertUnorderedList")} label="Bulleted list">
-          &#8226; List
-        </ToolbarButton>
+        </Button>
+        <Button
+          type="button"
+          text
+          severity="secondary"
+          size="small"
+          aria-label="Bulleted list"
+          label="• List"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => exec("insertUnorderedList")}
+        />
       </div>
       <div className="relative">
         <div
@@ -48,36 +64,14 @@ export function RichTextField({
           suppressContentEditableWarning
           onInput={sync}
           onBlur={sync}
-          className="prose-sm min-h-[120px] max-w-none px-3 py-2 text-sm text-slate-900 focus:outline-none dark:text-slate-100 [&_ul]:list-disc [&_ul]:pl-5"
+          className="prose-sm min-h-[120px] max-w-none px-3 py-2 text-sm text-ink focus:outline-none [&_ul]:list-disc [&_ul]:pl-5"
           dangerouslySetInnerHTML={{ __html: defaultValue }}
         />
         {isEmpty && placeholder ? (
-          <span className="pointer-events-none absolute left-3 top-2 text-sm text-slate-400">{placeholder}</span>
+          <span className="pointer-events-none absolute left-3 top-2 text-sm text-ink-muted">{placeholder}</span>
         ) : null}
       </div>
       <input type="hidden" name={name} value={html} />
     </div>
-  );
-}
-
-function ToolbarButton({
-  onClick,
-  label,
-  children,
-}: {
-  onClick: () => void;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
-      aria-label={label}
-      className="rounded px-2 py-1 text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-    >
-      {children}
-    </button>
   );
 }

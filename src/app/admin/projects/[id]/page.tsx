@@ -3,6 +3,7 @@ import { getProject } from "@/lib/data";
 import { approveProject, rejectProject } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import { AdminStatusBadge, Card, PageHeader, ProjectTypeBadge } from "@/components/ui";
+import { SubmitButton } from "@/components/form";
 
 export default async function AdminProjectReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,28 +36,18 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
           <Row label="Expected completion" value={formatDate(project.expectedCompletionDate)} />
         </dl>
         {project.description ? (
-          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Description</div>
-            <p className="whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{project.description}</p>
+          <div className="mt-4 border-t border-rule pt-4">
+            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Description</div>
+            <p className="whitespace-pre-line text-sm text-ink-muted">{project.description}</p>
           </div>
         ) : null}
 
-        <div className="mt-6 flex gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+        <div className="mt-6 flex gap-3 border-t border-rule pt-5">
           <form action={approveProject.bind(null, project.id)}>
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Approve
-            </button>
+            <SubmitButton icon="pi pi-check">Approve</SubmitButton>
           </form>
           <form action={rejectProject.bind(null, project.id)}>
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950"
-            >
-              Reject
-            </button>
+            <SubmitButton variant="outlined" icon="pi pi-times">Reject</SubmitButton>
           </form>
         </div>
       </Card>
@@ -67,8 +58,8 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-slate-700 dark:text-slate-200">{value || "—"}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</dt>
+      <dd className="text-ink">{value || "—"}</dd>
     </div>
   );
 }
