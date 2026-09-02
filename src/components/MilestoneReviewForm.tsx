@@ -53,10 +53,10 @@ export default function MilestoneReviewForm({
                 return (
                   <label
                     key={opt}
-                    className={`flex cursor-pointer items-center gap-2 rounded-ledger border px-3 py-2.5 text-sm transition-colors sm:flex-col sm:gap-1.5 sm:px-2 sm:py-3 sm:text-center ${
+                    className={`flex cursor-pointer items-center gap-2 rounded-[6px] border px-3 py-2.5 text-sm transition-colors sm:flex-col sm:gap-1.5 sm:px-2 sm:py-3 sm:text-center ${
                       checked
-                        ? "border-ink bg-band font-medium text-ink"
-                        : "border-rule text-ink-muted hover:border-rule-strong hover:text-ink"
+                        ? "border-link bg-[var(--link-subtle-bg)] font-medium text-ink"
+                        : "border-rule text-ink-muted hover:border-[var(--input-border)] hover:text-ink"
                     }`}
                   >
                     <RadioButton

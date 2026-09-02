@@ -10,6 +10,7 @@ import {
 import type { Company, CompanyMember } from "@/lib/types";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { Field, Select, TextInput } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 
 const ROLE_OPTIONS: [string, string][] = [
   ["member", "Member"],
@@ -19,7 +20,7 @@ const ROLE_OPTIONS: [string, string][] = [
 
 /**
  * People management for one company — the company's directory of members.
- * Every control is a PrimeReact widget.
+ * Every control is a PrimeReact widget; each mutation shows a flag.
  */
 export default function CompanyManager({
   company,
@@ -32,14 +33,16 @@ export default function CompanyManager({
     <>
       <Card className="mb-6">
         <SectionHeading>Company</SectionHeading>
-        <form action={renameCompany.bind(null, company.id)} className="flex flex-wrap items-end gap-3">
-          <div className="w-72">
-            <Field label="Name" required>
-              <TextInput name="name" required defaultValue={company.name} />
-            </Field>
-          </div>
+        <ActionForm
+          action={renameCompany.bind(null, company.id)}
+          success="Company name saved."
+          className="flex flex-wrap items-end gap-3"
+        >
+          <Field label="Name" required width="md">
+            <TextInput name="name" required defaultValue={company.name} />
+          </Field>
           <Button type="submit" outlined severity="secondary" label="Save" />
-        </form>
+        </ActionForm>
       </Card>
 
       <Card>
@@ -49,7 +52,7 @@ export default function CompanyManager({
         ) : (
           <ul className="mb-4 divide-y divide-rule text-sm">
             {members.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <span className="text-ink">
                   {m.name ? `${m.name} · ` : ""}
                   {m.email}
@@ -61,42 +64,44 @@ export default function CompanyManager({
                   </span>
                 </span>
                 <div className="flex items-center gap-3">
-                  <form action={updateCompanyMember.bind(null, company.id, m.id)} className="flex items-center gap-2">
+                  <ActionForm
+                    action={updateCompanyMember.bind(null, company.id, m.id)}
+                    success="Role updated."
+                    className="flex items-center gap-2"
+                  >
                     <div className="w-32">
                       <Select name="role" defaultValue={m.role} options={ROLE_OPTIONS} />
                     </div>
                     <Button type="submit" text size="small" label="Save" />
-                  </form>
-                  <form action={removeCompanyMember.bind(null, company.id, m.id)}>
+                  </ActionForm>
+                  <ActionForm
+                    action={removeCompanyMember.bind(null, company.id, m.id)}
+                    success="Person removed."
+                  >
                     <Button type="submit" text severity="danger" size="small" label="Remove" />
-                  </form>
+                  </ActionForm>
                 </div>
               </li>
             ))}
           </ul>
         )}
 
-        <form
+        <ActionForm
           action={addCompanyMember.bind(null, company.id)}
+          success="Person added to the directory."
           className="flex flex-wrap items-end gap-3 border-t border-rule pt-4"
         >
-          <div className="w-48">
-            <Field label="Name">
-              <TextInput name="name" placeholder="e.g. Sam Carter" />
-            </Field>
-          </div>
-          <div className="w-64">
-            <Field label="Email" required>
-              <TextInput type="email" name="email" required placeholder="sam@company.com" />
-            </Field>
-          </div>
-          <div className="w-36">
-            <Field label="Role">
-              <Select name="role" defaultValue="member" options={ROLE_OPTIONS} />
-            </Field>
-          </div>
+          <Field label="Name" width="sm">
+            <TextInput name="name" placeholder="e.g. Sam Carter" />
+          </Field>
+          <Field label="Email" required width="md">
+            <TextInput type="email" name="email" required placeholder="sam@company.com" />
+          </Field>
+          <Field label="Role" width="xs">
+            <Select name="role" defaultValue="member" options={ROLE_OPTIONS} />
+          </Field>
           <Button type="submit" label="Add person" />
-        </form>
+        </ActionForm>
         <p className="mt-3 text-xs text-ink-muted">
           A person becomes active the first time they sign in with this email. Assign people to individual projects
           from each project&apos;s People page.

@@ -43,6 +43,8 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { Select } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
+import { MoreActions, type MoreAction } from "@/components/MoreActions";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 import MilestoneReviewForm from "@/components/MilestoneReviewForm";
@@ -69,6 +71,24 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const perf = computeProjectPerformance(project);
   const isWhole = project.projectType === "whole";
 
+  const moreActions: MoreAction[] = [];
+  if (delLead && project.executionStatus === "ongoing") {
+    moreActions.push({
+      label: "Request completion",
+      icon: "pi pi-flag",
+      action: requestCompletion.bind(null, project.id),
+      success: "Completion requested — the client has been notified.",
+    });
+  }
+  if (delLead && project.executionStatus === "completed" && !project.capstone?.requested) {
+    moreActions.push({
+      label: "Request capstone endorsement",
+      icon: "pi pi-verified",
+      action: requestCapstone.bind(null, project.id),
+      success: "Capstone endorsement requested.",
+    });
+  }
+
   return (
     <div>
       <PageHeader
@@ -88,39 +108,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </GhostLink>
             ) : null}
             {delLead ? (
-              <>
-                <GhostLink href={`/projects/${project.id}/edit`} icon="edit">
-                  Edit
-                </GhostLink>
-                {project.executionStatus === "ongoing" ? (
-                  <form action={requestCompletion.bind(null, project.id)}>
-                    <GhostButton type="submit" icon="flag_circle">
-                      Request completion
-                    </GhostButton>
-                  </form>
-                ) : project.executionStatus === "awaiting_completion" ? (
-                  <StatusPill icon="hourglass_top" tone="warn">
-                    Awaiting client confirmation
-                  </StatusPill>
-                ) : null}
-                {project.executionStatus === "completed" && !project.capstone?.requested ? (
-                  <form action={requestCapstone.bind(null, project.id)}>
-                    <GhostButton type="submit" icon="workspace_premium">
-                      Request capstone
-                    </GhostButton>
-                  </form>
-                ) : project.capstone?.requested && !project.capstone.submitted ? (
-                  <StatusPill icon="workspace_premium" tone="link">
-                    Capstone requested
-                  </StatusPill>
-                ) : null}
-              </>
+              <GhostLink href={`/projects/${project.id}/edit`} icon="edit">
+                Edit
+              </GhostLink>
             ) : null}
             {del && !isWhole ? (
               <GhostLink href={`/projects/${project.id}/milestones/new`} icon="add">
                 Add milestone
               </GhostLink>
             ) : null}
+            <MoreActions actions={moreActions} />
             {delLead ? (
               project.visibility === "PUBLIC" ? (
                 <InkLink href={`/projects/${project.id}/public-preview`} icon="public">
@@ -135,11 +132,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   Pending admin approval
                 </StatusPill>
               ) : (
-                <form action={submitForApproval.bind(null, project.id)}>
+                <ActionForm action={submitForApproval.bind(null, project.id)} success="Submitted for admin approval.">
                   <InkButton type="submit" icon="send">
                     Submit for approval
                   </InkButton>
-                </form>
+                </ActionForm>
               )
             ) : null}
           </>
@@ -165,11 +162,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {perf.avgRating == null ? " (unrated)" : ""}.
           </p>
           {revLead ? (
-            <form action={confirmCompletion.bind(null, id)} className="mt-3">
+            <ActionForm action={confirmCompletion.bind(null, id)} success="Completion confirmed." className="mt-3">
               <InkButton type="submit" icon="check">
                 Confirm completion
               </InkButton>
-            </form>
+            </ActionForm>
           ) : (
             <p className="mt-2 text-xs opacity-80">Awaiting a client lead&apos;s confirmation.</p>
           )}
@@ -213,18 +210,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           ) : null}
 
           {delLead ? (
-            <form
+            <ActionForm
               action={setProjectStatus.bind(null, project.id)}
-              className="mt-5 flex flex-wrap items-center gap-2 border-t border-rule pt-4"
+              success="Project status updated."
+              className="mt-5 flex flex-wrap items-end gap-3 border-t border-rule pt-4"
             >
-              <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">
-                Project status
-              </span>
-              <div className="w-44">
-                <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} />
-              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-ink">Project status</span>
+                <div className="w-48">
+                  <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} />
+                </div>
+              </label>
               <GhostButton type="submit">Update</GhostButton>
-            </form>
+            </ActionForm>
           ) : null}
         </div>
 
@@ -356,7 +354,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   ) : null}
 
                   <div className="mt-3 border-t border-rule pt-3">
-                    <div className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+                    <div className="mb-1.5 text-xs font-semibold text-ink-muted">
                       Attachments
                     </div>
                     <MilestoneAttachments
@@ -417,7 +415,7 @@ function Info({
 }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">{label}</dt>
+      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
       <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
     </div>
   );

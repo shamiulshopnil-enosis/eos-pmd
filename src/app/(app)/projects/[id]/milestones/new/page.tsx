@@ -5,6 +5,7 @@ import { canAccessDelivery } from "@/lib/permissions";
 import { createMilestone } from "@/lib/actions";
 import { Field, FileInput, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
 import AssigneeCheckboxes from "@/components/AssigneeCheckboxes";
 
@@ -27,7 +28,7 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
       />
 
       <Card className="p-6">
-        <form action={action} className="space-y-5">
+        <ActionForm action={action} className="space-y-5">
           <Field label="Milestone Title" required hint="Plain text, e.g. Milestone 3 — Payment Gateway Integration">
             <TextInput name="title" required placeholder="Milestone 1 — Product Catalog" />
           </Field>
@@ -62,7 +63,7 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
           <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Add Milestone</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

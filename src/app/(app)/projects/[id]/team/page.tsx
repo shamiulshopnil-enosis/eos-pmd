@@ -7,6 +7,7 @@ import { setProjectStaffing, setReviewStaffing } from "@/lib/actions";
 import type { CompanyMember } from "@/lib/types";
 import { Badge, Card, PageHeader, SectionHeading } from "@/components/ui";
 import { SubmitButton } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 import PeoplePicker from "@/components/PeoplePicker";
 
 export default async function ProjectPeoplePage({ params }: { params: Promise<{ id: string }> }) {
@@ -91,10 +92,10 @@ function StaffingCard({
           .
         </p>
       ) : (
-        <form action={action} className="space-y-3">
+        <ActionForm action={action} success="People updated." className="space-y-3">
           <PeoplePicker members={members} name="memberIds" defaultSelectedIds={selectedMemberIds} />
           <SubmitButton>Save</SubmitButton>
-        </form>
+        </ActionForm>
       )}
     </Card>
   );

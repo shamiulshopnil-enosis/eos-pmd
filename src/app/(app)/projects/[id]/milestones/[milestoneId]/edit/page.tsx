@@ -7,6 +7,7 @@ import { updateMilestone } from "@/lib/actions";
 import { toDateInputValue } from "@/lib/format";
 import { Field, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
 import AssigneeCheckboxes from "@/components/AssigneeCheckboxes";
 
@@ -44,7 +45,7 @@ export default async function EditMilestonePage({
       <PageHeader title={`Edit Milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
 
       <Card className="p-6">
-        <form action={action} className="space-y-5">
+        <ActionForm action={action} className="space-y-5">
           <Field label="Milestone Title" required>
             <TextInput name="title" required defaultValue={milestone.title} />
           </Field>
@@ -78,7 +79,7 @@ export default async function EditMilestonePage({
           <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Save Changes</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

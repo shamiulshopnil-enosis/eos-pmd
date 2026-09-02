@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { SubmitButton } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 
@@ -121,22 +122,28 @@ export default async function MilestoneDetailPage({
                   review at a time.
                 </p>
               ) : null}
-              <form action={sendMilestoneForReview.bind(null, id, milestoneId)}>
+              <ActionForm
+                action={sendMilestoneForReview.bind(null, id, milestoneId)}
+                success="Milestone sent to the client for review."
+              >
                 <InkButton type="submit" icon="send" disabled={!!siblingSent}>
                   Send for client review
                 </InkButton>
-              </form>
+              </ActionForm>
             </div>
           ) : milestone.status === "sent" ? (
             <div className="space-y-3 text-sm">
               <p className="text-ink-muted">
                 With the client since {formatDateTime(milestone.sentAt)}. Locked from edits until reviewed.
               </p>
-              <form action={reopenMilestone.bind(null, id, milestoneId)}>
+              <ActionForm
+                action={reopenMilestone.bind(null, id, milestoneId)}
+                success="Milestone recalled from review."
+              >
                 <GhostButton type="submit" icon="undo">
                   Recall from review
                 </GhostButton>
-              </form>
+              </ActionForm>
             </div>
           ) : (
             <div className="space-y-3">
@@ -157,11 +164,14 @@ export default async function MilestoneDetailPage({
                   Reconsideration requested — waiting on the client. They may or may not change it.
                 </p>
               ) : (
-                <form action={requestRatingReconsideration.bind(null, id, milestoneId)}>
+                <ActionForm
+                  action={requestRatingReconsideration.bind(null, id, milestoneId)}
+                  success="Asked the client to reconsider their rating."
+                >
                   <GhostButton type="submit" icon="rate_review">
                     Ask client to reconsider
                   </GhostButton>
-                </form>
+                </ActionForm>
               )}
             </div>
           )}
@@ -191,7 +201,7 @@ function Info({
 }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">{label}</dt>
+      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
       <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
     </div>
   );

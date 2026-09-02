@@ -7,6 +7,7 @@ import { PROJECT_STATUS_LABELS } from "@/lib/constants";
 import { toDateInputValue } from "@/lib/format";
 import { Field, Select, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,7 +22,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
       <PageHeader title={`Edit Project — ${project.name}`} back={{ href: `/projects/${project.id}`, label: "Back to Project" }} />
 
       <Card className="p-6">
-        <form action={action} className="space-y-5">
+        <ActionForm action={action} className="space-y-5">
           <Field label="Project Name" required>
             <TextInput name="name" required defaultValue={project.name} />
           </Field>
@@ -84,7 +85,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
           <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Save Changes</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

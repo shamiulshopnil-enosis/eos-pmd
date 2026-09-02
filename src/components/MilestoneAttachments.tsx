@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/format";
 import type { Milestone } from "@/lib/types";
 import { Icon } from "@/components/icon";
 import { FileInput } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -59,16 +60,12 @@ export default function MilestoneAttachments({
                   </div>
                 </div>
                 {canRemove ? (
-                  <form action={removeMilestoneAttachment.bind(null, projectId, milestone.id, a.id)}>
-                    <Button
-                      type="submit"
-                      text
-                      severity="danger"
-                      size="small"
-                      icon="pi pi-trash"
-                      label="Remove"
-                    />
-                  </form>
+                  <ActionForm
+                    action={removeMilestoneAttachment.bind(null, projectId, milestone.id, a.id)}
+                    success="File removed."
+                  >
+                    <Button type="submit" text severity="danger" size="small" icon="pi pi-trash" label="Remove" />
+                  </ActionForm>
                 ) : null}
               </li>
             );
@@ -77,14 +74,15 @@ export default function MilestoneAttachments({
       )}
 
       {canUpload ? (
-        <form
+        <ActionForm
           action={uploadMilestoneAttachments.bind(null, projectId, milestone.id)}
+          success="Files uploaded."
           className="mt-3 flex flex-wrap items-center gap-3 border-t border-rule pt-3"
         >
-          <FileInput name="files" multiple className="max-w-xs" />
+          <FileInput name="files" multiple className="max-w-sm" />
           <Button type="submit" size="small" icon="pi pi-upload" label="Upload" />
-          <span className="w-full font-mono text-xs text-ink-muted">Up to 10 files, 15 MB each.</span>
-        </form>
+          <span className="w-full text-xs text-ink-muted">Up to 10 files, 15 MB each.</span>
+        </ActionForm>
       ) : null}
     </div>
   );

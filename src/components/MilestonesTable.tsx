@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { MilestoneWithProject } from "@/lib/types";
@@ -75,6 +76,7 @@ type Row = {
 };
 
 export default function MilestonesTable({ milestones }: { milestones: MilestoneWithProject[] }) {
+  const router = useRouter();
   const [f, setF] = useState({ ...EMPTY });
   const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
 
@@ -144,7 +146,19 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
       {filtered.length === 0 ? (
         <EmptyState icon="filter_alt_off" title="No milestones match your filters" description="Adjust or clear the filters above." />
       ) : (
-        <DataTable value={filtered} dataKey="id" removableSort className="eos-table" tableStyle={{ minWidth: "960px" }} scrollable>
+        <DataTable
+          value={filtered}
+          dataKey="id"
+          removableSort
+          className="eos-table eos-rows-clickable"
+          tableStyle={{ minWidth: "960px" }}
+          scrollable
+          onRowClick={(e) => {
+            if (window.getSelection()?.toString()) return;
+            const r = e.data as Row;
+            router.push(`/projects/${r.projectId}/milestones/${r.id}`);
+          }}
+        >
           <Column
             field="title"
             header="Milestone"

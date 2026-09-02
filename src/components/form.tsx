@@ -12,31 +12,60 @@ import { RadioButton } from "primereact/radiobutton";
 import { Button } from "primereact/button";
 
 /* ------------------------------------------------------------------ *
- * Form controls — every one is a PrimeReact widget. Server-action
- * forms still read plain FormData, so the controlled PrimeReact
- * components mirror their value into a hidden <input> where needed.
+ * Form controls — PrimeReact widgets with Jira-style field ergonomics:
+ * a labelled, filled input with a visible border, help text below (not
+ * inside), width that hints at the expected input length, an error
+ * slot, and ≥40px touch targets. Server-action forms still read plain
+ * FormData; controlled widgets mirror their value into a hidden input.
  * ------------------------------------------------------------------ */
+
+const FIELD_WIDTH: Record<string, string> = {
+  xs: "max-w-[7rem]",
+  sm: "max-w-[12rem]",
+  md: "max-w-[20rem]",
+  lg: "max-w-[28rem]",
+  full: "",
+};
 
 export function Field({
   label,
   required,
+  optional,
   hint,
+  error,
+  width = "full",
   children,
 }: {
   label: string;
   required?: boolean;
+  optional?: boolean;
   hint?: string;
+  error?: string;
+  width?: "xs" | "sm" | "md" | "lg" | "full";
   children: ReactNode;
 }) {
+  const hintId = useId();
   return (
-    <label className="block">
-      <span className="mb-1 block text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">
-        {label}
-        {required ? <span className="text-rag-bad"> *</span> : null}
-      </span>
-      {children}
-      {hint ? <span className="mt-1 block text-xs text-ink-muted">{hint}</span> : null}
-    </label>
+    <div className={`${FIELD_WIDTH[width]} ${error ? "eos-field-error" : ""}`}>
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold text-ink">
+          {label}
+          {required ? <span className="text-rag-bad"> *</span> : null}
+          {optional ? <span className="ml-1 font-normal text-ink-muted">(optional)</span> : null}
+        </span>
+        {children}
+      </label>
+      {error ? (
+        <span className="mt-1.5 flex items-center gap-1 text-xs text-rag-bad" role="alert">
+          <i className="pi pi-exclamation-circle text-[11px]" aria-hidden="true" />
+          {error}
+        </span>
+      ) : hint ? (
+        <span id={hintId} className="mt-1.5 block text-xs text-ink-muted">
+          {hint}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -51,9 +80,7 @@ export function TextArea({ className = "", rows, ...rest }: ComponentProps<typeo
 type Option = { label: string; value: string };
 
 function toOptions(options: Array<[string, string] | Option>): Option[] {
-  return options.map((o) =>
-    Array.isArray(o) ? { value: o[0], label: o[1] } : o,
-  );
+  return options.map((o) => (Array.isArray(o) ? { value: o[0], label: o[1] } : o));
 }
 
 /** PrimeReact <Dropdown> that posts its value through a hidden input. */
@@ -120,7 +147,13 @@ export function SecondaryButton({
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <Button {...props} outlined severity="secondary" className={className} label={typeof children === "string" ? children : undefined}>
+    <Button
+      {...props}
+      outlined
+      severity="secondary"
+      className={className}
+      label={typeof children === "string" ? children : undefined}
+    >
       {typeof children === "string" ? null : children}
     </Button>
   );
@@ -138,7 +171,11 @@ export function SearchInput({ className = "", ...rest }: ComponentProps<typeof I
 
 /** Right-aligned action bar above a hairline — the close of a form. */
 export function FormActions({ children }: { children: ReactNode }) {
-  return <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">{children}</div>;
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-rule pt-5">
+      {children}
+    </div>
+  );
 }
 
 /** A radio group rendered as tappable rows, on PrimeReact <RadioButton>. */
@@ -154,7 +191,7 @@ export function RadioCards({
   const [value, setValue] = useState(defaultValue ?? "");
   const groupId = useId();
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <input type="hidden" name={name} value={value} />
       {options.map((o) => {
         const checked = value === o.value;
@@ -163,16 +200,13 @@ export function RadioCards({
           <label
             key={o.value}
             htmlFor={id}
-            className={`flex cursor-pointer gap-3 rounded-ledger border p-3 transition-colors ${
-              checked ? "border-ink bg-band" : "border-rule hover:border-rule-strong"
+            className={`flex cursor-pointer gap-3 rounded-[6px] border p-3 transition-colors ${
+              checked
+                ? "border-link bg-[var(--link-subtle-bg)]"
+                : "border-rule hover:border-[var(--input-border)] hover:bg-hover"
             }`}
           >
-            <RadioButton
-              inputId={id}
-              checked={checked}
-              onChange={() => setValue(o.value)}
-              className="mt-0.5"
-            />
+            <RadioButton inputId={id} checked={checked} onChange={() => setValue(o.value)} className="mt-0.5" />
             <span className="text-sm">
               <span className="font-medium text-ink">{o.label}</span>
               {o.description ? (
@@ -186,11 +220,17 @@ export function RadioCards({
   );
 }
 
-/** Native file input (server actions read it from FormData), themed to match
- *  the PrimeReact button vocabulary via globals.css `.eos-file`. */
+/** Native file input (server actions read it from FormData), themed via
+ *  globals.css `.eos-file` to read as a field with a button. */
 export function FileInput({
   className = "",
   ...rest
 }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input type="file" {...rest} className={`eos-file w-full text-sm text-ink-muted ${className}`} />;
+  return (
+    <input
+      type="file"
+      {...rest}
+      className={`eos-file block w-full text-sm text-ink-muted file:cursor-pointer ${className}`}
+    />
+  );
 }

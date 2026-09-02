@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createProject } from "@/lib/actions";
 import { getMyCompany, listCompanyMembers, searchCompanies } from "@/lib/data";
 import { Field, FormActions, RadioCards, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 import { Card, PageHeader } from "@/components/ui";
 import CompanyPicker from "@/components/CompanyPicker";
 import PeoplePicker from "@/components/PeoplePicker";
@@ -23,9 +24,9 @@ export default async function NewProjectPage() {
       />
 
       <Card className="p-6">
-        <form action={createProject} className="space-y-6">
+        <ActionForm action={createProject} error="Couldn't create the project — check the required fields." className="space-y-6">
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+            <legend className="mb-1 text-xs font-semibold text-ink">
               Project type
             </legend>
             <RadioCards
@@ -90,7 +91,7 @@ export default async function NewProjectPage() {
           </Field>
 
           <fieldset className="space-y-3 border-t border-rule pt-5">
-            <legend className="text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+            <legend className="text-xs font-semibold text-ink">
               Assign people
             </legend>
             <p className="text-xs text-ink-muted">
@@ -109,7 +110,7 @@ export default async function NewProjectPage() {
           <FormActions>
             <SubmitButton>Create project</SubmitButton>
           </FormActions>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

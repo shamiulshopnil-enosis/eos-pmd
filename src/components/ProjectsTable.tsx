@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { ProjectWithMilestones } from "@/lib/types";
@@ -77,6 +78,7 @@ type Row = {
 };
 
 export default function ProjectsTable({ projects }: { projects: ProjectWithMilestones[] }) {
+  const router = useRouter();
   const [f, setF] = useState({ ...EMPTY });
   const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
 
@@ -152,9 +154,13 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           value={filtered}
           dataKey="id"
           removableSort
-          className="eos-table"
+          className="eos-table eos-rows-clickable"
           tableStyle={{ minWidth: "1040px" }}
           scrollable
+          onRowClick={(e) => {
+            if (window.getSelection()?.toString()) return;
+            router.push(`/projects/${(e.data as Row).id}`);
+          }}
         >
           <Column
             field="name"

@@ -8,6 +8,7 @@ import { minReviewThreshold } from "@/lib/constants";
 import { publishProject } from "@/lib/actions";
 import { formatPercent, formatRating } from "@/lib/format";
 import { Card, PageHeader } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { SingleCheckbox } from "@/components/CheckboxField";
 
@@ -41,7 +42,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
       </Card>
 
       <Card className="p-6">
-        <form action={action} className="space-y-5">
+        <ActionForm action={action} className="space-y-5">
           <Field label="Project Image URL" hint="Recommended 1920×1080 (16:9), matching the existing public project form.">
             <TextInput type="url" name="publicImageUrl" placeholder="https://…" />
           </Field>
@@ -112,7 +113,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
           <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Publish Project</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

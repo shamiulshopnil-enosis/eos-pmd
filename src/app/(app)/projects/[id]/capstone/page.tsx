@@ -6,6 +6,7 @@ import { submitCapstone } from "@/lib/actions";
 import { CAPSTONE_ATTRIBUTE_POOL, MAX_CAPSTONE_ATTRIBUTES } from "@/lib/attributes";
 import { CAPSTONE_TIER_LABELS } from "@/lib/constants";
 import { Card, PageHeader, SectionHeading } from "@/components/ui";
+import { ActionForm } from "@/components/ActionForm";
 import { Field, SubmitButton, TextArea } from "@/components/form";
 import { CheckboxGroup, SingleCheckbox } from "@/components/CheckboxField";
 
@@ -31,7 +32,7 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
       />
 
       <Card className="p-6">
-        <form action={submitCapstone.bind(null, id)} className="space-y-6">
+        <ActionForm action={submitCapstone.bind(null, id)} className="space-y-6">
           <div>
             <SectionHeading>Pick up to {MAX_CAPSTONE_ATTRIBUTES} attributes</SectionHeading>
             <p className="mb-3 text-xs text-ink-muted">
@@ -56,7 +57,7 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
           <div className="border-t border-rule pt-5">
             <SubmitButton>Submit endorsement</SubmitButton>
           </div>
-        </form>
+        </ActionForm>
       </Card>
     </div>
   );

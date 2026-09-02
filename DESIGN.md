@@ -12,9 +12,9 @@ colors:
   ink: "#172b4d"
   ink-muted: "#626f86"
   ink-subtle: "#8590a2"
-  link: "#1868db"
-  link-strong: "#0055cc"
-  link-subtle-bg: "#e9f2fe"
+  link: "#22488f"
+  link-strong: "#17356b"
+  link-subtle-bg: "#eaf0f9"
   rag-good: "#216e4e"
   rag-good-fill: "#22a06b"
   rag-good-bg: "#dcfff1"
@@ -135,7 +135,7 @@ components:
 
 The workspace is a **restrained enterprise console** for executives who review delivery
 performance. It is modelled on the **Atlassian Design System** (Jira): neutral surfaces,
-a single blue accent, information density, and calm. Elevation and whitespace do the work
+a single navy accent, information density, and calm. Elevation and whitespace do the work
 that heavy borders and shouty labels used to do.
 
 The UI is built on the **PrimeReact** component library (`primereact@10`, `primeicons`),
@@ -146,7 +146,7 @@ inline script in `src/app/layout.tsx` from `localStorage['eos-theme']` or the OS
 **Key characteristics**
 
 - Neutral palette: `#F7F8F9` page, `#FFFFFF` surfaces, `#172B4D` text, `#DFE1E6` hairlines.
-- One accent — Atlassian blue `#1868DB` — for primary actions, links, focus and the active
+- One accent — Enosis navy-blue `#22488F` — for primary actions, links, focus and the active
   nav item. It is the only saturated hue outside of status.
 - **3px** radius on controls (buttons, inputs, lozenges), **8px** on cards, tables and
   dialogs. No sharp 2px corners, no chunky pills.
@@ -169,7 +169,7 @@ inline script in `src/app/layout.tsx` from `localStorage['eos-theme']` or the OS
 
 ### Lines
 - **Rule** (`#DFE1E6` / dark `#2C333A`): every hairline divider, card and table border.
-- **Rule strong** (`#B3B9C4` / dark `#454F59`): input borders, stronger dividers.
+- **Input border** (`#8993A4` / dark `#738496`) with a filled `#F1F2F4` / dark `#22272B` field background; **rule-strong** `#B3B9C4` / dark `#454F59` for other strong dividers.
 
 ### Text
 - **Ink** (`#172B4D` / dark `#C7D1DB`): body copy and headings.
@@ -177,9 +177,9 @@ inline script in `src/app/layout.tsx` from `localStorage['eos-theme']` or the OS
 - **Ink subtle** (`#8590A2` / dark `#738496`): placeholders, disabled, sort glyphs.
 
 ### Accent
-- **Link** (`#1868DB` / dark `#579DFF`): primary button fill, text links, focus ring seed,
-  active-nav text and icon. **Hover** `link-strong` `#0055CC` / dark `#85B8FF`.
-- **Link subtle bg** (`#E9F2FE` / dark `#1C2B41`): active nav background, selected menu item,
+- **Link** (`#22488F` / dark `#7DB0FF`): primary button fill, text links, focus ring seed,
+  active-nav text and icon. **Hover** `link-strong` `#17356B` / dark `#A6CBFF`.
+- **Link subtle bg** (`#EAF0F9` / dark `#1B2C46`): active nav background, selected menu item,
   info lozenge and info message fill.
 
 ### Status (RAG)

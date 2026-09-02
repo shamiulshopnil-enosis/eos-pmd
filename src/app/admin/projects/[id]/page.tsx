@@ -4,6 +4,7 @@ import { approveProject, rejectProject } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import { AdminStatusBadge, Card, PageHeader, ProjectTypeBadge } from "@/components/ui";
 import { SubmitButton } from "@/components/form";
+import { ActionForm } from "@/components/ActionForm";
 
 export default async function AdminProjectReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,18 +38,18 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
         </dl>
         {project.description ? (
           <div className="mt-4 border-t border-rule pt-4">
-            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Description</div>
+            <div className="mb-1 text-xs font-medium text-ink-muted">Description</div>
             <p className="whitespace-pre-line text-sm text-ink-muted">{project.description}</p>
           </div>
         ) : null}
 
         <div className="mt-6 flex gap-3 border-t border-rule pt-5">
-          <form action={approveProject.bind(null, project.id)}>
+          <ActionForm action={approveProject.bind(null, project.id)} success="Project approved.">
             <SubmitButton icon="pi pi-check">Approve</SubmitButton>
-          </form>
-          <form action={rejectProject.bind(null, project.id)}>
+          </ActionForm>
+          <ActionForm action={rejectProject.bind(null, project.id)} success="Project rejected.">
             <SubmitButton variant="outlined" icon="pi pi-times">Reject</SubmitButton>
-          </form>
+          </ActionForm>
         </div>
       </Card>
     </div>
@@ -58,7 +59,7 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</dt>
+      <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="text-ink">{value || "—"}</dd>
     </div>
   );

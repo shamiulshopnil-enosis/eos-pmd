@@ -7,6 +7,7 @@ import { signOut } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/theme";
 import { NavLinks } from "@/components/NavLinks";
 import { ActivityMenu, MobileMenu } from "@/components/AppChrome";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const [recentActivity, company] = await Promise.all([
@@ -56,10 +57,8 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
             <Link href="/dashboard" className="text-sm font-bold text-ink md:hidden">
               EOS
             </Link>
-            <div className="hidden truncate text-sm text-ink-muted md:block">
-              <span className="text-ink">{company?.name ?? "EOS"}</span>
-              <span className="mx-1.5 text-rule-strong">/</span>
-              Workspace
+            <div className="hidden min-w-0 sm:block">
+              <Breadcrumbs company={company?.name ?? "EOS"} />
             </div>
           </div>
 
