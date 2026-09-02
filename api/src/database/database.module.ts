@@ -11,7 +11,6 @@ import {
   CompanySchema,
   CompanyMemberSchema,
   ProjectSchema,
-  TeamSchema,
   UserSchema,
   VendorMemberSchema,
 } from "../schemas/schemas";
@@ -24,7 +23,6 @@ const features = MongooseModule.forFeature([
   { name: MODEL.LoginCode, schema: LoginCodeSchema },
   { name: MODEL.Invitation, schema: InvitationSchema },
   { name: MODEL.VendorMember, schema: VendorMemberSchema },
-  { name: MODEL.Team, schema: TeamSchema },
   { name: MODEL.ClientCompany, schema: ClientCompanySchema },
   { name: MODEL.Company, schema: CompanySchema },
   { name: MODEL.CompanyMember, schema: CompanyMemberSchema },

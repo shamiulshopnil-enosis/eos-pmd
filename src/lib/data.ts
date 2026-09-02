@@ -11,7 +11,6 @@ import type {
   Project,
   ProjectWithMilestones,
   RecentActivity,
-  Team,
 } from "./types";
 
 // Read layer. Previously these talked to MongoDB through Mongoose; they now call
@@ -141,7 +140,7 @@ export async function listPendingInvitations(projectId: string): Promise<Invitat
 }
 
 // ---------------------------------------------------------------------------
-// companies & teams (company-unification PR1)
+// companies & people (company-unification PR1)
 // ---------------------------------------------------------------------------
 
 /** The company the signed-in user acts as (their single membership). */
@@ -152,11 +151,6 @@ export async function getMyCompany(): Promise<Company> {
 /** Members of the given company. */
 export async function listCompanyMembers(companyId: string): Promise<CompanyMember[]> {
   return apiFetch<CompanyMember[]>(`/companies/${companyId}/members`);
-}
-
-/** The signed-in user's teams (acting company), each with its members resolved. */
-export async function listTeams(): Promise<Team[]> {
-  return apiFetch<Team[]>(`/teams`);
 }
 
 /** Companies the signed-in user belongs to. */

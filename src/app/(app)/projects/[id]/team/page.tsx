@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getMyCompany, getProject, listCompanyMembers, listTeams } from "@/lib/data";
+import { getMyCompany, getProject, listCompanyMembers } from "@/lib/data";
 import { canManageDeliveryStaffing, canManageReview } from "@/lib/permissions";
 import { setProjectStaffing, setReviewStaffing } from "@/lib/actions";
-import type { CompanyMember, Team } from "@/lib/types";
+import type { CompanyMember } from "@/lib/types";
 import { Badge, Card, PageHeader, SectionHeading } from "@/components/ui";
+import PeoplePicker from "@/components/PeoplePicker";
 
-export default async function ProjectTeamPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPeoplePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
   const project = await getProject(id);
@@ -18,9 +19,7 @@ export default async function ProjectTeamPage({ params }: { params: Promise<{ id
   if (!canDelivery && !canReview && user.role !== "admin") notFound();
 
   const myCompany = await getMyCompany().catch(() => null);
-  const [teams, members] = myCompany
-    ? await Promise.all([listTeams(), listCompanyMembers(myCompany.id)])
-    : [[], []];
+  const members = myCompany ? await listCompanyMembers(myCompany.id) : [];
 
   const showDeliveryForm = canDelivery && myCompany?.id === project.deliveringCompanyId;
   const showReviewForm = canReview && myCompany?.id === project.receivingCompanyId;
@@ -28,17 +27,15 @@ export default async function ProjectTeamPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={`Team — ${project.name}`}
-        description="Assign your company's teams and people to this project. People are managed in your Company; assignment is a live reference."
+        title={`People — ${project.name}`}
+        description="Assign your company's people to this project. People are managed under My Company; adding someone here lets them see and work on this project."
         back={{ href: `/projects/${id}`, label: "Back to Project" }}
       />
 
       {showDeliveryForm ? (
         <StaffingCard
-          title="Delivery Staffing"
-          teams={teams}
+          title="Delivery people"
           members={members}
-          selectedTeamIds={project.assignedTeamIds}
           selectedMemberIds={project.assignedMemberIds}
           action={setProjectStaffing.bind(null, id)}
         />
@@ -46,10 +43,8 @@ export default async function ProjectTeamPage({ params }: { params: Promise<{ id
 
       {showReviewForm ? (
         <StaffingCard
-          title="Review Staffing"
-          teams={teams}
+          title="Review people"
           members={members}
-          selectedTeamIds={project.receivingTeamIds}
           selectedMemberIds={project.receivingMemberIds}
           action={setReviewStaffing.bind(null, id)}
         />
@@ -74,77 +69,29 @@ export default async function ProjectTeamPage({ params }: { params: Promise<{ id
 
 function StaffingCard({
   title,
-  teams,
   members,
-  selectedTeamIds,
   selectedMemberIds,
   action,
 }: {
   title: string;
-  teams: Team[];
   members: CompanyMember[];
-  selectedTeamIds: string[];
   selectedMemberIds: string[];
   action: (formData: FormData) => void;
 }) {
   return (
     <Card className="mb-6 p-5">
       <SectionHeading>{title}</SectionHeading>
-      {teams.length === 0 && members.length === 0 ? (
+      {members.length === 0 ? (
         <p className="text-sm text-slate-400">
           Your company has no people yet.{" "}
           <Link href="/team" className="text-blue-600 hover:underline">
-            Set up teams and people
+            Add people under My Company
           </Link>
           .
         </p>
       ) : (
         <form action={action} className="space-y-3">
-          <input type="hidden" name="teamIds" value="" />
-          <input type="hidden" name="memberIds" value="" />
-          {teams.length > 0 ? (
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams</div>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {teams.map((t) => (
-                  <label key={t.id} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      name="teamIds"
-                      value={t.id}
-                      defaultChecked={selectedTeamIds.includes(t.id)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      {t.name}
-                      <span className="block text-xs text-slate-400">
-                        {t.members.length} member{t.members.length === 1 ? "" : "s"}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {members.length > 0 ? (
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Individuals</div>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {members.map((m) => (
-                  <label key={m.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      name="memberIds"
-                      value={m.id}
-                      defaultChecked={selectedMemberIds.includes(m.id)}
-                    />
-                    {m.name ? `${m.name} · ` : ""}
-                    {m.email}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ) : null}
+          <PeoplePicker members={members} name="memberIds" defaultSelectedIds={selectedMemberIds} />
           <button
             type="submit"
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

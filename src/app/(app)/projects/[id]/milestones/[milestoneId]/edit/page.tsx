@@ -54,9 +54,12 @@ export default async function EditMilestonePage({
             <span className="mt-1 block text-xs text-slate-400">Supports bold and bulleted lists.</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field label="Target Date">
-              <TextInput type="date" name="targetDate" defaultValue={toDateInputValue(milestone.targetDate)} />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <Field label="Start Date">
+              <TextInput type="date" name="startDate" defaultValue={toDateInputValue(milestone.startDate)} />
+            </Field>
+            <Field label="Due Date">
+              <TextInput type="date" name="dueDate" defaultValue={toDateInputValue(milestone.dueDate)} />
             </Field>
             <Field label="URL" hint="Optional — repo, demo, or spec link.">
               <TextInput type="url" name="url" defaultValue={milestone.url ?? ""} placeholder="https://…" />

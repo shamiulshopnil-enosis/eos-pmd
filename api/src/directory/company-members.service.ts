@@ -18,7 +18,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export class CompanyMembersService {
   constructor(
     @InjectModel(MODEL.CompanyMember) private readonly memberships: Model<any>,
-    @InjectModel(MODEL.Team) private readonly teams: Model<any>,
     @InjectModel(MODEL.Project) private readonly projects: Model<any>,
     @InjectModel(MODEL.User) private readonly users: Model<any>,
     private readonly companies: CompaniesService,
@@ -103,10 +102,9 @@ export class CompanyMembersService {
 
     await this.memberships.deleteOne({ _id: membershipId });
     const oid = new Types.ObjectId(membershipId);
-    await this.teams.updateMany({ memberIds: oid }, { $pull: { memberIds: oid } });
     await this.projects.updateMany(
-      { assignedMemberIds: oid },
-      { $pull: { assignedMemberIds: oid } },
+      { $or: [{ assignedMemberIds: oid }, { receivingMemberIds: oid }] },
+      { $pull: { assignedMemberIds: oid, receivingMemberIds: oid } },
     );
   }
 

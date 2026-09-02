@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { createProject } from "@/lib/actions";
-import { getMyCompany, listCompanyMembers, listTeams, searchCompanies } from "@/lib/data";
+import { getMyCompany, listCompanyMembers, searchCompanies } from "@/lib/data";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import CompanyPicker from "@/components/CompanyPicker";
+import PeoplePicker from "@/components/PeoplePicker";
+import ProjectMilestonesField from "@/components/ProjectMilestonesField";
 
 export default async function NewProjectPage() {
   const company = await getMyCompany();
-  const [companies, teams, members] = await Promise.all([
+  const [companies, members] = await Promise.all([
     searchCompanies(),
-    listTeams(),
     listCompanyMembers(company.id),
   ]);
 
@@ -92,60 +93,19 @@ export default async function NewProjectPage() {
           </Field>
 
           <fieldset className="space-y-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-            <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Assign your team</legend>
+            <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Assign people</legend>
             <p className="text-xs text-slate-400">
-              You are added as the project owner automatically. Assign whole teams, individual people, or both —
-              staffing stays in sync with{" "}
+              You are added as the project owner automatically. Search your company&apos;s{" "}
               <Link href="/team" className="text-blue-600 hover:underline">
-                Team Management
-              </Link>
-              .
+                people directory
+              </Link>{" "}
+              and add whoever works on this project — only they (plus your company&apos;s owners and
+              admins) will see it. You can change this later on the project&apos;s People page.
             </p>
-
-            {teams.length === 0 && members.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700">
-                Your team directory is empty. You can{" "}
-                <Link href="/team" className="text-blue-600 hover:underline">
-                  set up teams and people
-                </Link>{" "}
-                now or after creating the project.
-              </p>
-            ) : null}
-
-            {teams.length > 0 ? (
-              <div>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams</div>
-                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {teams.map((t) => (
-                    <label key={t.id} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <input type="checkbox" name="teamIds" value={t.id} className="mt-0.5" />
-                      <span>
-                        {t.name}
-                        <span className="block text-xs text-slate-400">
-                          {t.members.length} member{t.members.length === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {members.length > 0 ? (
-              <div>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Individuals</div>
-                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {members.map((m) => (
-                    <label key={m.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <input type="checkbox" name="memberIds" value={m.id} />
-                      {m.name ? `${m.name} · ` : ""}
-                      {m.email}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <PeoplePicker members={members} name="memberIds" />
           </fieldset>
+
+          <ProjectMilestonesField />
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
             <SubmitButton>Create Project</SubmitButton>

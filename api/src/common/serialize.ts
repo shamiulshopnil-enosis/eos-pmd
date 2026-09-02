@@ -10,7 +10,6 @@ import type {
   Company,
   CompanyMember,
   Project,
-  Team,
   VendorTeamMember,
 } from "./types";
 
@@ -82,18 +81,6 @@ export function serializeCompanyMember(m: Raw): CompanyMember {
   };
 }
 
-export function serializeTeam(t: Raw, members: CompanyMember[] = []): Team {
-  return {
-    id: String(t._id),
-    companyId: String(t.companyId),
-    name: String(t.name ?? ""),
-    memberIds: idList(t.memberIds),
-    members,
-    createdAt: date(t.createdAt) ?? new Date(0),
-    updatedAt: date(t.updatedAt) ?? new Date(0),
-  };
-}
-
 export function serializeInvitation(i: Raw): Invitation {
   return {
     id: String(i._id),
@@ -145,9 +132,7 @@ export function serializeProject(p: Raw): Project {
     clientContacts: Array.isArray(p.clientContacts)
       ? (p.clientContacts as Raw[]).map(serializeClientContact)
       : [],
-    assignedTeamIds: idList(p.assignedTeamIds),
     assignedMemberIds: idList(p.assignedMemberIds),
-    receivingTeamIds: idList(p.receivingTeamIds),
     receivingMemberIds: idList(p.receivingMemberIds),
     capstone: serializeCapstone(p.capstone as Raw | null | undefined),
     publicSummary: str(p.publicSummary),
@@ -206,7 +191,8 @@ export function serializeMilestone(m: Raw): Milestone {
     title: m.title as string,
     description: (m.description as string) ?? "",
     url: str(m.url),
-    targetDate: date(m.targetDate),
+    startDate: date(m.startDate),
+    dueDate: date(m.dueDate),
     status: (m.status as Milestone["status"]) ?? "draft",
     assignees: Array.isArray(m.assignees)
       ? (m.assignees as Raw[]).map(serializeMilestoneAssignee)

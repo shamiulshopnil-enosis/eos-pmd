@@ -12,7 +12,8 @@ function milestone(p: Partial<Milestone>): Milestone {
     title: "M",
     description: "",
     url: null,
-    targetDate: null,
+    startDate: null,
+    dueDate: null,
     status: "draft",
     assignees: [],
     attachments: [],
@@ -34,20 +35,20 @@ function milestone(p: Partial<Milestone>): Milestone {
 
 describe("getMilestoneFlag", () => {
   it("flags a lapsed target date while draft or sent", () => {
-    expect(getMilestoneFlag(milestone({ status: "draft", targetDate: daysFrom(NOW, -1) }), NOW)).toBe("OVERDUE");
-    expect(getMilestoneFlag(milestone({ status: "sent", targetDate: daysFrom(NOW, -1) }), NOW)).toBe("OVERDUE");
+    expect(getMilestoneFlag(milestone({ status: "draft", dueDate: daysFrom(NOW, -1) }), NOW)).toBe("OVERDUE");
+    expect(getMilestoneFlag(milestone({ status: "sent", dueDate: daysFrom(NOW, -1) }), NOW)).toBe("OVERDUE");
   });
 
   it("only shows DUE_SOON for a draft inside the window", () => {
-    expect(getMilestoneFlag(milestone({ status: "draft", targetDate: daysFrom(NOW, 3) }), NOW)).toBe("DUE_SOON");
+    expect(getMilestoneFlag(milestone({ status: "draft", dueDate: daysFrom(NOW, 3) }), NOW)).toBe("DUE_SOON");
     // a sent milestone in the same window reads as awaiting review, not due soon
-    expect(getMilestoneFlag(milestone({ status: "sent", targetDate: daysFrom(NOW, 3) }), NOW)).toBe("AWAITING_REVIEW");
+    expect(getMilestoneFlag(milestone({ status: "sent", dueDate: daysFrom(NOW, 3) }), NOW)).toBe("AWAITING_REVIEW");
   });
 
   it("falls back to AWAITING_REVIEW / null", () => {
-    expect(getMilestoneFlag(milestone({ status: "sent", targetDate: null }), NOW)).toBe("AWAITING_REVIEW");
-    expect(getMilestoneFlag(milestone({ status: "draft", targetDate: daysFrom(NOW, 30) }), NOW)).toBeNull();
-    expect(getMilestoneFlag(milestone({ status: "reviewed", rating: 5, targetDate: daysFrom(NOW, -30) }), NOW)).toBeNull();
+    expect(getMilestoneFlag(milestone({ status: "sent", dueDate: null }), NOW)).toBe("AWAITING_REVIEW");
+    expect(getMilestoneFlag(milestone({ status: "draft", dueDate: daysFrom(NOW, 30) }), NOW)).toBeNull();
+    expect(getMilestoneFlag(milestone({ status: "reviewed", rating: 5, dueDate: daysFrom(NOW, -30) }), NOW)).toBeNull();
   });
 });
 
@@ -88,7 +89,7 @@ describe("computeAlerts", () => {
         id: "p1",
         name: "Overdue + stale",
         milestones: [
-          milestone({ status: "draft", targetDate: daysFrom(NOW, -2) }),
+          milestone({ status: "draft", dueDate: daysFrom(NOW, -2) }),
           milestone({ status: "sent", sentAt: daysFrom(NOW, -10) }),
         ],
       }),
