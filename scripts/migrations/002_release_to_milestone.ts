@@ -65,7 +65,7 @@ async function main() {
       projectId: r.projectId,
       title: r.name,
       description: buildDescription(r),
-      targetDate: r.plannedDeliveryDate ?? null,
+      dueDate: r.plannedDeliveryDate ?? null,
       status,
       rating: fb ? (fb.qualityOfDeliverables ?? fb.overallSatisfaction ?? null) : null,
       comment: fb ? (fb.comments ?? null) : null,
@@ -92,7 +92,7 @@ async function main() {
           projectId: p._id,
           title: "Project delivery",
           description: "",
-          targetDate: (p as Record<string, unknown>).expectedCompletionDate ?? null,
+          dueDate: (p as Record<string, unknown>).expectedCompletionDate ?? null,
           status: "draft",
         });
       } else if (existing.length > 1) {

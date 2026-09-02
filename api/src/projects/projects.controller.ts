@@ -118,13 +118,13 @@ export class ProjectsController {
     return { ok: true };
   }
 
-  @Post(":id/assigned-teams")
-  async setAssignedTeams(
+  @Post(":id/delivery-staffing")
+  async setDeliveryStaffing(
     @CurrentUser() user: SessionUser,
     @Param("id") id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    await this.projects.setAssignedTeams(user, id, body);
+    await this.projects.setDeliveryStaffing(user, id, body);
     return { ok: true };
   }
 

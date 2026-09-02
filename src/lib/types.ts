@@ -58,17 +58,6 @@ export interface CompanySummary extends Company {
   primaryContact: { name: string | null; email: string } | null;
 }
 
-/** A named grouping of company members. */
-export interface Team {
-  id: string;
-  companyId: string;
-  name: string;
-  memberIds: string[];
-  members: CompanyMember[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 /** The current viewer's derived access to a project (company-unification PR2). */
 export interface ProjectAccess {
   deliveryRole: CompanyRole | null;
@@ -111,10 +100,8 @@ export interface Project {
 
   vendorTeam: VendorTeamMember[]; // effective delivery people (resolved)
   clientContacts: ClientContact[]; // effective review people (resolved)
-  assignedTeamIds: string[];
-  assignedMemberIds: string[];
-  receivingTeamIds: string[];
-  receivingMemberIds: string[];
+  assignedMemberIds: string[]; // delivering-company people on the project
+  receivingMemberIds: string[]; // receiving-company people on the project
   myAccess?: ProjectAccess;
   capstone: CapstoneEndorsement | null;
 
@@ -168,7 +155,8 @@ export interface Milestone {
   title: string;
   description: string; // sanitized rich-text HTML
   url: string | null; // optional link (repo, demo, doc…)
-  targetDate: Date | null;
+  startDate: Date | null;
+  dueDate: Date | null;
   status: MilestoneStatus;
   assignees: MilestoneAssignee[]; // vendor teammates responsible for this milestone
   attachments: MilestoneAttachment[];

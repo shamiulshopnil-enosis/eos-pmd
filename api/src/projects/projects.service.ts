@@ -17,6 +17,7 @@ import {
   serializeProject,
 } from "../common/serialize";
 import { runningAverage } from "../common/scoring";
+import { sanitizeMilestoneHtml } from "../common/richtext";
 import { minReviewThreshold, COMPLETION_TIMEOUT_DAYS, RATING_SELF_CORRECTION_HOURS } from "../common/constants";
 import { CAPSTONE_ATTRIBUTE_POOL, MAX_CAPSTONE_ATTRIBUTES, tierForScore } from "../common/attributes";
 import {
@@ -46,6 +47,42 @@ const isValidId = (id: string) => Types.ObjectId.isValid(id);
 const toObjectIds = (ids: string[]) =>
   ids.filter(isValidId).map((id) => new Types.ObjectId(id));
 
+const toDate = (v: unknown): Date | null => {
+  if (typeof v !== "string" || v === "") return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/**
+ * Milestones added inline on the new-project form. The client serialises them
+ * into a `milestonesJson` field: `[{title, startDate?, dueDate?, description?}]`.
+ * Only rows with a title survive.
+ */
+function parseInlineMilestones(
+  body: Record<string, unknown>,
+): { title: string; description: string; startDate: Date | null; dueDate: Date | null }[] {
+  const raw = body["milestonesJson"];
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((r) => {
+      const row = (r ?? {}) as Record<string, unknown>;
+      return {
+        title: typeof row.title === "string" ? row.title.trim() : "",
+        description: typeof row.description === "string" ? row.description : "",
+        startDate: toDate(row.startDate),
+        dueDate: toDate(row.dueDate),
+      };
+    })
+    .filter((m) => m.title !== "");
+}
+
 /**
  * Merge people resolved from the company model with any legacy embedded rows.
  * Company-resolved rows win on an email clash (they carry current userId / role);
@@ -67,7 +104,6 @@ export class ProjectsService {
     @InjectModel(MODEL.Milestone) private readonly milestones: Model<any>,
     @InjectModel(MODEL.Activity) private readonly activities: Model<any>,
     @InjectModel(MODEL.Invitation) private readonly invitations: Model<any>,
-    @InjectModel(MODEL.Team) private readonly teams: Model<any>,
     @InjectModel(MODEL.CompanyMember) private readonly companyMembers: Model<any>,
     private readonly activity: ActivityService,
     private readonly users: UsersService,
@@ -109,10 +145,10 @@ export class ProjectsService {
   /**
    * Resolve each project's effective people from the company model (company-unification
    * PR2) and, when a `user` is given, compute their `myAccess`:
-   *  - `vendorTeam`   = delivering-company owners/admins + people on assigned
-   *                     delivery teams / assigned individually
-   *  - `clientContacts` = receiving-company owners/admins + people on assigned
-   *                     review teams / assigned individually
+   *  - `vendorTeam`   = delivering-company owners/admins + people assigned to
+   *                     the project on the delivery side
+   *  - `clientContacts` = receiving-company owners/admins + people assigned to
+   *                     the project on the review side
    * Legacy embedded `vendorTeam` / `clientContacts` rows are merged in so
    * grandfathered projects still render.
    */
@@ -120,32 +156,17 @@ export class ProjectsService {
     projects: T[],
     user?: SessionUser,
   ): Promise<T[]> {
-    const teamIds = new Set<string>();
     const memberIds = new Set<string>();
     const companyIds = new Set<string>();
     for (const p of projects) {
-      for (const id of [...(p.assignedTeamIds ?? []), ...(p.receivingTeamIds ?? [])]) teamIds.add(id);
       for (const id of [...(p.assignedMemberIds ?? []), ...(p.receivingMemberIds ?? [])])
         memberIds.add(id);
       if (p.deliveringCompanyId) companyIds.add(p.deliveringCompanyId);
       if (p.receivingCompanyId) companyIds.add(p.receivingCompanyId);
     }
 
-    const teamDocs = teamIds.size
-      ? await this.teams
-          .find({ _id: { $in: toObjectIds([...teamIds]) } })
-          .select({ memberIds: 1 })
-          .lean()
-      : [];
-    const teamMembers = new Map<string, string[]>();
-    for (const t of teamDocs) {
-      const ids = ((t.memberIds as unknown[]) ?? []).map((m) => String(m));
-      teamMembers.set(String(t._id), ids);
-      for (const id of ids) memberIds.add(id);
-    }
-
-    // Every membership we might need: assigned individuals/team members, plus
-    // all owners/admins of the two companies.
+    // Every membership we might need: assigned individuals, plus all
+    // owners/admins of the two companies.
     const membershipDocs: Record<string, any>[] = [];
     if (memberIds.size) {
       membershipDocs.push(
@@ -171,11 +192,9 @@ export class ProjectsService {
 
     const resolveSide = (
       companyId: string | null,
-      sideTeamIds: string[],
       sideMemberIds: string[],
     ): { people: VendorTeamMember[]; myRole: string | null; assigned: boolean } => {
       const wanted = new Set<string>(sideMemberIds);
-      for (const tid of sideTeamIds) for (const mid of teamMembers.get(tid) ?? []) wanted.add(mid);
       const seen = new Set<string>();
       const people: VendorTeamMember[] = [];
       const push = (m: Record<string, any>) => {
@@ -204,16 +223,8 @@ export class ProjectsService {
     };
 
     return projects.map((p) => {
-      const delivery = resolveSide(
-        p.deliveringCompanyId,
-        p.assignedTeamIds ?? [],
-        p.assignedMemberIds ?? [],
-      );
-      const review = resolveSide(
-        p.receivingCompanyId,
-        p.receivingTeamIds ?? [],
-        p.receivingMemberIds ?? [],
-      );
+      const delivery = resolveSide(p.deliveringCompanyId, p.assignedMemberIds ?? []);
+      const review = resolveSide(p.receivingCompanyId, p.receivingMemberIds ?? []);
 
       const out: T = {
         ...p,
@@ -244,9 +255,9 @@ export class ProjectsService {
 
   /**
    * Ids of every project the user can access on the given side(s).
-   * Owners/admins of an company reach all its projects; plain members reach only
-   * projects they're assigned to (team or individual). Legacy embedded rows are
-   * still matched for grandfathered projects.
+   * Owners/admins of a company reach all its projects; plain members reach only
+   * projects they're individually assigned to. Legacy embedded rows are still
+   * matched for grandfathered projects.
    */
   async projectIdsForUser(
     userId?: string,
@@ -263,10 +274,6 @@ export class ProjectsService {
       .filter((m) => m.role === "owner" || m.role === "admin")
       .map((m) => m.companyId as Types.ObjectId);
     const myMemberIds = myMemberships.map((m) => m._id as Types.ObjectId);
-    const myTeams = myMemberIds.length
-      ? await this.teams.find({ memberIds: { $in: myMemberIds } }).select({ _id: 1 }).lean()
-      : [];
-    const myTeamIds = myTeams.map((t) => t._id as Types.ObjectId);
 
     const deliveryOr: Record<string, unknown>[] = [{ "vendorTeam.userId": uid }];
     const reviewOr: Record<string, unknown>[] = [{ "clientContacts.userId": uid }];
@@ -277,10 +284,6 @@ export class ProjectsService {
     if (myMemberIds.length) {
       deliveryOr.push({ assignedMemberIds: { $in: myMemberIds } });
       reviewOr.push({ receivingMemberIds: { $in: myMemberIds } });
-    }
-    if (myTeamIds.length) {
-      deliveryOr.push({ assignedTeamIds: { $in: myTeamIds } });
-      reviewOr.push({ receivingTeamIds: { $in: myTeamIds } });
     }
 
     const or =
@@ -495,27 +498,15 @@ export class ProjectsService {
     return { companyId: company.id, name: company.name, contactEmail, contactName, designation };
   }
 
-  /** Keep only assignment ids that are real teams/members of the delivering company. */
-  private async ownedAssignments(
-    companyId: string,
-    teamIds: string[],
-    memberIds: string[],
-  ): Promise<{ teamIds: Types.ObjectId[]; memberIds: Types.ObjectId[] }> {
-    const company = new Types.ObjectId(companyId);
-    const teamOids = toObjectIds(teamIds);
+  /** Keep only ids that are real members of the given company. */
+  private async ownedMemberIds(companyId: string, memberIds: string[]): Promise<Types.ObjectId[]> {
     const memberOids = toObjectIds(memberIds);
-    const [teams, members] = await Promise.all([
-      teamOids.length
-        ? this.teams.find({ _id: { $in: teamOids }, companyId: company }).select({ _id: 1 }).lean()
-        : [],
-      memberOids.length
-        ? this.companyMembers.find({ _id: { $in: memberOids }, companyId: company }).select({ _id: 1 }).lean()
-        : [],
-    ]);
-    return {
-      teamIds: teams.map((t) => t._id as Types.ObjectId),
-      memberIds: members.map((m) => m._id as Types.ObjectId),
-    };
+    if (memberOids.length === 0) return [];
+    const members = await this.companyMembers
+      .find({ _id: { $in: memberOids }, companyId: new Types.ObjectId(companyId) })
+      .select({ _id: 1 })
+      .lean();
+    return members.map((m) => m._id as Types.ObjectId);
   }
 
   async createProject(user: SessionUser, body: Record<string, unknown>): Promise<{ id: string }> {
@@ -529,9 +520,8 @@ export class ProjectsService {
       throw new BadRequestException("A project's client company must differ from your own.");
     }
 
-    const assignments = await this.ownedAssignments(
+    const assignedMemberIds = await this.ownedMemberIds(
       deliveringCompanyId,
-      strList(body, "teamIds"),
       strList(body, "memberIds"),
     );
 
@@ -551,8 +541,7 @@ export class ProjectsService {
       internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
       projectType: str(body, "projectType") === "whole" ? "whole" : "milestone",
-      assignedTeamIds: assignments.teamIds,
-      assignedMemberIds: assignments.memberIds,
+      assignedMemberIds,
       vendorTeam: [
         { userId: user.id, email: user.email, name: user.name, role: "owner", invitePending: false },
       ],
@@ -602,9 +591,26 @@ export class ProjectsService {
         projectId,
         title: "Project delivery",
         description: "",
-        targetDate: optDate(body, "expectedCompletionDate"),
+        dueDate: optDate(body, "expectedCompletionDate"),
         status: "draft",
       });
+    } else {
+      const inline = parseInlineMilestones(body);
+      for (const m of inline) {
+        await this.milestones.create({
+          projectId,
+          title: m.title,
+          description: sanitizeMilestoneHtml(m.description),
+          startDate: m.startDate,
+          dueDate: m.dueDate,
+          status: "draft",
+        });
+        await this.activity.log({
+          projectId,
+          type: "RELEASE_CREATED",
+          message: `Milestone "${m.title}" created`,
+        });
+      }
     }
     await this.recomputeProjectScore(projectId);
 
@@ -656,11 +662,11 @@ export class ProjectsService {
   }
 
   /**
-   * Replace a project's assigned teams / individual members (Team Management
-   * feature). The effective vendor team is recomputed live on every read from
-   * these ids, so there is nothing else to sync.
+   * Replace the delivering-company people assigned to a project. The effective
+   * vendor team is recomputed live on every read from these ids, so there is
+   * nothing else to sync.
    */
-  async setAssignedTeams(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
+  async setDeliveryStaffing(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
     const project = await this.requirePermission(
       projectId,
       user,
@@ -670,19 +676,14 @@ export class ProjectsService {
     const deliveringCompanyId =
       project.deliveringCompanyId ??
       (await this.companies.resolveActingCompany(user, optStr(body, "deliveringCompanyId") ?? undefined));
-    const assignments = await this.ownedAssignments(
-      deliveringCompanyId,
-      strList(body, "teamIds"),
-      strList(body, "memberIds"),
-    );
-    await this.projects.findByIdAndUpdate(projectId, {
-      assignedTeamIds: assignments.teamIds,
-      assignedMemberIds: assignments.memberIds,
-    });
+    const assignedMemberIds = await this.ownedMemberIds(deliveringCompanyId, strList(body, "memberIds"));
+    await this.projects.findByIdAndUpdate(projectId, { assignedMemberIds });
     await this.activity.log({
       projectId,
       type: "PROJECT_UPDATED",
-      message: `Project staffing updated — ${assignments.teamIds.length} team(s), ${assignments.memberIds.length} individual(s)`,
+      message: `Project staffing updated — ${assignedMemberIds.length} ${
+        assignedMemberIds.length === 1 ? "person" : "people"
+      }`,
     });
   }
 
@@ -914,9 +915,9 @@ export class ProjectsService {
   }
 
   // -------------------------------------------------------------------------
-  // Review-side staffing (company-unification PR2). Mirror of setAssignedTeams for
-  // the receiving company. The receiving company's owner/admin picks which of their
-  // teams / people are on the project.
+  // Review-side staffing (company-unification PR2). Mirror of setDeliveryStaffing
+  // for the receiving company. Its owner/admin picks which of their people are
+  // on the project.
   // -------------------------------------------------------------------------
 
   async setReviewStaffing(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
@@ -927,20 +928,17 @@ export class ProjectsService {
       "Only a receiving-company owner or admin can change review staffing.",
     );
     if (!project.receivingCompanyId) throw new BadRequestException("This project has no client company.");
-    const assignments = await this.ownedAssignments(
+    const receivingMemberIds = await this.ownedMemberIds(
       project.receivingCompanyId,
-      strList(body, "teamIds"),
       strList(body, "memberIds"),
     );
-    await this.projects.findByIdAndUpdate(projectId, {
-      receivingTeamIds: assignments.teamIds,
-      receivingMemberIds: assignments.memberIds,
-    });
+    await this.projects.findByIdAndUpdate(projectId, { receivingMemberIds });
     await this.activity.log({
       projectId,
       type: "PROJECT_UPDATED",
-      message: `Client staffing updated — ${assignments.teamIds.length} team(s), ${assignments.memberIds.length} individual(s)`,
+      message: `Client staffing updated — ${receivingMemberIds.length} ${
+        receivingMemberIds.length === 1 ? "person" : "people"
+      }`,
     });
   }
-
 }

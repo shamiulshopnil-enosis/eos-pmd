@@ -261,7 +261,7 @@ export async function unpublishProject(projectId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Companies, members, teams (company-unification)
+// Companies, members (company-unification)
 // ---------------------------------------------------------------------------
 
 export async function addCompanyMember(companyId: string, formData: FormData) {
@@ -285,33 +285,17 @@ export async function renameCompany(companyId: string, formData: FormData) {
   revalidatePath("/companies");
 }
 
-export async function createTeam(formData: FormData) {
-  await post(`/teams`, formToObject(formData));
-  revalidatePath("/team");
-}
-
-export async function updateTeam(teamId: string, formData: FormData) {
-  await patch(`/teams/${teamId}`, formToObject(formData));
-  revalidatePath("/team");
-}
-
-export async function deleteTeam(teamId: string) {
-  await del(`/teams/${teamId}`);
-  revalidatePath("/team");
-}
-
-/** Replace a project's assigned delivery teams / individual members. */
+/** Replace the delivering-company people assigned to a project. */
 export async function setProjectStaffing(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/assigned-teams`, formToObject(formData));
+  await post(`/projects/${projectId}/delivery-staffing`, formToObject(formData));
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/team`);
 }
 
-/** Replace a project's client-side (review) teams / individual members. */
+/** Replace the receiving-company people assigned to a project's review side. */
 export async function setReviewStaffing(projectId: string, formData: FormData) {
   await post(`/projects/${projectId}/review-staffing`, formToObject(formData));
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath(`/projects/${projectId}/team`);
   revalidatePath(`/projects/${projectId}/team`);
 }
 

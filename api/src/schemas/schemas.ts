@@ -117,19 +117,6 @@ export const VendorMemberSchema = new Schema(
 );
 VendorMemberSchema.index({ ownerUserId: 1, email: 1 }, { unique: true });
 
-// A named grouping of CompanyMember ids, owned by one company. Assigning a
-// team to a project is a live reference: the effective team on the project
-// always reflects the team's current membership.
-export const TeamSchema = new Schema(
-  {
-    companyId: { type: Schema.Types.ObjectId, ref: "Company", index: true },
-    ownerUserId: { type: Schema.Types.ObjectId, ref: "User" }, // legacy, unused after migration
-    name: { type: String, required: true, trim: true },
-    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
-  },
-  { timestamps: true },
-);
-
 // Legacy — kept registered so migration 007 can read old rows. No longer written.
 export const ClientCompanySchema = new Schema(
   {
@@ -180,13 +167,12 @@ export const ProjectSchema = new Schema(
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
 
-    // Live-reference staffing (company-unification). `assigned*` = delivering side,
-    // `receiving*` = client side. The effective people lists (`vendorTeam` /
+    // Live-reference staffing (company-unification). `assignedMemberIds` = the
+    // delivering-company people on the project, `receivingMemberIds` = the
+    // receiving-company people. The effective people lists (`vendorTeam` /
     // `clientContacts` on a read) are resolved from these plus each company's
     // owners/admins.
-    assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
     assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
-    receivingTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
     receivingMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
 
     capstone: { type: capstoneEndorsementSchema, default: null },
@@ -253,7 +239,8 @@ export const MilestoneSchema = new Schema(
     title: { type: String, required: true },
     description: { type: String, default: "" },
     url: { type: String, default: null },
-    targetDate: { type: Date, default: null },
+    startDate: { type: Date, default: null },
+    dueDate: { type: Date, default: null },
     status: { type: String, enum: MILESTONE_STATUS, default: "draft" },
     assignees: { type: [milestoneAssigneeSchema], default: [] },
     attachments: { type: [milestoneAttachmentSchema], default: [] },
@@ -321,7 +308,6 @@ export const MODEL = {
   LoginCode: "LoginCode",
   Invitation: "Invitation",
   VendorMember: "VendorMember",
-  Team: "Team",
   ClientCompany: "ClientCompany",
   Company: "Company",
   CompanyMember: "CompanyMember",

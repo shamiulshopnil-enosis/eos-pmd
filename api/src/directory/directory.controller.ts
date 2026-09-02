@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CompaniesService } from "./companies.service";
 import { CompanyMembersService } from "./company-members.service";
-import { TeamsService } from "./teams.service";
 import { CurrentUser } from "../common/auth.decorators";
 import type { SessionUser } from "../common/types";
 
@@ -71,36 +70,6 @@ export class CompaniesController {
     @Param("membershipId") membershipId: string,
   ) {
     await this.members.remove(user, id, membershipId);
-    return { ok: true };
-  }
-}
-
-@Controller("teams")
-export class TeamsController {
-  constructor(private readonly teams: TeamsService) {}
-
-  @Get()
-  list(@CurrentUser() user: SessionUser, @Query("companyId") companyId?: string) {
-    return this.teams.list(user, companyId);
-  }
-
-  @Post()
-  create(@CurrentUser() user: SessionUser, @Body() body: Record<string, unknown>) {
-    return this.teams.create(user, body);
-  }
-
-  @Patch(":id")
-  update(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.teams.update(user, id, body);
-  }
-
-  @Delete(":id")
-  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    await this.teams.remove(user, id);
     return { ok: true };
   }
 }

@@ -57,8 +57,12 @@ export default async function MilestoneDetailPage({
           <SectionHeading>Milestone Details</SectionHeading>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Target Date</dt>
-              <dd className="text-slate-700 dark:text-slate-200">{formatDate(milestone.targetDate)}</dd>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Start Date</dt>
+              <dd className="text-slate-700 dark:text-slate-200">{formatDate(milestone.startDate)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Due Date</dt>
+              <dd className="text-slate-700 dark:text-slate-200">{formatDate(milestone.dueDate)}</dd>
             </div>
             <div>
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Created</dt>

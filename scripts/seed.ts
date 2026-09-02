@@ -31,7 +31,7 @@ async function ensureUser(email: string, name: string, role: "admin" | "member" 
 type MilestoneSeed = {
   title: string;
   description?: string;
-  targetDate?: Date | null;
+  dueDate?: Date | null;
   status: "draft" | "sent" | "reviewed";
   rating?: number;
   comment?: string;
@@ -44,7 +44,7 @@ async function addMilestone(projectId: mongoose.Types.ObjectId, m: MilestoneSeed
     projectId,
     title: m.title,
     description: m.description ?? "",
-    targetDate: m.targetDate ?? null,
+    dueDate: m.dueDate ?? null,
     status: m.status,
     rating: m.rating ?? null,
     comment: m.comment ?? null,
@@ -138,7 +138,7 @@ async function main() {
   const p1m1 = await addMilestone(p1._id, {
     title: "Whole Project — Corporate Rebrand Rollout",
     description: "<p>The complete engagement, reviewed once on delivery.</p>",
-    targetDate: daysAgo(10),
+    dueDate: daysAgo(10),
     status: "reviewed",
     rating: 5,
     comment: "Exactly what we hoped for — polished and delivered on time.",
@@ -210,7 +210,7 @@ async function main() {
   const p2m1 = await addMilestone(p2._id, {
     title: "Milestone 1 — Product Catalog",
     description: "<ul><li>Catalog UI</li><li>Search API</li><li>Product detail pages</li></ul>",
-    targetDate: daysAgo(50),
+    dueDate: daysAgo(50),
     status: "reviewed",
     rating: 4,
     comment: "Solid catalog. A couple of small tweaks after review, handled quickly.",
@@ -219,26 +219,26 @@ async function main() {
   const p2m2 = await addMilestone(p2._id, {
     title: "Milestone 2 — Shopping Cart & Checkout",
     description: "<ul><li>Cart</li><li>Checkout flow</li><li>Promo codes</li></ul>",
-    targetDate: daysAgo(12),
+    dueDate: daysAgo(12),
     status: "sent",
     sentAt: daysAgo(9),
   });
   const p2m3 = await addMilestone(p2._id, {
     title: "Milestone 3 — Payment Integration",
     description: "<ul><li>Stripe integration</li><li>Refunds</li><li>Receipts</li></ul>",
-    targetDate: daysAgo(3),
+    dueDate: daysAgo(3),
     status: "draft",
   });
   await addMilestone(p2._id, {
     title: "Milestone 4 — Customer Dashboard",
     description: "<ul><li>Order history</li><li>Account settings</li></ul>",
-    targetDate: daysFromNow(20),
+    dueDate: daysFromNow(20),
     status: "draft",
   });
   await addMilestone(p2._id, {
     title: "Milestone 5 — Production Launch",
     description: "<ul><li>App store submission</li><li>Launch monitoring</li></ul>",
-    targetDate: daysFromNow(45),
+    dueDate: daysFromNow(45),
     status: "draft",
   });
 
@@ -321,7 +321,7 @@ async function main() {
 
   const p3m1 = await addMilestone(p3._id, {
     title: "Milestone 1 — Homepage & Design System",
-    targetDate: daysAgo(172),
+    dueDate: daysAgo(172),
     status: "reviewed",
     rating: 5,
     comment: "Loved the new homepage — great collaboration throughout.",
@@ -329,7 +329,7 @@ async function main() {
   });
   const p3m2 = await addMilestone(p3._id, {
     title: "Milestone 2 — Blog Platform",
-    targetDate: daysAgo(120),
+    dueDate: daysAgo(120),
     status: "reviewed",
     rating: 5,
     comment: "Reliable delivery, no surprises.",
@@ -337,7 +337,7 @@ async function main() {
   });
   const p3m3 = await addMilestone(p3._id, {
     title: "Milestone 3 — Launch & Handover",
-    targetDate: daysAgo(80),
+    dueDate: daysAgo(80),
     status: "reviewed",
     rating: 5,
     comment: "Smooth launch and a thorough handover.",
