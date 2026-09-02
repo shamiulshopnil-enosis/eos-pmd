@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
-import { isVendorTeamMember } from "@/lib/permissions";
+import { isVendorOwner, isVendorTeamMember } from "@/lib/permissions";
 import { getMilestoneFlag } from "@/lib/derived";
 import { deleteMilestone, reopenMilestone, requestRatingReconsideration, sendMilestoneForReview } from "@/lib/actions";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { MILESTONE_RATING_LABEL } from "@/lib/constants";
-import { Card, FlagBadge, MilestoneStatusBadge, PageHeader, SectionHeading, StarRating } from "@/components/ui";
+import { Card, FlagBadge, MilestoneStatusBadge, PageHeader, SectionHeading } from "@/components/ui";
+import MilestoneAttachments from "@/components/MilestoneAttachments";
+import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 
 export default async function MilestoneDetailPage({
   params,
@@ -63,6 +64,26 @@ export default async function MilestoneDetailPage({
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Created</dt>
               <dd className="text-slate-700 dark:text-slate-200">{formatDate(milestone.createdAt)}</dd>
             </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">Assigned to</dt>
+              <dd className="text-slate-700 dark:text-slate-200">
+                {milestone.assignees.length === 0
+                  ? "—"
+                  : milestone.assignees.map((a) => a.name ?? a.email).join(", ")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">URL</dt>
+              <dd className="truncate text-slate-700 dark:text-slate-200">
+                {milestone.url ? (
+                  <a href={milestone.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    {milestone.url}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </dd>
+            </div>
           </dl>
 
           {milestone.description ? (
@@ -75,6 +96,17 @@ export default async function MilestoneDetailPage({
               No description.
             </p>
           )}
+
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <SectionHeading>Attachments</SectionHeading>
+            <MilestoneAttachments
+              projectId={id}
+              milestone={milestone}
+              currentUserId={user.id}
+              isVendorOwner={isVendorOwner(user, project)}
+              canUpload={project.executionStatus !== "completed"}
+            />
+          </div>
         </Card>
 
         <div className="space-y-4">
@@ -84,7 +116,7 @@ export default async function MilestoneDetailPage({
             {milestone.status === "draft" ? (
               <div className="space-y-3">
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Send this milestone to the client for their {MILESTONE_RATING_LABEL} rating.
+                  Send this milestone to the client for their review.
                 </p>
                 {siblingSent ? (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">
@@ -118,16 +150,18 @@ export default async function MilestoneDetailPage({
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{MILESTONE_RATING_LABEL}</span>
-                  <StarRating value={milestone.rating} />
-                </div>
+                <MilestoneReviewSummary milestone={milestone} />
                 {milestone.comment ? (
                   <blockquote className="rounded-lg bg-slate-50 p-3 text-sm italic text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     &ldquo;{milestone.comment}&rdquo;
                   </blockquote>
                 ) : null}
-                <div className="text-xs text-slate-400">Reviewed {formatDateTime(milestone.reviewedAt)}</div>
+                <div className="text-xs text-slate-400">
+                  Reviewed {formatDateTime(milestone.reviewedAt)}
+                  {milestone.reviewedByName || milestone.reviewedByEmail
+                    ? ` by ${milestone.reviewedByName ?? milestone.reviewedByEmail}`
+                    : ""}
+                </div>
                 {milestone.editRequestedByVendor ? (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                     Reconsideration requested — waiting on the client. They may or may not change it.

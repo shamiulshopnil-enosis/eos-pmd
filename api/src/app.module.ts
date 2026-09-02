@@ -9,6 +9,7 @@ import { ActivityModule } from "./activity/activity.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { MilestonesModule } from "./milestones/milestones.module";
 import { InvitationsModule } from "./invitations/invitations.module";
+import { DirectoryModule } from "./directory/directory.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -21,6 +22,7 @@ import { HealthController } from "./health.controller";
     ProjectsModule,
     MilestonesModule,
     InvitationsModule,
+    DirectoryModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

@@ -21,8 +21,63 @@ export const AT_RISK_RATING_THRESHOLD = 3.0;
 /** A milestone becomes "Due Soon" inside this many days of its target date. */
 export const DUE_SOON_WINDOW_DAYS = 7;
 
-/** The single rating dimension a client gives each milestone (spec §6.4). */
-export const MILESTONE_RATING_LABEL = "Quality of Deliverables";
+/** Label for the milestone's overall score (the average of the review dimensions). */
+export const MILESTONE_RATING_LABEL = "Overall";
+
+/**
+ * The client milestone review — the five delivery dimensions ported from the
+ * Enosis "Client Feedback Form" (items 1–5). Each `options[0]` scores 5 (best)
+ * down to `options[4]` scoring 1. `milestone.rating` is the average of the five,
+ * so all existing scoring keeps working off one number.
+ */
+export const MILESTONE_REVIEW_DIMENSIONS = [
+  {
+    key: "deliverables",
+    label: "Quality of deliverables",
+    question:
+      "How would you evaluate the quality of the deliverables provided in this milestone?",
+    options: ["Very Good", "Good", "Satisfactory", "Poor", "Very Poor"],
+  },
+  {
+    key: "timeliness",
+    label: "Timeliness & reliability",
+    question:
+      "How satisfied are you with the timeliness and reliability of the team in meeting this milestone's deadlines as expected?",
+    options: ["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"],
+  },
+  {
+    key: "understanding",
+    label: "Understanding of requirements",
+    question:
+      "How would you rate the team's understanding of your project's requirements — your product, target users, business goals, vision, and the broader industry you operate in?",
+    options: ["Very Good", "Good", "Satisfactory", "Poor", "Very Poor"],
+  },
+  {
+    key: "planning",
+    label: "Planning & management",
+    question:
+      "How would you assess the quality of project planning and management, including the accuracy of task estimates compared to your expectations?",
+    options: ["Very Good", "Good", "Satisfactory", "Poor", "Very Poor"],
+  },
+  {
+    key: "communication",
+    label: "Communication",
+    question:
+      "Please rate the team's communication skills, including clarity, responsiveness, and consistency.",
+    options: ["Very Good", "Good", "Satisfactory", "Poor", "Very Poor"],
+  },
+] as const;
+
+export type MilestoneReviewDimensionKey = (typeof MILESTONE_REVIEW_DIMENSIONS)[number]["key"];
+
+/** Map a stored 1–5 score back to its label for a given dimension. */
+export function reviewScoreLabel(key: MilestoneReviewDimensionKey, score: number | null): string {
+  if (score == null) return "—";
+  const dim = MILESTONE_REVIEW_DIMENSIONS.find((d) => d.key === key);
+  if (!dim) return String(score);
+  const idx = 5 - Math.round(score); // 5 -> options[0]
+  return dim.options[idx] ?? String(score);
+}
 
 // ---------------------------------------------------------------------------
 // Milestones plan §11 — TBD numbers, each with a working default so a later

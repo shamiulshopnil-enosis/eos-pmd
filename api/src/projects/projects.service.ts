@@ -27,9 +27,27 @@ import type {
   Project,
   ProjectWithMilestones,
   SessionUser,
+  VendorTeamMember,
 } from "../common/types";
 
 const isValidId = (id: string) => Types.ObjectId.isValid(id);
+const toObjectIds = (ids: string[]) =>
+  ids.filter(isValidId).map((id) => new Types.ObjectId(id));
+
+/**
+ * Merge a project's stored vendorTeam (the founding owner + any grandfathered
+ * rows) with the people resolved live from its assigned teams / members. Stored
+ * rows win on an email clash so the founding owner keeps their role.
+ */
+function mergeVendorTeam(
+  stored: VendorTeamMember[],
+  resolved: VendorTeamMember[],
+): VendorTeamMember[] {
+  const byEmail = new Map<string, VendorTeamMember>();
+  for (const r of resolved) byEmail.set(r.email.toLowerCase(), r);
+  for (const s of stored) byEmail.set(s.email.toLowerCase(), s);
+  return [...byEmail.values()];
+}
 
 @Injectable()
 export class ProjectsService {
@@ -38,6 +56,9 @@ export class ProjectsService {
     @InjectModel(MODEL.Milestone) private readonly milestones: Model<any>,
     @InjectModel(MODEL.Activity) private readonly activities: Model<any>,
     @InjectModel(MODEL.Invitation) private readonly invitations: Model<any>,
+    @InjectModel(MODEL.Team) private readonly teams: Model<any>,
+    @InjectModel(MODEL.VendorMember) private readonly vendorMembers: Model<any>,
+    @InjectModel(MODEL.ClientCompany) private readonly clientCompanies: Model<any>,
     private readonly activity: ActivityService,
     private readonly users: UsersService,
   ) {}
@@ -63,19 +84,84 @@ export class ProjectsService {
     return projects.map((p) => ({ ...p, milestones: byProject.get(p.id) ?? [] }));
   }
 
-  private withVendorScope(query: Record<string, unknown>, vendorUserId?: string): Record<string, unknown> {
-    if (vendorUserId && isValidId(vendorUserId)) {
-      query["vendorTeam.userId"] = new Types.ObjectId(vendorUserId);
+  /**
+   * Resolve every project's assigned teams / members and fold the current
+   * membership into `project.vendorTeam` (live reference — Team Management
+   * feature). All downstream permission checks and UI keep reading
+   * `vendorTeam`, so nothing else has to change.
+   */
+  private async hydrateVendorTeams<T extends Project>(projects: T[]): Promise<T[]> {
+    const teamIds = new Set<string>();
+    const memberIds = new Set<string>();
+    for (const p of projects) {
+      for (const id of p.assignedTeamIds ?? []) teamIds.add(id);
+      for (const id of p.assignedMemberIds ?? []) memberIds.add(id);
     }
-    return query;
+    if (teamIds.size === 0 && memberIds.size === 0) return projects;
+
+    const teamDocs = teamIds.size
+      ? await this.teams
+          .find({ _id: { $in: toObjectIds([...teamIds]) } })
+          .select({ memberIds: 1 })
+          .lean()
+      : [];
+    const teamMembers = new Map<string, string[]>();
+    for (const t of teamDocs) {
+      const ids = ((t.memberIds as unknown[]) ?? []).map((m) => String(m));
+      teamMembers.set(String(t._id), ids);
+      for (const id of ids) memberIds.add(id);
+    }
+
+    const memberDocs = memberIds.size
+      ? await this.vendorMembers.find({ _id: { $in: toObjectIds([...memberIds]) } }).lean()
+      : [];
+    const memberById = new Map<string, Record<string, any>>(
+      memberDocs.map((m) => [String(m._id), m as Record<string, any>]),
+    );
+
+    return projects.map((p) => {
+      const wanted = new Set<string>(p.assignedMemberIds ?? []);
+      for (const tid of p.assignedTeamIds ?? []) {
+        for (const mid of teamMembers.get(tid) ?? []) wanted.add(mid);
+      }
+      const resolved: VendorTeamMember[] = [];
+      for (const mid of wanted) {
+        const m = memberById.get(mid);
+        if (!m) continue;
+        resolved.push({
+          userId: m.userId ? String(m.userId) : null,
+          email: String(m.email),
+          name: m.name ?? null,
+          role: m.role === "owner" ? "owner" : "member",
+          invitePending: m.userId == null,
+        });
+      }
+      return { ...p, vendorTeam: mergeVendorTeam(p.vendorTeam, resolved) };
+    });
   }
 
-  private async projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
+  /**
+   * The ids of every project a vendor user belongs to — whether as a stored
+   * vendorTeam row (founding owner / grandfathered) or via an assigned team or
+   * an individual assignment that resolves to a directory member linked to
+   * their account. Returns null when there is no vendor scope to apply.
+   */
+  async projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
     if (!vendorUserId || !isValidId(vendorUserId)) return null;
-    const docs = await this.projects
-      .find({ "vendorTeam.userId": new Types.ObjectId(vendorUserId) })
-      .select({ _id: 1 })
-      .lean();
+    const uid = new Types.ObjectId(vendorUserId);
+
+    const myMembers = await this.vendorMembers.find({ userId: uid }).select({ _id: 1 }).lean();
+    const myMemberIds = myMembers.map((m) => m._id as Types.ObjectId);
+    const myTeams = myMemberIds.length
+      ? await this.teams.find({ memberIds: { $in: myMemberIds } }).select({ _id: 1 }).lean()
+      : [];
+    const myTeamIds = myTeams.map((t) => t._id as Types.ObjectId);
+
+    const or: Record<string, unknown>[] = [{ "vendorTeam.userId": uid }];
+    if (myMemberIds.length) or.push({ assignedMemberIds: { $in: myMemberIds } });
+    if (myTeamIds.length) or.push({ assignedTeamIds: { $in: myTeamIds } });
+
+    const docs = await this.projects.find({ $or: or }).select({ _id: 1 }).lean();
     return docs.map((d) => d._id as Types.ObjectId);
   }
 
@@ -83,8 +169,9 @@ export class ProjectsService {
   // reads (ported from data.ts)
   // -------------------------------------------------------------------------
 
-  countProjects(vendorUserId?: string): Promise<number> {
-    return this.projects.countDocuments(this.withVendorScope({}, vendorUserId));
+  async countProjects(vendorUserId?: string): Promise<number> {
+    const ids = await this.projectIdsForVendor(vendorUserId);
+    return this.projects.countDocuments(ids ? { _id: { $in: ids } } : {});
   }
 
   async listProjectsWithMilestones(filter: {
@@ -92,15 +179,18 @@ export class ProjectsService {
     q?: string;
     vendorUserId?: string;
   } = {}): Promise<ProjectWithMilestones[]> {
-    const query: Record<string, unknown> = this.withVendorScope({}, filter.vendorUserId);
-    if (filter.status) query.status = filter.status;
+    const clauses: Record<string, unknown>[] = [];
+    const ids = await this.projectIdsForVendor(filter.vendorUserId);
+    if (ids) clauses.push({ _id: { $in: ids } });
+    if (filter.status) clauses.push({ status: filter.status });
     if (filter.q) {
       const rx = new RegExp(filter.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      query.$or = [{ name: rx }, { clientCompanyName: rx }];
+      clauses.push({ $or: [{ name: rx }, { clientCompanyName: rx }] });
     }
+    const query = clauses.length ? { $and: clauses } : {};
     const projectDocs = await this.projects.find(query).sort({ updatedAt: -1 }).lean();
     const projects = projectDocs.map((p) => serializeProject(p as Record<string, unknown>));
-    return this.attachMilestones(projects);
+    return this.attachMilestones(await this.hydrateVendorTeams(projects));
   }
 
   async listProjectsForUser(userId: string): Promise<ProjectWithMilestones[]> {
@@ -110,13 +200,17 @@ export class ProjectsService {
       .sort({ updatedAt: -1 })
       .lean();
     const projects = docs.map((p) => serializeProject(p as Record<string, unknown>));
-    return this.attachMilestones(projects);
+    return this.attachMilestones(await this.hydrateVendorTeams(projects));
   }
 
   async getProject(id: string): Promise<Project | null> {
     if (!isValidId(id)) return null;
     const doc = await this.projects.findById(id).lean();
-    return doc ? serializeProject(doc as Record<string, unknown>) : null;
+    if (!doc) return null;
+    const [hydrated] = await this.hydrateVendorTeams([
+      serializeProject(doc as Record<string, unknown>),
+    ]);
+    return hydrated;
   }
 
   async getProjectOrThrow(id: string): Promise<Project> {
@@ -129,7 +223,7 @@ export class ProjectsService {
     const query: Record<string, unknown> = {};
     if (filter.adminStatus) query.adminStatus = filter.adminStatus;
     const docs = await this.projects.find(query).sort({ updatedAt: -1 }).lean();
-    return docs.map((p) => serializeProject(p as Record<string, unknown>));
+    return this.hydrateVendorTeams(docs.map((p) => serializeProject(p as Record<string, unknown>)));
   }
 
   async listProjectsAwaitingCompletionTimeout(timeoutDays: number): Promise<Project[]> {
@@ -138,7 +232,7 @@ export class ProjectsService {
       .find({ executionStatus: "awaiting_completion", completionRequestedAt: { $lte: cutoff } })
       .sort({ completionRequestedAt: 1 })
       .lean();
-    return docs.map((p) => serializeProject(p as Record<string, unknown>));
+    return this.hydrateVendorTeams(docs.map((p) => serializeProject(p as Record<string, unknown>)));
   }
 
   async getProjectWithMilestones(id: string): Promise<ProjectWithMilestones | null> {
@@ -226,14 +320,113 @@ export class ProjectsService {
   // project writes (ported from actions.ts)
   // -------------------------------------------------------------------------
 
+  /**
+   * Resolve the client company for a new project: an existing directory entry
+   * picked by id, or one created inline from `newCompany*` fields. Falls back to
+   * the legacy free-text `clientCompanyName` / `clientEmail` body fields so
+   * direct API callers and older forms keep working.
+   */
+  private async resolveClientCompany(
+    user: SessionUser,
+    body: Record<string, unknown>,
+  ): Promise<{
+    companyId: string | null;
+    name: string;
+    contactEmail: string;
+    contactName: string | null;
+    designation: string;
+  }> {
+    const pickedId = optStr(body, "clientCompanyId");
+    if (pickedId) {
+      if (!isValidId(pickedId)) throw new BadRequestException("Invalid client company.");
+      const company = (await this.clientCompanies.findById(pickedId).lean()) as Record<
+        string,
+        any
+      > | null;
+      if (!company) throw new BadRequestException("The selected client company no longer exists.");
+      return {
+        companyId: String(company._id),
+        name: String(company.name),
+        contactEmail: String(company.contactEmail ?? "").toLowerCase(),
+        contactName: (company.contactName as string | null) ?? null,
+        designation: (company.designation as string) || "Client Contact",
+      };
+    }
+
+    const newName = optStr(body, "newCompanyName");
+    if (newName) {
+      const created = await this.clientCompanies.create({
+        name: newName,
+        contactName: optStr(body, "newCompanyContactName"),
+        contactEmail: str(body, "newCompanyContactEmail").toLowerCase(),
+        designation: optStr(body, "newCompanyDesignation") ?? "",
+        createdByUserId: user.id,
+      });
+      return {
+        companyId: String(created._id),
+        name: created.name,
+        contactEmail: String(created.contactEmail ?? "").toLowerCase(),
+        contactName: created.contactName ?? null,
+        designation: (created.designation as string) || "Client Contact",
+      };
+    }
+
+    return {
+      companyId: null,
+      name: str(body, "clientCompanyName"),
+      contactEmail: str(body, "clientEmail").toLowerCase(),
+      contactName: optStr(body, "clientContactName"),
+      designation: optStr(body, "contactDesignation") ?? "Client Contact",
+    };
+  }
+
+  /** Keep only assignment ids that are real directory entities owned by this vendor. */
+  private async ownedAssignments(
+    ownerUserId: string,
+    teamIds: string[],
+    memberIds: string[],
+  ): Promise<{ teamIds: Types.ObjectId[]; memberIds: Types.ObjectId[] }> {
+    const owner = new Types.ObjectId(ownerUserId);
+    const teamOids = toObjectIds(teamIds);
+    const memberOids = toObjectIds(memberIds);
+    const [teams, members] = await Promise.all([
+      teamOids.length
+        ? this.teams.find({ _id: { $in: teamOids }, ownerUserId: owner }).select({ _id: 1 }).lean()
+        : [],
+      memberOids.length
+        ? this.vendorMembers
+            .find({ _id: { $in: memberOids }, ownerUserId: owner })
+            .select({ _id: 1 })
+            .lean()
+        : [],
+    ]);
+    return {
+      teamIds: teams.map((t) => t._id as Types.ObjectId),
+      memberIds: members.map((m) => m._id as Types.ObjectId),
+    };
+  }
+
   async createProject(user: SessionUser, body: Record<string, unknown>): Promise<{ id: string }> {
     if (user.role !== "vendor") throw new ForbiddenException("Only vendors can create projects.");
 
+    const company = await this.resolveClientCompany(user, body);
+    if (!company.name) throw new BadRequestException("Select or add a client company.");
+    if (!company.contactEmail) {
+      throw new BadRequestException("The client company needs a contact email.");
+    }
+
+    const assignments = await this.ownedAssignments(
+      user.id,
+      strList(body, "teamIds"),
+      strList(body, "memberIds"),
+    );
+
     const project = await this.projects.create({
       name: str(body, "name"),
-      clientCompanyName: str(body, "clientCompanyName"),
-      clientContactName: optStr(body, "clientContactName"),
-      clientEmail: str(body, "clientEmail"),
+      clientCompanyName: company.name,
+      clientCompanyId: company.companyId,
+      clientContactName: company.contactName,
+      clientEmail: company.contactEmail,
       services: optStr(body, "services"),
       description: optStr(body, "description"),
       startDate: optDate(body, "startDate"),
@@ -243,6 +436,8 @@ export class ProjectsService {
       internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
       projectType: str(body, "projectType") === "whole" ? "whole" : "milestone",
+      assignedTeamIds: assignments.teamIds,
+      assignedMemberIds: assignments.memberIds,
       vendorTeam: [
         { userId: user.id, email: user.email, name: user.name, role: "owner", invitePending: false },
       ],
@@ -264,10 +459,9 @@ export class ProjectsService {
       project.vendorTeam.push({ userId: null, email, name: null, role, invitePending: true });
     }
 
-    const contactEmail = optStr(body, "contactEmail");
-    if (contactEmail) {
-      const email = contactEmail.toLowerCase();
-      const designation = optStr(body, "contactDesignation") ?? "Client Contact";
+    if (company.contactEmail) {
+      const email = company.contactEmail;
+      const designation = company.designation || "Client Contact";
       await this.invitations.create({
         email,
         projectId,
@@ -279,14 +473,14 @@ export class ProjectsService {
       project.clientContacts.push({
         userId: null,
         email,
-        name: null,
+        name: company.contactName,
         designation,
         role: "primary",
         invitePending: true,
       });
     }
 
-    if (teammateEmail || contactEmail) await project.save();
+    await project.save();
 
     if (project.projectType === "whole") {
       await this.milestones.create({
@@ -344,6 +538,34 @@ export class ProjectsService {
     );
 
     await this.activity.log({ projectId, type: "PROJECT_UPDATED", message: "Project details updated" });
+  }
+
+  /**
+   * Replace a project's assigned teams / individual members (Team Management
+   * feature). The effective vendor team is recomputed live on every read from
+   * these ids, so there is nothing else to sync.
+   */
+  async setAssignedTeams(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
+    await this.requirePermission(
+      projectId,
+      user,
+      canManageProject,
+      "Only a project owner can change project staffing.",
+    );
+    const assignments = await this.ownedAssignments(
+      user.id,
+      strList(body, "teamIds"),
+      strList(body, "memberIds"),
+    );
+    await this.projects.findByIdAndUpdate(projectId, {
+      assignedTeamIds: assignments.teamIds,
+      assignedMemberIds: assignments.memberIds,
+    });
+    await this.activity.log({
+      projectId,
+      type: "PROJECT_UPDATED",
+      message: `Project staffing updated — ${assignments.teamIds.length} team(s), ${assignments.memberIds.length} individual(s)`,
+    });
   }
 
   // --- Admin approval lifecycle (spec §5.1, §9) ---

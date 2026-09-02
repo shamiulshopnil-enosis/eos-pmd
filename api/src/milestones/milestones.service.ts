@@ -1,36 +1,90 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model, Types } from "mongoose";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectConnection, InjectModel } from "@nestjs/mongoose";
+import mongoose, { Connection, Model, Types } from "mongoose";
+import type { Readable } from "stream";
 import { MODEL } from "../schemas/schemas";
 import { ActivityService } from "../activity/activity.service";
 import { ProjectsService } from "../projects/projects.service";
 import { serializeMilestone, serializeProject } from "../common/serialize";
 import { sanitizeMilestoneHtml } from "../common/richtext";
-import { RATING_SELF_CORRECTION_HOURS } from "../common/constants";
+import { MILESTONE_REVIEW_DIMENSION_KEYS, RATING_SELF_CORRECTION_HOURS } from "../common/constants";
 import {
   assertPermission,
+  canAttachToMilestone,
   canEditMilestone,
   canRateMilestone,
   canSendMilestone,
+  isPrimaryContact,
+  isVendorOwner,
 } from "../common/permissions";
-import { optDate, optStr, str } from "../common/input";
+import { optDate, optStr, str, strList } from "../common/input";
 import type {
   Milestone,
   MilestoneWithFullProject,
   MilestoneWithProject,
+  Project,
   SessionUser,
 } from "../common/types";
 
 const isValidId = (id: string) => Types.ObjectId.isValid(id);
+const ATTACHMENT_BUCKET = "milestone_files";
+export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15 MB per file
+
+/** A minimal shape for a Multer in-memory file (no @types/multer dependency). */
+export interface UploadedFileLike {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 @Injectable()
 export class MilestonesService {
   constructor(
     @InjectModel(MODEL.Milestone) private readonly milestones: Model<any>,
     @InjectModel(MODEL.Project) private readonly projects: Model<any>,
+    @InjectConnection() private readonly connection: Connection,
     private readonly activity: ActivityService,
     private readonly projectsService: ProjectsService,
   ) {}
+
+  private bucket(): mongoose.mongo.GridFSBucket {
+    return new mongoose.mongo.GridFSBucket(this.connection.db!, {
+      bucketName: ATTACHMENT_BUCKET,
+    });
+  }
+
+  /**
+   * Map assignee emails to a snapshot from the project's (already hydrated)
+   * vendor team. Emails that aren't on the vendor team are dropped.
+   */
+  private resolveAssignees(project: Project, emails: string[]): {
+    userId: Types.ObjectId | null;
+    email: string;
+    name: string | null;
+  }[] {
+    const byEmail = new Map(project.vendorTeam.map((v) => [v.email.toLowerCase(), v]));
+    const seen = new Set<string>();
+    const out: { userId: Types.ObjectId | null; email: string; name: string | null }[] = [];
+    for (const raw of emails) {
+      const email = raw.trim().toLowerCase();
+      if (!email || seen.has(email)) continue;
+      const member = byEmail.get(email);
+      if (!member) continue;
+      seen.add(email);
+      out.push({
+        userId: member.userId && isValidId(member.userId) ? new Types.ObjectId(member.userId) : null,
+        email,
+        name: member.name ?? null,
+      });
+    }
+    return out;
+  }
 
   private async projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
     if (!vendorUserId || !isValidId(vendorUserId)) return null;
@@ -124,7 +178,9 @@ export class MilestonesService {
       projectId,
       title: str(body, "title"),
       description: sanitizeMilestoneHtml(str(body, "description")),
+      url: optStr(body, "url"),
       targetDate: optDate(body, "targetDate"),
+      assignees: this.resolveAssignees(project, strList(body, "assigneeEmails")),
       status: "draft",
     });
     const milestoneId = String(milestone._id);
@@ -162,7 +218,11 @@ export class MilestonesService {
     }
     existing.title = str(body, "title");
     existing.description = sanitizeMilestoneHtml(str(body, "description"));
+    existing.url = optStr(body, "url");
     existing.targetDate = optDate(body, "targetDate");
+    if (body.assigneeEmails !== undefined) {
+      existing.assignees = this.resolveAssignees(project, strList(body, "assigneeEmails"));
+    }
     await existing.save();
     await this.activity.log({
       projectId,
@@ -270,14 +330,28 @@ export class MilestonesService {
     return { projectId };
   }
 
-  // --- Client milestone rating (spec §6.4, §6.5) ---
+  // --- Client milestone review (Enosis Client Feedback Form, items 1–5) ---
 
-  private parseRating(body: Record<string, unknown>): number {
-    const n = Number.parseInt(String(body.rating ?? ""), 10);
-    if (Number.isNaN(n) || n < 1 || n > 5) {
-      throw new BadRequestException("Please give a rating from 1 to 5.");
+  /**
+   * Parse the five review dimensions from the submitted form. Every dimension is
+   * required, 1–5. Returns the dimension map plus their average, which becomes
+   * `milestone.rating` (the number all scoring runs off).
+   */
+  private parseReview(body: Record<string, unknown>): {
+    ratings: Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number>;
+    overall: number;
+  } {
+    const ratings = {} as Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number>;
+    for (const key of MILESTONE_REVIEW_DIMENSION_KEYS) {
+      const n = Number.parseInt(String(body[key] ?? ""), 10);
+      if (Number.isNaN(n) || n < 1 || n > 5) {
+        throw new BadRequestException("Please answer every review question (1–5).");
+      }
+      ratings[key] = n;
     }
-    return n;
+    const values = MILESTONE_REVIEW_DIMENSION_KEYS.map((k) => ratings[k]);
+    const overall = values.reduce((a, b) => a + b, 0) / values.length;
+    return { ratings, overall };
   }
 
   async submitMilestoneRating(
@@ -293,27 +367,31 @@ export class MilestonesService {
       projectId,
       user,
       canRateMilestone,
-      "Only the primary client contact can rate milestones.",
+      "Only a client contact on this project can rate milestones.",
     );
     this.projectsService.assertActiveProject(project);
 
     if (milestone.status !== "sent") {
       throw new BadRequestException("This milestone is not awaiting your review.");
     }
-    const rating = this.parseRating(body);
+    const { ratings, overall } = this.parseReview(body);
     const now = new Date();
-    milestone.rating = rating;
+    milestone.ratings = ratings;
+    milestone.rating = overall;
     milestone.comment = optStr(body, "comment");
     milestone.status = "reviewed";
     milestone.ratingSubmittedAt = now;
     milestone.reviewedAt = now;
+    milestone.reviewedByUserId = new Types.ObjectId(user.id);
+    milestone.reviewedByName = user.name ?? null;
+    milestone.reviewedByEmail = user.email;
     await milestone.save();
     await this.projectsService.recomputeProjectScore(projectId);
     await this.activity.log({
       projectId,
       milestoneId,
       type: "FEEDBACK_RECEIVED",
-      message: `Client reviewed "${milestone.title}" (${rating}/5)`,
+      message: `Client reviewed "${milestone.title}" (${overall.toFixed(1)}/5 overall)`,
     });
     return { projectId };
   }
@@ -331,12 +409,20 @@ export class MilestonesService {
       projectId,
       user,
       canRateMilestone,
-      "Only the primary client contact can edit this rating.",
+      "Only a client contact on this project can edit this rating.",
     );
     this.projectsService.assertActiveProject(project);
 
     if (milestone.status !== "reviewed") {
       throw new BadRequestException("This milestone has not been reviewed yet.");
+    }
+    // Only the person who submitted the rating may change it. Legacy milestones
+    // reviewed before reviewer stamping fall back to "any primary contact".
+    const isReviewer = milestone.reviewedByUserId
+      ? String(milestone.reviewedByUserId) === user.id
+      : isPrimaryContact(user, project);
+    if (!isReviewer) {
+      throw new ForbiddenException("Only the client contact who submitted this rating can change it.");
     }
     const withinWindow =
       milestone.ratingSubmittedAt != null &&
@@ -345,8 +431,9 @@ export class MilestonesService {
     if (!withinWindow && !milestone.editRequestedByVendor) {
       throw new BadRequestException("The window to change this rating has closed.");
     }
-    const rating = this.parseRating(body);
-    milestone.rating = rating;
+    const { ratings, overall } = this.parseReview(body);
+    milestone.ratings = ratings;
+    milestone.rating = overall;
     milestone.comment = optStr(body, "comment");
     await milestone.save();
     await this.projectsService.recomputeProjectScore(projectId);
@@ -354,7 +441,7 @@ export class MilestonesService {
       projectId,
       milestoneId,
       type: "FEEDBACK_RECEIVED",
-      message: `Client updated their rating for "${milestone.title}" (${rating}/5)`,
+      message: `Client updated their review for "${milestone.title}" (${overall.toFixed(1)}/5 overall)`,
     });
     return { projectId };
   }
@@ -390,5 +477,133 @@ export class MilestonesService {
       message: `Vendor asked the client to reconsider the rating for "${milestone.title}"`,
     });
     return { projectId };
+  }
+
+  // --- Attachments (GridFS-backed, either side can upload) ---
+
+  private async loadMilestoneAndProject(milestoneId: string) {
+    if (!isValidId(milestoneId)) throw new NotFoundException("Milestone not found.");
+    const milestone = await this.milestones.findById(milestoneId);
+    if (!milestone) throw new NotFoundException("Milestone not found.");
+    const projectId = String(milestone.projectId);
+    const project = await this.projectsService.getProjectOrThrow(projectId);
+    return { milestone, project, projectId };
+  }
+
+  async addAttachments(
+    user: SessionUser,
+    milestoneId: string,
+    files: UploadedFileLike[],
+  ): Promise<{ projectId: string; milestoneId: string }> {
+    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId);
+    assertPermission(
+      canAttachToMilestone(user, project),
+      "You are not on this project, so you cannot attach files.",
+    );
+    this.projectsService.assertActiveProject(project);
+    if (!files || files.length === 0) throw new BadRequestException("No files were uploaded.");
+
+    const bucket = this.bucket();
+    for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        throw new BadRequestException(
+          `"${file.originalname}" is larger than the ${Math.round(
+            MAX_ATTACHMENT_BYTES / (1024 * 1024),
+          )} MB limit.`,
+        );
+      }
+      const fileId = await new Promise<Types.ObjectId>((resolve, reject) => {
+        const stream = bucket.openUploadStream(file.originalname, {
+          contentType: file.mimetype,
+          metadata: { milestoneId, uploadedByUserId: user.id },
+        });
+        stream.on("error", reject);
+        stream.on("finish", () => resolve(stream.id as Types.ObjectId));
+        stream.end(file.buffer);
+      });
+      milestone.attachments.push({
+        fileId,
+        filename: file.originalname,
+        contentType: file.mimetype || "application/octet-stream",
+        size: file.size,
+        uploadedByUserId: new Types.ObjectId(user.id),
+        uploadedByName: user.name ?? null,
+        uploadedByEmail: user.email,
+        uploadedAt: new Date(),
+      });
+    }
+    await milestone.save();
+    await this.activity.log({
+      projectId,
+      milestoneId,
+      type: "RELEASE_UPDATED",
+      message: `${files.length} file${files.length === 1 ? "" : "s"} attached to "${milestone.title}"`,
+    });
+    return { projectId, milestoneId };
+  }
+
+  async removeAttachment(
+    user: SessionUser,
+    milestoneId: string,
+    attachmentId: string,
+  ): Promise<{ projectId: string; milestoneId: string }> {
+    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId);
+    const attachment = milestone.attachments.id(attachmentId);
+    if (!attachment) throw new NotFoundException("Attachment not found.");
+
+    const isUploader = String(attachment.uploadedByUserId ?? "") === user.id;
+    if (!isUploader && !isVendorOwner(user, project)) {
+      throw new ForbiddenException(
+        "Only the person who uploaded a file, or a project owner, can remove it.",
+      );
+    }
+    this.projectsService.assertActiveProject(project);
+
+    try {
+      await this.bucket().delete(new Types.ObjectId(String(attachment.fileId)));
+    } catch {
+      // file already gone from GridFS — drop the metadata anyway
+    }
+    attachment.deleteOne();
+    await milestone.save();
+    await this.activity.log({
+      projectId,
+      milestoneId,
+      type: "RELEASE_UPDATED",
+      message: `Removed "${attachment.filename}" from "${milestone.title}"`,
+    });
+    return { projectId, milestoneId };
+  }
+
+  async getAttachment(
+    user: SessionUser,
+    milestoneId: string,
+    attachmentId: string,
+  ): Promise<{
+    stream: Readable;
+    filename: string;
+    contentType: string;
+    size: number;
+  }> {
+    const { milestone, project } = await this.loadMilestoneAndProject(milestoneId);
+    assertPermission(
+      canAttachToMilestone(user, project),
+      "You do not have access to this milestone's files.",
+    );
+    const attachment = milestone.attachments.id(attachmentId);
+    if (!attachment) throw new NotFoundException("Attachment not found.");
+
+    const fileId = new Types.ObjectId(String(attachment.fileId));
+    const [fileDoc] = await this.bucket()
+      .find({ _id: fileId })
+      .toArray();
+    if (!fileDoc) throw new NotFoundException("File is no longer stored.");
+
+    return {
+      stream: this.bucket().openDownloadStream(fileId),
+      filename: attachment.filename,
+      contentType: attachment.contentType || "application/octet-stream",
+      size: attachment.size || fileDoc.length,
+    };
   }
 }

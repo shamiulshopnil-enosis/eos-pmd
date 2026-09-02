@@ -68,12 +68,19 @@ describe("action guards", () => {
     }
   });
 
-  it("rating + capstone submission + inviting collaborators: primary contact only", () => {
-    for (const guard of [canRateMilestone, canSubmitCapstone, canInviteCollaborator]) {
+  it("capstone submission + inviting collaborators: primary contact only", () => {
+    for (const guard of [canSubmitCapstone, canInviteCollaborator]) {
       expect(guard(primary, project)).toBe(true);
       expect(guard(collab, project)).toBe(false);
       expect(guard(owner, project)).toBe(false);
     }
+  });
+
+  it("milestone rating: any client contact, no vendor", () => {
+    expect(canRateMilestone(primary, project)).toBe(true);
+    expect(canRateMilestone(collab, project)).toBe(true);
+    expect(canRateMilestone(owner, project)).toBe(false);
+    expect(canRateMilestone(null, project)).toBe(false);
   });
 
   it("exposes the plain predicates too", () => {

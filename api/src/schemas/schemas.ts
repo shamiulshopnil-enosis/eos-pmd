@@ -12,6 +12,7 @@ const EXECUTION_STATUS = ["ongoing", "awaiting_completion", "completed"] as cons
 const MILESTONE_STATUS = ["draft", "sent", "reviewed"] as const;
 const CAPSTONE_TIER = ["promoter", "neutral", "detractor"] as const;
 const VENDOR_TEAM_ROLE = ["owner", "member"] as const;
+const VENDOR_MEMBER_ROLE = ["owner", "member"] as const;
 const CLIENT_CONTACT_ROLE = ["primary", "collaborator"] as const;
 const INVITATION_KIND = ["vendor_team", "client_contact"] as const;
 const INVITATION_ROLE = ["owner", "member", "primary", "collaborator"] as const;
@@ -70,10 +71,54 @@ const capstoneEndorsementSchema = new Schema(
   { _id: false },
 );
 
+// Vendor-owned people directory. A vendor maintains a pool of teammates once
+// (name + email + a default project role); teams and individual project
+// assignments reference these by id. `userId` is filled the first time the
+// person signs in with this email (see UsersService.findOrCreate).
+export const VendorMemberSchema = new Schema(
+  {
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: VENDOR_MEMBER_ROLE, default: "member" },
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+VendorMemberSchema.index({ ownerUserId: 1, email: 1 }, { unique: true });
+
+// A named grouping of VendorMember ids, owned by one vendor. Assigning a team to
+// a project is a live reference: the project's vendor team always reflects the
+// team's current membership.
+export const TeamSchema = new Schema(
+  {
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    name: { type: String, required: true, trim: true },
+    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+  },
+  { timestamps: true },
+);
+
+// Global, shared directory of client companies. A vendor searches this when
+// creating a project; if the company is not found they add it once and it is
+// reusable on every later project.
+export const ClientCompanySchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    contactName: { type: String, default: null },
+    contactEmail: { type: String, required: true, lowercase: true, trim: true },
+    designation: { type: String, default: "" },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+ClientCompanySchema.index({ name: 1 });
+
 export const ProjectSchema = new Schema(
   {
     name: { type: String, required: true },
     clientCompanyName: { type: String, required: true },
+    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null },
     clientContactName: { type: String, default: null },
     clientEmail: { type: String, required: true },
     services: { type: String, default: null },
@@ -102,6 +147,12 @@ export const ProjectSchema = new Schema(
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
 
+    // Live-reference vendor staffing (Team Management feature). The effective
+    // vendor team on a project read is `vendorTeam` (the founding owner + any
+    // grandfathered rows) merged with the current membership of these.
+    assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
+    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+
     capstone: { type: capstoneEndorsementSchema, default: null },
 
     publicSummary: { type: String, default: null },
@@ -118,18 +169,67 @@ export const ProjectSchema = new Schema(
   { timestamps: true },
 );
 
+// A vendor teammate a milestone is assigned to. Snapshotted from the project's
+// vendor team at assign time (email is the stable key; userId is null until the
+// person has signed in).
+const milestoneAssigneeSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+// An uploaded file. Bytes live in the `milestone_files` GridFS bucket; this
+// subdocument is the metadata and points at the GridFS file by `fileId`.
+const milestoneAttachmentSchema = new Schema(
+  {
+    fileId: { type: Schema.Types.ObjectId, required: true },
+    filename: { type: String, required: true },
+    contentType: { type: String, default: "application/octet-stream" },
+    size: { type: Number, default: 0 },
+    uploadedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    uploadedByName: { type: String, default: null },
+    uploadedByEmail: { type: String, default: null },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
+// Client milestone review — the five delivery dimensions ported from the Enosis
+// "Client Feedback Form" (items 1–5). Each is 1–5 (5 = best). `rating` on the
+// milestone stays as their average so all existing scoring keeps working.
+const milestoneReviewSchema = new Schema(
+  {
+    deliverables: { type: Number, default: null }, // quality of deliverables
+    timeliness: { type: Number, default: null }, // meeting this milestone's deadlines
+    understanding: { type: Number, default: null }, // grasp of requirements
+    planning: { type: Number, default: null }, // planning & estimate accuracy
+    communication: { type: Number, default: null }, // clarity, responsiveness
+  },
+  { _id: false },
+);
+
 export const MilestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
     title: { type: String, required: true },
     description: { type: String, default: "" },
+    url: { type: String, default: null },
     targetDate: { type: Date, default: null },
     status: { type: String, enum: MILESTONE_STATUS, default: "draft" },
-    rating: { type: Number, default: null },
+    assignees: { type: [milestoneAssigneeSchema], default: [] },
+    attachments: { type: [milestoneAttachmentSchema], default: [] },
+    ratings: { type: milestoneReviewSchema, default: null },
+    rating: { type: Number, default: null }, // average of `ratings`, drives scoring
     comment: { type: String, default: null },
     editRequestedByVendor: { type: Boolean, default: false },
     ratingSubmittedAt: { type: Date, default: null },
     reviewedAt: { type: Date, default: null },
+    reviewedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedByName: { type: String, default: null },
+    reviewedByEmail: { type: String, default: null },
     sentAt: { type: Date, default: null },
   },
   { timestamps: true },
@@ -184,4 +284,7 @@ export const MODEL = {
   User: "User",
   LoginCode: "LoginCode",
   Invitation: "Invitation",
+  VendorMember: "VendorMember",
+  Team: "Team",
+  ClientCompany: "ClientCompany",
 } as const;

@@ -28,10 +28,49 @@ export type ActivityType =
   | "PUBLICATION_REQUESTED"
   | "PROJECT_PUBLISHED";
 
+export type VendorMemberRole = "owner" | "member";
+
+/** An entry in a vendor's reusable people directory (Team Management feature). */
+export interface VendorMember {
+  id: string;
+  ownerUserId: string;
+  email: string;
+  name: string | null;
+  role: VendorMemberRole;
+  userId: string | null;
+  invitePending: boolean; // derived: userId == null (person has not signed in yet)
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A named grouping of directory members, owned by one vendor. */
+export interface Team {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  memberIds: string[];
+  members: VendorMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Global, shared client-company directory searched when creating a project. */
+export interface ClientCompany {
+  id: string;
+  name: string;
+  contactName: string | null;
+  contactEmail: string;
+  designation: string;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Project {
   id: string;
   name: string;
   clientCompanyName: string;
+  clientCompanyId: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -59,6 +98,8 @@ export interface Project {
 
   vendorTeam: VendorTeamMember[];
   clientContacts: ClientContact[];
+  assignedTeamIds: string[];
+  assignedMemberIds: string[];
   capstone: CapstoneEndorsement | null;
 
   publicSummary: string | null;
@@ -76,18 +117,54 @@ export interface Project {
   updatedAt: Date;
 }
 
+export interface MilestoneAssignee {
+  userId: string | null;
+  email: string;
+  name: string | null;
+  invitePending: boolean;
+}
+
+export interface MilestoneAttachment {
+  id: string;
+  fileId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
+  uploadedAt: Date;
+}
+
+export type MilestoneReviewDimension =
+  | "deliverables"
+  | "timeliness"
+  | "understanding"
+  | "planning"
+  | "communication";
+
+/** The five Enosis Client Feedback Form delivery dimensions, each 1–5 (5 = best). */
+export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
+
 export interface Milestone {
   id: string;
   projectId: string;
   title: string;
   description: string; // sanitized rich-text HTML
+  url: string | null; // optional link (repo, demo, doc…)
   targetDate: Date | null;
   status: MilestoneStatus;
-  rating: number | null; // 1-5, "Quality of Deliverables"
+  assignees: MilestoneAssignee[]; // vendor teammates responsible for this milestone
+  attachments: MilestoneAttachment[];
+  ratings: MilestoneReview | null; // the five review dimensions
+  rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;
   ratingSubmittedAt: Date | null;
   reviewedAt: Date | null;
+  reviewedByUserId: string | null; // which client contact submitted the rating
+  reviewedByName: string | null;
+  reviewedByEmail: string | null;
   sentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

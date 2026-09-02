@@ -28,6 +28,8 @@ export const isVendorTeamMember = (u: SessionUser | null, p: ProjectPeople) => v
 export const isPrimaryContact = (u: SessionUser | null, p: ProjectPeople) => clientRole(u, p) === "primary";
 export const isCollaborator = (u: SessionUser | null, p: ProjectPeople) => clientRole(u, p) === "collaborator";
 export const isClientContact = (u: SessionUser | null, p: ProjectPeople) => clientRole(u, p) !== null;
+export const isProjectMember = (u: SessionUser | null, p: ProjectPeople) =>
+  isVendorTeamMember(u, p) || isClientContact(u, p);
 
 // --- Action-level checks (spec §7) ---
 
@@ -38,7 +40,10 @@ export const canSendMilestone = (u: SessionUser | null, p: ProjectPeople) => isV
 export const canManageProject = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
 export const canInviteTeammate = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
 export const canRequestCompletion = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
-export const canRateMilestone = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
+/** Any client contact — primary or collaborator — may submit the one rating. */
+export const canRateMilestone = (u: SessionUser | null, p: ProjectPeople) => isClientContact(u, p);
+/** Either side can attach files to a milestone. */
+export const canAttachToMilestone = (u: SessionUser | null, p: ProjectPeople) => isProjectMember(u, p);
 export const canConfirmCompletion = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 export const canInviteCollaborator = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 /** Capstone endorsement (spec §6.9): vendor Owner requests, Primary Contact submits. */

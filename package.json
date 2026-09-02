@@ -16,7 +16,9 @@
     "migrate:001": "tsx --env-file=.env scripts/migrations/001_project_type_status.ts",
     "migrate:002": "tsx --env-file=.env scripts/migrations/002_release_to_milestone.ts",
     "migrate:003": "tsx --env-file=.env scripts/migrations/003_project_people.ts",
-    "migrate:004": "tsx --env-file=.env scripts/migrations/004_backfill_scores.ts"
+    "migrate:004": "tsx --env-file=.env scripts/migrations/004_backfill_scores.ts",
+    "migrate:005": "tsx --env-file=.env scripts/migrations/005_client_company_directory.ts",
+    "migrate:006": "tsx --env-file=.env scripts/migrations/006_milestone_review_dimensions.ts"
   },
   "dependencies": {
     "jose": "^6.2.10",

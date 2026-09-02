@@ -54,9 +54,43 @@ export default async function EditMilestonePage({
             <span className="mt-1 block text-xs text-slate-400">Supports bold and bulleted lists.</span>
           </div>
 
-          <Field label="Target Date">
-            <TextInput type="date" name="targetDate" defaultValue={toDateInputValue(milestone.targetDate)} />
-          </Field>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Target Date">
+              <TextInput type="date" name="targetDate" defaultValue={toDateInputValue(milestone.targetDate)} />
+            </Field>
+            <Field label="URL" hint="Optional — repo, demo, or spec link.">
+              <TextInput type="url" name="url" defaultValue={milestone.url ?? ""} placeholder="https://…" />
+            </Field>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Assign to</legend>
+            <input type="hidden" name="assigneeEmails" value="" />
+            {project.vendorTeam.length === 0 ? (
+              <p className="text-xs text-slate-400">No vendor team members to assign yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {project.vendorTeam.map((m) => (
+                  <label
+                    key={m.email}
+                    className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      name="assigneeEmails"
+                      value={m.email}
+                      defaultChecked={milestone.assignees.some(
+                        (a) => a.email.toLowerCase() === m.email.toLowerCase(),
+                      )}
+                    />
+                    {m.name ? `${m.name} · ` : ""}
+                    {m.email}
+                    {m.invitePending ? <span className="text-xs text-amber-500">(pending)</span> : null}
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
             <SubmitButton>Save Changes</SubmitButton>

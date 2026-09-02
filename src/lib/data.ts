@@ -1,6 +1,7 @@
 import { apiFetch } from "./api-client";
 import type {
   ActivityWithMilestoneName,
+  ClientCompany,
   Invitation,
   Milestone,
   MilestoneWithFullProject,
@@ -8,6 +9,8 @@ import type {
   Project,
   ProjectWithMilestones,
   RecentActivity,
+  Team,
+  VendorMember,
 } from "./types";
 
 // Read layer. Previously these talked to MongoDB through Mongoose; they now call
@@ -145,6 +148,25 @@ export async function getInvitation(id: string): Promise<Invitation | null> {
 
 export async function listPendingInvitations(projectId: string): Promise<Invitation[]> {
   return apiFetch<Invitation[]>(`/projects/${projectId}/invitations`);
+}
+
+// ---------------------------------------------------------------------------
+// team directory (Team Management feature)
+// ---------------------------------------------------------------------------
+
+/** The signed-in vendor's reusable people directory. */
+export async function listVendorMembers(): Promise<VendorMember[]> {
+  return apiFetch<VendorMember[]>(`/vendor-members`);
+}
+
+/** The signed-in vendor's teams, each with its members resolved. */
+export async function listTeams(): Promise<Team[]> {
+  return apiFetch<Team[]>(`/teams`);
+}
+
+/** The shared client-company directory. Pass `q` to filter by name. */
+export async function listClientCompanies(q?: string): Promise<ClientCompany[]> {
+  return apiFetch<ClientCompany[]>(`/client-companies${qs({ q })}`);
 }
 
 // ---------------------------------------------------------------------------

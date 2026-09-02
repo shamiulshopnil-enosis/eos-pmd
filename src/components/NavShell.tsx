@@ -10,6 +10,8 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Performance Dashboard", icon: "📊" },
   { href: "/projects", label: "Projects", icon: "📁" },
   { href: "/milestones", label: "Milestones", icon: "🚀" },
+  { href: "/team", label: "Team Management", icon: "👥" },
+  { href: "/client-companies", label: "Client Companies", icon: "🏢" },
 ];
 
 export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {

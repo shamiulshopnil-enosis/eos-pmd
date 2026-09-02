@@ -7,9 +7,27 @@ This is the `eos-pmd` milestones-feature prototype. Two things that differ from 
   actions guard with `src/lib/permissions.ts`. No passwords — sign-in is an emailed one-time code shown
   on screen and in the server console.
 - **`Release` / `FeedbackRequest` are gone.** Projects own a `Milestone` collection (one for a Whole
-  project, many for a Milestone project). A milestone goes `draft → sent → reviewed`; the client's
-  Primary Contact gives it one 1–5 rating. See `private_docs/plan1.md` for the phased design and the
-  `spec §N` comments in `src/lib` for individual rules.
+  project, many for a Milestone project). A milestone goes `draft → sent → reviewed`; **any** client
+  contact (not just the Primary) submits the review, and the reviewer is stamped on
+  `reviewedByUserId/Name/Email`. The review is **five 1–5 dimensions** (`milestone.ratings`:
+  deliverables, timeliness, understanding, planning, communication — from the Enosis Client Feedback
+  Form, `MILESTONE_REVIEW_DIMENSIONS` in `src/lib/constants.ts`); `milestone.rating` is their average
+  and still the single number every scoring path uses. Migration `npm run migrate:006` backfills
+  pre-existing reviews. Milestones also carry `assignees[]` (vendor teammates, snapshotted
+  from the project's vendor team), an optional `url`, and `attachments[]` — file bytes live in the
+  `milestone_files` GridFS bucket; either side uploads via `POST /milestones/:id/attachments`
+  (multipart, 15 MB/file), and the browser downloads through the Next route
+  `/files/milestones/[milestoneId]/[attachmentId]` which proxies the API with the session token. See
+  `private_docs/plan1.md` for the phased design and the `spec §N` comments in `src/lib`.
+
+- **Team Management + Client Company directory.** A vendor keeps a reusable people directory
+  (`VendorMember`, linked to a `User` on first sign-in with that email) grouped into `Team`s, both
+  managed at `/team`. Projects reference `assignedTeamIds` / `assignedMemberIds`; the effective
+  `project.vendorTeam` is recomputed live from them on every read in `projects.service` (grandfathered
+  embedded `vendorTeam` rows are merged in, stored rows win). Client companies are a global directory
+  (`ClientCompany`, `/client-companies`); creating a project picks one (or adds it inline) and its
+  contact becomes the primary client contact. Migration: `npm run migrate:005` backfills companies
+  from existing projects.
 
 Run `npm test` for the pure-logic unit tests; `npm run db:seed` for a demo database.
 

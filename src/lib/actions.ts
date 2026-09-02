@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { apiFetch } from "./api-client";
+import { apiFetch, apiUpload } from "./api-client";
 import { acceptInvitationSignedIn } from "./auth";
 
 // Mutations. The permission checks, validation and database writes now live in
@@ -83,14 +83,51 @@ export async function setProjectStatus(projectId: string, formData: FormData) {
 // Milestones (Milestones plan, Phase 2 — spec §6.2, §6.3, §5.3)
 // ---------------------------------------------------------------------------
 
+/** Pull real, non-empty File entries out of a FormData field. */
+function filesFrom(formData: FormData, field = "files"): File[] {
+  return formData
+    .getAll(field)
+    .filter((f): f is File => typeof f === "object" && f instanceof File && f.size > 0);
+}
+
+async function uploadAttachments(milestoneId: string, files: File[]): Promise<void> {
+  if (files.length === 0) return;
+  const up = new FormData();
+  for (const f of files) up.append("files", f);
+  await apiUpload(`/milestones/${milestoneId}/attachments`, up);
+}
+
 export async function createMilestone(projectId: string, formData: FormData) {
-  const { milestoneId } = await post<{ milestoneId: string }>("/milestones", {
-    ...formToObject(formData),
-    projectId,
-  });
+  const files = filesFrom(formData);
+  const body = formToObject(formData);
+  delete body.files;
+  const { milestoneId } = await post<{ milestoneId: string }>("/milestones", { ...body, projectId });
+  await uploadAttachments(milestoneId, files);
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/milestones");
   redirect(`/projects/${projectId}/milestones/${milestoneId}`);
+}
+
+export async function uploadMilestoneAttachments(
+  projectId: string,
+  milestoneId: string,
+  formData: FormData,
+) {
+  await uploadAttachments(milestoneId, filesFrom(formData));
+  revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/my-projects/${projectId}`);
+}
+
+export async function removeMilestoneAttachment(
+  projectId: string,
+  milestoneId: string,
+  attachmentId: string,
+) {
+  await del(`/milestones/${milestoneId}/attachments/${attachmentId}`);
+  revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/my-projects/${projectId}`);
 }
 
 export async function updateMilestone(projectId: string, milestoneId: string, formData: FormData) {
@@ -258,6 +295,62 @@ export async function removeClientContact(projectId: string, formData: FormData)
   await post(`/projects/${projectId}/client-contacts/remove`, formToObject(formData));
   revalidatePath(`/projects/${projectId}/team`);
   revalidatePath(`/my-projects/${projectId}/people`);
+}
+
+// ---------------------------------------------------------------------------
+// Team directory: vendor members, teams, client companies (Team Management)
+// ---------------------------------------------------------------------------
+
+export async function createVendorMember(formData: FormData) {
+  await post(`/vendor-members`, formToObject(formData));
+  revalidatePath("/team");
+}
+
+export async function updateVendorMember(memberId: string, formData: FormData) {
+  await patch(`/vendor-members/${memberId}`, formToObject(formData));
+  revalidatePath("/team");
+}
+
+export async function removeVendorMember(memberId: string) {
+  await del(`/vendor-members/${memberId}`);
+  revalidatePath("/team");
+}
+
+export async function createTeam(formData: FormData) {
+  await post(`/teams`, formToObject(formData));
+  revalidatePath("/team");
+}
+
+export async function updateTeam(teamId: string, formData: FormData) {
+  await patch(`/teams/${teamId}`, formToObject(formData));
+  revalidatePath("/team");
+}
+
+export async function deleteTeam(teamId: string) {
+  await del(`/teams/${teamId}`);
+  revalidatePath("/team");
+}
+
+export async function createClientCompany(formData: FormData) {
+  await post(`/client-companies`, formToObject(formData));
+  revalidatePath("/client-companies");
+}
+
+export async function updateClientCompany(companyId: string, formData: FormData) {
+  await patch(`/client-companies/${companyId}`, formToObject(formData));
+  revalidatePath("/client-companies");
+}
+
+export async function deleteClientCompany(companyId: string) {
+  await del(`/client-companies/${companyId}`);
+  revalidatePath("/client-companies");
+}
+
+/** Replace a project's assigned teams / individual members (live reference). */
+export async function setProjectStaffing(projectId: string, formData: FormData) {
+  await post(`/projects/${projectId}/assigned-teams`, formToObject(formData));
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/team`);
 }
 
 /** Accept an invitation as the already-signed-in matching user. */

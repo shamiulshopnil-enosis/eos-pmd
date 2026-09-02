@@ -11,7 +11,18 @@ export const SATISFACTION_THRESHOLDS = {
 export const SATISFIED_RATING_THRESHOLD = 4.0;
 export const AT_RISK_RATING_THRESHOLD = 3.0;
 export const DUE_SOON_WINDOW_DAYS = 7;
-export const MILESTONE_RATING_LABEL = "Quality of Deliverables";
+export const MILESTONE_RATING_LABEL = "Overall";
+
+// The five delivery dimensions of a milestone review (Enosis Client Feedback
+// Form, items 1–5). Each answer is stored 1–5 (5 = best); `milestone.rating` is
+// their average. Keep in sync with the Next app's src/lib/constants.ts.
+export const MILESTONE_REVIEW_DIMENSION_KEYS = [
+  "deliverables",
+  "timeliness",
+  "understanding",
+  "planning",
+  "communication",
+] as const;
 
 export const RATING_SELF_CORRECTION_HOURS = 48;
 export const COMPLETION_TIMEOUT_DAYS = 7;

@@ -87,6 +87,30 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
   return reviveDates(payload) as T;
 }
 
+/**
+ * Multipart POST for file uploads. Forwards the session as a Bearer token and
+ * lets fetch set the multipart boundary. `form` is a FormData built in a server
+ * action from the incoming request's files.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { ...(await authHeader()) },
+    body: form,
+  });
+
+  const text = await res.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    const message =
+      (payload && (payload.message || payload.error)) ||
+      `API POST ${path} failed (${res.status})`;
+    throw new ApiError(Array.isArray(message) ? message.join(", ") : String(message), res.status);
+  }
+  return reviveDates(payload) as T;
+}
+
 /** Same as apiFetch but never throws — returns null on any error (for optional reads). */
 export async function apiFetchOrNull<T>(path: string, opts: Options = {}): Promise<T | null> {
   try {

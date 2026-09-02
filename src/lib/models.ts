@@ -73,10 +73,48 @@ const capstoneEndorsementSchema = new Schema(
   { _id: false },
 );
 
+// Team Management feature — vendor-owned people directory, named teams over it,
+// and a global client-company directory. Kept in sync with api/src/schemas.
+const VENDOR_MEMBER_ROLE = ["owner", "member"] as const;
+
+const vendorMemberSchema = new Schema(
+  {
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: VENDOR_MEMBER_ROLE, default: "member" },
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+vendorMemberSchema.index({ ownerUserId: 1, email: 1 }, { unique: true });
+
+const teamSchema = new Schema(
+  {
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    name: { type: String, required: true, trim: true },
+    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+  },
+  { timestamps: true },
+);
+
+const clientCompanySchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    contactName: { type: String, default: null },
+    contactEmail: { type: String, required: true, lowercase: true, trim: true },
+    designation: { type: String, default: "" },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+clientCompanySchema.index({ name: 1 });
+
 const projectSchema = new Schema(
   {
     name: { type: String, required: true },
     clientCompanyName: { type: String, required: true },
+    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null },
     clientContactName: { type: String, default: null },
     clientEmail: { type: String, required: true },
     services: { type: String, default: null },
@@ -107,6 +145,10 @@ const projectSchema = new Schema(
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
 
+    // --- Team Management feature — live-reference vendor staffing ---
+    assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
+    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+
     // --- Milestones plan, Phase 7 ---
     capstone: { type: capstoneEndorsementSchema, default: null },
 
@@ -125,18 +167,60 @@ const projectSchema = new Schema(
 );
 
 // --- Milestone (Milestones plan, Phase 2 — replaces Release + FeedbackRequest) ---
+const milestoneAssigneeSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+const milestoneAttachmentSchema = new Schema(
+  {
+    fileId: { type: Schema.Types.ObjectId, required: true }, // GridFS `milestone_files` bucket
+    filename: { type: String, required: true },
+    contentType: { type: String, default: "application/octet-stream" },
+    size: { type: Number, default: 0 },
+    uploadedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    uploadedByName: { type: String, default: null },
+    uploadedByEmail: { type: String, default: null },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
+// Enosis Client Feedback Form, items 1–5 — each 1–5 (5 = best).
+const milestoneReviewSchema = new Schema(
+  {
+    deliverables: { type: Number, default: null },
+    timeliness: { type: Number, default: null },
+    understanding: { type: Number, default: null },
+    planning: { type: Number, default: null },
+    communication: { type: Number, default: null },
+  },
+  { _id: false },
+);
+
 const milestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
     title: { type: String, required: true }, // plain text
     description: { type: String, default: "" }, // sanitized rich-text HTML (bold + lists)
+    url: { type: String, default: null }, // optional link
     targetDate: { type: Date, default: null },
     status: { type: String, enum: MILESTONE_STATUS, default: "draft" },
-    rating: { type: Number, default: null }, // 1-5, "Quality of Deliverables"
+    assignees: { type: [milestoneAssigneeSchema], default: [] },
+    attachments: { type: [milestoneAttachmentSchema], default: [] },
+    ratings: { type: milestoneReviewSchema, default: null }, // the five review dimensions
+    rating: { type: Number, default: null }, // average of `ratings`, drives scoring
     comment: { type: String, default: null },
     editRequestedByVendor: { type: Boolean, default: false },
     ratingSubmittedAt: { type: Date, default: null },
     reviewedAt: { type: Date, default: null },
+    reviewedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedByName: { type: String, default: null },
+    reviewedByEmail: { type: String, default: null },
     sentAt: { type: Date, default: null },
   },
   { timestamps: true },
@@ -193,6 +277,9 @@ export type ActivityDoc = InferSchemaType<typeof activitySchema>;
 export type UserDoc = InferSchemaType<typeof userSchema>;
 export type LoginCodeDoc = InferSchemaType<typeof loginCodeSchema>;
 export type InvitationDoc = InferSchemaType<typeof invitationSchema>;
+export type VendorMemberDoc = InferSchemaType<typeof vendorMemberSchema>;
+export type TeamDoc = InferSchemaType<typeof teamSchema>;
+export type ClientCompanyDoc = InferSchemaType<typeof clientCompanySchema>;
 
 export const ProjectModel =
   (models.Project as mongoose.Model<ProjectDoc>) ?? model<ProjectDoc>("Project", projectSchema);
@@ -209,3 +296,11 @@ export const LoginCodeModel =
 export const InvitationModel =
   (models.Invitation as mongoose.Model<InvitationDoc>) ??
   model<InvitationDoc>("Invitation", invitationSchema);
+export const VendorMemberModel =
+  (models.VendorMember as mongoose.Model<VendorMemberDoc>) ??
+  model<VendorMemberDoc>("VendorMember", vendorMemberSchema);
+export const TeamModel =
+  (models.Team as mongoose.Model<TeamDoc>) ?? model<TeamDoc>("Team", teamSchema);
+export const ClientCompanyModel =
+  (models.ClientCompany as mongoose.Model<ClientCompanyDoc>) ??
+  model<ClientCompanyDoc>("ClientCompany", clientCompanySchema);

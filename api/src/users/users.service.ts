@@ -10,7 +10,10 @@ function normalizeEmail(email: string): string {
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(MODEL.User) private readonly users: Model<any>) {}
+  constructor(
+    @InjectModel(MODEL.User) private readonly users: Model<any>,
+    @InjectModel(MODEL.VendorMember) private readonly vendorMembers: Model<any>,
+  ) {}
 
   /** Find an existing account by email or create a fresh one (ported from auth.ts). */
   async findOrCreate(email: string, role: UserRole = "buyer"): Promise<SessionUser> {
@@ -20,11 +23,26 @@ export class UsersService {
       { $setOnInsert: { email: normalized, role }, $set: { emailVerified: true } },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
+    const userId = String(user!._id);
+
+    // Team Management: if this email is in a vendor's people directory, link the
+    // fresh account to those entries and make sure the person can act as a
+    // vendor. This is how a directory member "joins" — no per-project invite.
+    await this.vendorMembers.updateMany(
+      { email: normalized, userId: null },
+      { $set: { userId: user!._id } },
+    );
+    let effectiveRole = user!.role as UserRole;
+    if (effectiveRole === "buyer" && (await this.vendorMembers.exists({ email: normalized }))) {
+      effectiveRole = "vendor";
+      await this.users.updateOne({ _id: userId }, { $set: { role: "vendor" } });
+    }
+
     return {
-      id: String(user!._id),
+      id: userId,
       email: user!.email,
       name: user!.name ?? null,
-      role: user!.role as UserRole,
+      role: effectiveRole,
     };
   }
 

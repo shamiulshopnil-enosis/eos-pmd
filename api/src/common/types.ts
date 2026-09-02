@@ -28,10 +28,46 @@ export type ActivityType =
   | "PUBLICATION_REQUESTED"
   | "PROJECT_PUBLISHED";
 
+export type VendorMemberRole = "owner" | "member";
+
+export interface VendorMember {
+  id: string;
+  ownerUserId: string;
+  email: string;
+  name: string | null;
+  role: VendorMemberRole;
+  userId: string | null;
+  invitePending: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Team {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  memberIds: string[];
+  members: VendorMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ClientCompany {
+  id: string;
+  name: string;
+  contactName: string | null;
+  contactEmail: string;
+  designation: string;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Project {
   id: string;
   name: string;
   clientCompanyName: string;
+  clientCompanyId: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -59,6 +95,8 @@ export interface Project {
 
   vendorTeam: VendorTeamMember[];
   clientContacts: ClientContact[];
+  assignedTeamIds: string[];
+  assignedMemberIds: string[];
   capstone: CapstoneEndorsement | null;
 
   publicSummary: string | null;
@@ -76,18 +114,53 @@ export interface Project {
   updatedAt: Date;
 }
 
+export interface MilestoneAssignee {
+  userId: string | null;
+  email: string;
+  name: string | null;
+  invitePending: boolean; // derived: userId == null
+}
+
+export interface MilestoneAttachment {
+  id: string;
+  fileId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
+  uploadedAt: Date;
+}
+
+export type MilestoneReviewDimension =
+  | "deliverables"
+  | "timeliness"
+  | "understanding"
+  | "planning"
+  | "communication";
+
+export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
+
 export interface Milestone {
   id: string;
   projectId: string;
   title: string;
   description: string;
+  url: string | null;
   targetDate: Date | null;
   status: MilestoneStatus;
-  rating: number | null;
+  assignees: MilestoneAssignee[];
+  attachments: MilestoneAttachment[];
+  ratings: MilestoneReview | null; // the five Enosis feedback dimensions, 1–5
+  rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;
   ratingSubmittedAt: Date | null;
   reviewedAt: Date | null;
+  reviewedByUserId: string | null;
+  reviewedByName: string | null;
+  reviewedByEmail: string | null;
   sentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

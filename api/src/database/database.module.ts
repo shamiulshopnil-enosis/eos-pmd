@@ -3,12 +3,15 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
 import {
   ActivitySchema,
+  ClientCompanySchema,
   InvitationSchema,
   LoginCodeSchema,
   MilestoneSchema,
   MODEL,
   ProjectSchema,
+  TeamSchema,
   UserSchema,
+  VendorMemberSchema,
 } from "../schemas/schemas";
 
 const features = MongooseModule.forFeature([
@@ -18,6 +21,9 @@ const features = MongooseModule.forFeature([
   { name: MODEL.User, schema: UserSchema },
   { name: MODEL.LoginCode, schema: LoginCodeSchema },
   { name: MODEL.Invitation, schema: InvitationSchema },
+  { name: MODEL.VendorMember, schema: VendorMemberSchema },
+  { name: MODEL.Team, schema: TeamSchema },
+  { name: MODEL.ClientCompany, schema: ClientCompanySchema },
 ]);
 
 // One shared connection pool (mirrors the Next.js app's cached connection) plus

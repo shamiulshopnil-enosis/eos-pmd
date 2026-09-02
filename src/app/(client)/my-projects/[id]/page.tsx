@@ -9,9 +9,10 @@ import { formatDate, formatDateTime, formatRating } from "@/lib/format";
 import {
   ACTIVITY_LABELS,
   CAPSTONE_TIER_LABELS,
-  MILESTONE_RATING_LABEL,
+  MILESTONE_REVIEW_DIMENSIONS,
   RATING_SELF_CORRECTION_HOURS,
 } from "@/lib/constants";
+import type { MilestoneReview } from "@/lib/types";
 import {
   Badge,
   Card,
@@ -22,10 +23,10 @@ import {
   PageHeader,
   ProjectTypeBadge,
   SectionHeading,
-  StarRating,
 } from "@/components/ui";
 import { Field, SubmitButton, TextArea } from "@/components/form";
-import { RatingInput } from "@/components/RatingInput";
+import MilestoneAttachments from "@/components/MilestoneAttachments";
+import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 
 const WINDOW_MS = RATING_SELF_CORRECTION_HOURS * 60 * 60 * 1000;
 
@@ -168,7 +169,9 @@ export default async function ClientPmdPage({ params }: { params: Promise<{ id: 
       <div className="space-y-3">
         {project.milestones.map((m) => {
           const withinWindow = withinCorrectionWindow(m.ratingSubmittedAt);
-          const canEdit = isPrimary && m.status === "reviewed" && (withinWindow || m.editRequestedByVendor);
+          const isReviewer = m.reviewedByUserId === user.id;
+          const canEdit =
+            isReviewer && m.status === "reviewed" && (withinWindow || m.editRequestedByVendor);
 
           return (
             <Card key={m.id} className="p-5">
@@ -188,24 +191,34 @@ export default async function ClientPmdPage({ params }: { params: Promise<{ id: 
                 />
               ) : null}
 
-              {isMilestoneReviewed(m) && !canEdit ? (
-                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 dark:text-slate-400">{MILESTONE_RATING_LABEL}</span>
-                    <StarRating value={m.rating} />
-                  </div>
-                  {m.comment ? (
-                    <p className="mt-2 text-sm italic text-slate-600 dark:text-slate-300">&ldquo;{m.comment}&rdquo;</p>
-                  ) : null}
-                  <div className="mt-1 text-xs text-slate-400">Reviewed {formatDateTime(m.reviewedAt)}</div>
+              {m.url ? (
+                <div className="mt-2 text-sm">
+                  <a href={m.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    {m.url}
+                  </a>
                 </div>
               ) : null}
 
-              {isPrimary && m.status === "sent" ? (
+              {isMilestoneReviewed(m) && !canEdit ? (
+                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <MilestoneReviewSummary milestone={m} />
+                  {m.comment ? (
+                    <p className="mt-2 text-sm italic text-slate-600 dark:text-slate-300">&ldquo;{m.comment}&rdquo;</p>
+                  ) : null}
+                  <div className="mt-1 text-xs text-slate-400">
+                    Reviewed {formatDateTime(m.reviewedAt)}
+                    {m.reviewedByName || m.reviewedByEmail
+                      ? ` by ${m.reviewedByName ?? m.reviewedByEmail}`
+                      : ""}
+                  </div>
+                </div>
+              ) : null}
+
+              {m.status === "sent" ? (
                 <RatingForm
                   action={submitMilestoneRating.bind(null, id, m.id)}
-                  submitLabel="Submit rating"
-                  intro={`Rate this milestone on ${MILESTONE_RATING_LABEL}.`}
+                  submitLabel="Submit review"
+                  intro="Please rate this milestone on each of the following."
                 />
               ) : null}
 
@@ -223,16 +236,25 @@ export default async function ClientPmdPage({ params }: { params: Promise<{ id: 
                   )}
                   <RatingForm
                     action={editOwnMilestoneRating.bind(null, id, m.id)}
-                    submitLabel="Update rating"
-                    defaultRating={m.rating ?? undefined}
+                    submitLabel="Update review"
+                    defaultReview={m.ratings}
                     defaultComment={m.comment ?? ""}
                   />
                 </div>
               ) : null}
 
-              {!isPrimary && m.status === "sent" ? (
-                <p className="mt-3 text-sm text-slate-400">Awaiting the primary contact&apos;s rating.</p>
-              ) : null}
+              <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Attachments
+                </div>
+                <MilestoneAttachments
+                  projectId={id}
+                  milestone={m}
+                  currentUserId={user.id}
+                  isVendorOwner={false}
+                  canUpload={project.executionStatus !== "completed"}
+                />
+              </div>
             </Card>
           );
         })}
@@ -271,24 +293,47 @@ function RatingForm({
   action,
   submitLabel,
   intro,
-  defaultRating,
+  defaultReview,
   defaultComment = "",
 }: {
   action: (formData: FormData) => void;
   submitLabel: string;
   intro?: string;
-  defaultRating?: number;
+  defaultReview?: MilestoneReview | null;
   defaultComment?: string;
 }) {
   return (
-    <form action={action} className="mt-3 space-y-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+    <form action={action} className="mt-3 space-y-5 border-t border-slate-100 pt-3 dark:border-slate-800">
       {intro ? <p className="text-sm text-slate-500 dark:text-slate-400">{intro}</p> : null}
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{MILESTONE_RATING_LABEL}</span>
-        <RatingInput name="rating" required defaultValue={defaultRating} />
-      </div>
-      <Field label="Comment" hint="Optional">
-        <TextArea name="comment" rows={2} defaultValue={defaultComment} placeholder="How did this milestone go?" />
+      {MILESTONE_REVIEW_DIMENSIONS.map((dim, i) => {
+        const current = defaultReview ? defaultReview[dim.key] : null;
+        return (
+          <fieldset key={dim.key} className="space-y-1.5">
+            <legend className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              {i + 1}. {dim.question} <span className="text-rose-500">*</span>
+            </legend>
+            <div className="space-y-1">
+              {dim.options.map((opt, idx) => {
+                const value = 5 - idx;
+                return (
+                  <label key={opt} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <input
+                      type="radio"
+                      name={dim.key}
+                      value={value}
+                      required
+                      defaultChecked={current === value}
+                    />
+                    {opt}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        );
+      })}
+      <Field label="Additional feedback" hint="Optional — one comment for the whole review">
+        <TextArea name="comment" rows={3} defaultValue={defaultComment} placeholder="Anything else about this milestone?" />
       </Field>
       <SubmitButton>{submitLabel}</SubmitButton>
     </form>

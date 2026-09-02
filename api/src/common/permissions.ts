@@ -28,12 +28,18 @@ export const isPrimaryContact = (u: SessionUser | null, p: ProjectPeople) => cli
 export const isCollaborator = (u: SessionUser | null, p: ProjectPeople) => clientRole(u, p) === "collaborator";
 export const isClientContact = (u: SessionUser | null, p: ProjectPeople) => clientRole(u, p) !== null;
 
+export const isProjectMember = (u: SessionUser | null, p: ProjectPeople) =>
+  isVendorTeamMember(u, p) || isClientContact(u, p);
+
 export const canEditMilestone = (u: SessionUser | null, p: ProjectPeople) => isVendorTeamMember(u, p);
 export const canSendMilestone = (u: SessionUser | null, p: ProjectPeople) => isVendorTeamMember(u, p);
 export const canManageProject = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
 export const canInviteTeammate = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
 export const canRequestCompletion = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);
-export const canRateMilestone = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
+/** Any client contact — primary or collaborator — may submit the one rating. */
+export const canRateMilestone = (u: SessionUser | null, p: ProjectPeople) => isClientContact(u, p);
+/** Vendor team or client contact — either side can attach files to a milestone. */
+export const canAttachToMilestone = (u: SessionUser | null, p: ProjectPeople) => isProjectMember(u, p);
 export const canConfirmCompletion = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 export const canInviteCollaborator = (u: SessionUser | null, p: ProjectPeople) => isPrimaryContact(u, p);
 export const canRequestCapstone = (u: SessionUser | null, p: ProjectPeople) => isVendorOwner(u, p);

@@ -37,8 +37,45 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
             <span className="mt-1 block text-xs text-slate-400">Supports bold and bulleted lists.</span>
           </div>
 
-          <Field label="Target Date">
-            <TextInput type="date" name="targetDate" />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Target Date">
+              <TextInput type="date" name="targetDate" />
+            </Field>
+            <Field label="URL" hint="Optional — repo, demo, or spec link.">
+              <TextInput type="url" name="url" placeholder="https://…" />
+            </Field>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              Assign to
+            </legend>
+            {project.vendorTeam.length === 0 ? (
+              <p className="text-xs text-slate-400">No vendor team members to assign yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {project.vendorTeam.map((m) => (
+                  <label
+                    key={m.email}
+                    className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    <input type="checkbox" name="assigneeEmails" value={m.email} />
+                    {m.name ? `${m.name} · ` : ""}
+                    {m.email}
+                    {m.invitePending ? <span className="text-xs text-amber-500">(pending)</span> : null}
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
+
+          <Field label="Files" hint="Optional — up to 10 files, 15 MB each.">
+            <input
+              type="file"
+              name="files"
+              multiple
+              className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
+            />
           </Field>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">

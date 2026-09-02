@@ -4,10 +4,13 @@
 import type {
   Activity,
   CapstoneEndorsement,
+  ClientCompany,
   ClientContact,
   Invitation,
   Milestone,
   Project,
+  Team,
+  VendorMember,
   VendorTeamMember,
 } from "./types";
 
@@ -16,8 +19,10 @@ type Raw = Record<string, unknown>;
 const str = (v: unknown): string | null => (v == null ? null : String(v));
 const num = (v: unknown): number | null => (v == null ? null : Number(v));
 const date = (v: unknown): Date | null => (v == null ? null : (v as Date));
+const idList = (v: unknown): string[] =>
+  Array.isArray(v) ? (v as unknown[]).map((x) => String(x)) : [];
 
-function serializeVendorMember(v: Raw): VendorTeamMember {
+function serializeEmbeddedVendorMember(v: Raw): VendorTeamMember {
   return {
     userId: v.userId == null ? null : String(v.userId),
     email: String(v.email ?? ""),
@@ -52,6 +57,45 @@ function serializeCapstone(c: Raw | null | undefined): CapstoneEndorsement | nul
   };
 }
 
+export function serializeVendorMember(v: Raw): VendorMember {
+  return {
+    id: String(v._id),
+    ownerUserId: String(v.ownerUserId),
+    email: String(v.email ?? ""),
+    name: str(v.name),
+    role: (v.role as VendorMember["role"]) ?? "member",
+    userId: v.userId == null ? null : String(v.userId),
+    invitePending: v.userId == null,
+    createdAt: date(v.createdAt) ?? new Date(0),
+    updatedAt: date(v.updatedAt) ?? new Date(0),
+  };
+}
+
+export function serializeTeam(t: Raw, members: VendorMember[] = []): Team {
+  return {
+    id: String(t._id),
+    ownerUserId: String(t.ownerUserId),
+    name: String(t.name ?? ""),
+    memberIds: idList(t.memberIds),
+    members,
+    createdAt: date(t.createdAt) ?? new Date(0),
+    updatedAt: date(t.updatedAt) ?? new Date(0),
+  };
+}
+
+export function serializeClientCompany(c: Raw): ClientCompany {
+  return {
+    id: String(c._id),
+    name: String(c.name ?? ""),
+    contactName: str(c.contactName),
+    contactEmail: String(c.contactEmail ?? ""),
+    designation: (c.designation as string) ?? "",
+    createdByUserId: c.createdByUserId == null ? null : String(c.createdByUserId),
+    createdAt: date(c.createdAt) ?? new Date(0),
+    updatedAt: date(c.updatedAt) ?? new Date(0),
+  };
+}
+
 export function serializeInvitation(i: Raw): Invitation {
   return {
     id: String(i._id),
@@ -71,6 +115,7 @@ export function serializeProject(p: Raw): Project {
     id: String(p._id),
     name: p.name as string,
     clientCompanyName: p.clientCompanyName as string,
+    clientCompanyId: p.clientCompanyId == null ? null : String(p.clientCompanyId),
     clientContactName: str(p.clientContactName),
     clientEmail: p.clientEmail as string,
     services: str(p.services),
@@ -94,10 +139,14 @@ export function serializeProject(p: Raw): Project {
     liveScore: num(p.liveScore),
     reviewedMilestoneCount: Number(p.reviewedMilestoneCount ?? 0),
     finalScore: num(p.finalScore),
-    vendorTeam: Array.isArray(p.vendorTeam) ? (p.vendorTeam as Raw[]).map(serializeVendorMember) : [],
+    vendorTeam: Array.isArray(p.vendorTeam)
+      ? (p.vendorTeam as Raw[]).map(serializeEmbeddedVendorMember)
+      : [],
     clientContacts: Array.isArray(p.clientContacts)
       ? (p.clientContacts as Raw[]).map(serializeClientContact)
       : [],
+    assignedTeamIds: idList(p.assignedTeamIds),
+    assignedMemberIds: idList(p.assignedMemberIds),
     capstone: serializeCapstone(p.capstone as Raw | null | undefined),
     publicSummary: str(p.publicSummary),
     publicKeyChallenges: str(p.publicKeyChallenges),
@@ -114,19 +163,64 @@ export function serializeProject(p: Raw): Project {
   };
 }
 
+function serializeMilestoneAssignee(a: Raw): Milestone["assignees"][number] {
+  return {
+    userId: a.userId == null ? null : String(a.userId),
+    email: String(a.email ?? ""),
+    name: str(a.name),
+    invitePending: a.userId == null,
+  };
+}
+
+function serializeMilestoneAttachment(a: Raw): Milestone["attachments"][number] {
+  return {
+    id: String(a._id),
+    fileId: String(a.fileId),
+    filename: String(a.filename ?? ""),
+    contentType: (a.contentType as string) ?? "application/octet-stream",
+    size: Number(a.size ?? 0),
+    uploadedByUserId: a.uploadedByUserId == null ? null : String(a.uploadedByUserId),
+    uploadedByName: str(a.uploadedByName),
+    uploadedByEmail: str(a.uploadedByEmail),
+    uploadedAt: date(a.uploadedAt) ?? new Date(0),
+  };
+}
+
+function serializeMilestoneReview(r: Raw | null | undefined): Milestone["ratings"] {
+  if (!r) return null;
+  return {
+    deliverables: num(r.deliverables),
+    timeliness: num(r.timeliness),
+    understanding: num(r.understanding),
+    planning: num(r.planning),
+    communication: num(r.communication),
+  };
+}
+
 export function serializeMilestone(m: Raw): Milestone {
   return {
     id: String(m._id),
     projectId: String(m.projectId),
     title: m.title as string,
     description: (m.description as string) ?? "",
+    url: str(m.url),
     targetDate: date(m.targetDate),
     status: (m.status as Milestone["status"]) ?? "draft",
+    assignees: Array.isArray(m.assignees)
+      ? (m.assignees as Raw[]).map(serializeMilestoneAssignee)
+      : [],
+    attachments: Array.isArray(m.attachments)
+      ? (m.attachments as Raw[]).map(serializeMilestoneAttachment)
+      : [],
+    ratings: serializeMilestoneReview(m.ratings as Raw | null | undefined),
     rating: num(m.rating),
     comment: str(m.comment),
     editRequestedByVendor: Boolean(m.editRequestedByVendor),
     ratingSubmittedAt: date(m.ratingSubmittedAt),
     reviewedAt: date(m.reviewedAt),
+    reviewedByUserId: m.reviewedByUserId == null ? null : String(m.reviewedByUserId),
+    reviewedByName: str(m.reviewedByName),
+    reviewedByEmail: str(m.reviewedByEmail),
     sentAt: date(m.sentAt),
     createdAt: date(m.createdAt) ?? new Date(0),
     updatedAt: date(m.updatedAt) ?? new Date(0),

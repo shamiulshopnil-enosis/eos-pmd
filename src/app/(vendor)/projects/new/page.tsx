@@ -1,8 +1,17 @@
+import Link from "next/link";
 import { createProject } from "@/lib/actions";
-import { Field, Select, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { listClientCompanies, listTeams, listVendorMembers } from "@/lib/data";
+import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
+import ClientCompanyPicker from "@/components/ClientCompanyPicker";
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
+  const [companies, teams, members] = await Promise.all([
+    listClientCompanies(),
+    listTeams(),
+    listVendorMembers(),
+  ]);
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
@@ -40,23 +49,13 @@ export default function NewProjectPage() {
             <TextInput name="name" required placeholder="e.g. E-commerce Platform Development" />
           </Field>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field label="Client Company Name" required>
-              <TextInput name="clientCompanyName" required placeholder="e.g. Gravity77 Pty Ltd" />
-            </Field>
-            <Field label="Client Contact Name">
-              <TextInput name="clientContactName" placeholder="e.g. Saz Virk" />
-            </Field>
-          </div>
+          <Field label="Client Company" required hint="Search the shared directory, or add a new company.">
+            <ClientCompanyPicker companies={companies} />
+          </Field>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field label="Client Email" required hint="The client's primary contact email.">
-              <TextInput type="email" name="clientEmail" required placeholder="client@company.com" />
-            </Field>
-            <Field label="Project Services" hint="Comma-separated, e.g. Mobile Development, QA">
-              <TextInput name="services" placeholder="Mobile Application Development" />
-            </Field>
-          </div>
+          <Field label="Project Services" hint="Comma-separated, e.g. Mobile Development, QA">
+            <TextInput name="services" placeholder="Mobile Application Development" />
+          </Field>
 
           <Field label="Project Description / Scope">
             <TextArea name="description" rows={4} placeholder="What is this engagement about?" />
@@ -88,30 +87,59 @@ export default function NewProjectPage() {
           </Field>
 
           <fieldset className="space-y-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-            <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Invite people (optional)</legend>
+            <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Assign your team</legend>
             <p className="text-xs text-slate-400">
-              You are added as the vendor owner automatically. Anyone else can also be invited later from the project.
+              You are added as the project owner automatically. Assign whole teams, individual people, or both —
+              staffing stays in sync with{" "}
+              <Link href="/team" className="text-blue-600 hover:underline">
+                Team Management
+              </Link>
+              .
             </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Vendor teammate email">
-                <TextInput type="email" name="teammateEmail" placeholder="teammate@company.com" />
-              </Field>
-              <Field label="Teammate role">
-                <Select name="teammateRole" defaultValue="member">
-                  <option value="member">Member</option>
-                  <option value="owner">Owner</option>
-                </Select>
-              </Field>
-              <div className="hidden sm:block" />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Primary client contact email">
-                <TextInput type="email" name="contactEmail" placeholder="client@company.com" />
-              </Field>
-              <Field label="Contact designation">
-                <TextInput name="contactDesignation" placeholder="e.g. Product Owner" />
-              </Field>
-            </div>
+
+            {teams.length === 0 && members.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500 dark:border-slate-700">
+                Your team directory is empty. You can{" "}
+                <Link href="/team" className="text-blue-600 hover:underline">
+                  set up teams and people
+                </Link>{" "}
+                now or after creating the project.
+              </p>
+            ) : null}
+
+            {teams.length > 0 ? (
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams</div>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {teams.map((t) => (
+                    <label key={t.id} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <input type="checkbox" name="teamIds" value={t.id} className="mt-0.5" />
+                      <span>
+                        {t.name}
+                        <span className="block text-xs text-slate-400">
+                          {t.members.length} member{t.members.length === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {members.length > 0 ? (
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Individuals</div>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {members.map((m) => (
+                    <label key={m.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <input type="checkbox" name="memberIds" value={m.id} />
+                      {m.name ? `${m.name} · ` : ""}
+                      {m.email}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </fieldset>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
