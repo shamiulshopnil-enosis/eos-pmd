@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { MODEL } from "../schemas/schemas";
 import type { SessionUser, UserRole } from "../common/types";
 
@@ -12,11 +12,12 @@ function normalizeEmail(email: string): string {
 export class UsersService {
   constructor(
     @InjectModel(MODEL.User) private readonly users: Model<any>,
-    @InjectModel(MODEL.VendorMember) private readonly vendorMembers: Model<any>,
+    @InjectModel(MODEL.CompanyMember) private readonly memberships: Model<any>,
+    @InjectModel(MODEL.Company) private readonly companies: Model<any>,
   ) {}
 
   /** Find an existing account by email or create a fresh one (ported from auth.ts). */
-  async findOrCreate(email: string, role: UserRole = "buyer"): Promise<SessionUser> {
+  async findOrCreate(email: string, role: UserRole = "member"): Promise<SessionUser> {
     const normalized = normalizeEmail(email);
     const user = await this.users.findOneAndUpdate(
       { email: normalized },
@@ -25,24 +26,25 @@ export class UsersService {
     );
     const userId = String(user!._id);
 
-    // Team Management: if this email is in a vendor's people directory, link the
-    // fresh account to those entries and make sure the person can act as a
-    // vendor. This is how a directory member "joins" — no per-project invite.
-    await this.vendorMembers.updateMany(
+    // Company-model unification: link every unclaimed membership for this email to the
+    // account and mark those companies claimed. This is how someone "joins" — no
+    // per-project invite.
+    await this.memberships.updateMany(
       { email: normalized, userId: null },
       { $set: { userId: user!._id } },
     );
-    let effectiveRole = user!.role as UserRole;
-    if (effectiveRole === "buyer" && (await this.vendorMembers.exists({ email: normalized }))) {
-      effectiveRole = "vendor";
-      await this.users.updateOne({ _id: userId }, { $set: { role: "vendor" } });
+    const myCompanyIds = (
+      await this.memberships.find({ email: normalized }).select({ companyId: 1 }).lean()
+    ).map((m) => m.companyId as Types.ObjectId);
+    if (myCompanyIds.length > 0) {
+      await this.companies.updateMany({ _id: { $in: myCompanyIds } }, { $set: { claimed: true } });
     }
 
     return {
       id: userId,
       email: user!.email,
       name: user!.name ?? null,
-      role: effectiveRole,
+      role: (user!.role === "admin" ? "admin" : "member") as UserRole,
     };
   }
 

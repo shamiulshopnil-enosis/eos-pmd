@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { connectToDatabase } from "../../src/lib/mongoose";
 import { ClientCompanyModel, ProjectModel, UserModel } from "../../src/lib/models";
-import { SEED_USERS } from "../seed-users";
+import { SEED_VENDOR_EMAIL } from "../seed-users";
 
 // Team Management feature. Backfills the shared Client Company directory from the
 // free-text client fields already stored on every project, then links each
@@ -16,7 +16,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 async function main() {
   await connectToDatabase();
 
-  const vendorEmail = SEED_USERS.find((u) => u.role === "vendor")!.email;
+  const vendorEmail = SEED_VENDOR_EMAIL;
   const vendor = await UserModel.findOne({ email: vendorEmail });
   const createdBy = vendor?._id ?? null;
 

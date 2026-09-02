@@ -9,6 +9,7 @@ import { Model, Types } from "mongoose";
 import { MODEL } from "../schemas/schemas";
 import { ActivityService } from "../activity/activity.service";
 import { UsersService } from "../users/users.service";
+import { CompaniesService } from "../directory/companies.service";
 import {
   serializeActivity,
   serializeInvitation,
@@ -18,13 +19,24 @@ import {
 import { runningAverage } from "../common/scoring";
 import { minReviewThreshold, COMPLETION_TIMEOUT_DAYS, RATING_SELF_CORRECTION_HOURS } from "../common/constants";
 import { CAPSTONE_ATTRIBUTE_POOL, MAX_CAPSTONE_ATTRIBUTES, tierForScore } from "../common/attributes";
-import { assertPermission, canManageProject } from "../common/permissions";
+import {
+  access,
+  assertPermission,
+  canConfirmCompletion,
+  canManageProject,
+  canManageReviewStaffing,
+  canRequestCapstone,
+  canSubmitCapstone,
+} from "../common/permissions";
 import { bool, optDate, optInt, optStr, str, strList } from "../common/input";
 import type {
   ActivityWithMilestoneName,
   CapstoneTier,
+  ClientContact,
   Milestone,
+  CompanyRole,
   Project,
+  ProjectAccess,
   ProjectWithMilestones,
   SessionUser,
   VendorTeamMember,
@@ -35,19 +47,18 @@ const toObjectIds = (ids: string[]) =>
   ids.filter(isValidId).map((id) => new Types.ObjectId(id));
 
 /**
- * Merge a project's stored vendorTeam (the founding owner + any grandfathered
- * rows) with the people resolved live from its assigned teams / members. Stored
- * rows win on an email clash so the founding owner keeps their role.
+ * Merge people resolved from the company model with any legacy embedded rows.
+ * Company-resolved rows win on an email clash (they carry current userId / role);
+ * stored rows only fill emails the company model doesn't cover (pure grandfathering).
  */
-function mergeVendorTeam(
-  stored: VendorTeamMember[],
-  resolved: VendorTeamMember[],
-): VendorTeamMember[] {
-  const byEmail = new Map<string, VendorTeamMember>();
-  for (const r of resolved) byEmail.set(r.email.toLowerCase(), r);
+function mergeByEmail<T extends { email: string }>(stored: T[], resolved: T[]): T[] {
+  const byEmail = new Map<string, T>();
   for (const s of stored) byEmail.set(s.email.toLowerCase(), s);
+  for (const r of resolved) byEmail.set(r.email.toLowerCase(), r);
   return [...byEmail.values()];
 }
+const mergeVendorTeam = (s: VendorTeamMember[], r: VendorTeamMember[]) => mergeByEmail(s, r);
+const mergeClientContacts = (s: ClientContact[], r: ClientContact[]) => mergeByEmail(s, r);
 
 @Injectable()
 export class ProjectsService {
@@ -57,10 +68,10 @@ export class ProjectsService {
     @InjectModel(MODEL.Activity) private readonly activities: Model<any>,
     @InjectModel(MODEL.Invitation) private readonly invitations: Model<any>,
     @InjectModel(MODEL.Team) private readonly teams: Model<any>,
-    @InjectModel(MODEL.VendorMember) private readonly vendorMembers: Model<any>,
-    @InjectModel(MODEL.ClientCompany) private readonly clientCompanies: Model<any>,
+    @InjectModel(MODEL.CompanyMember) private readonly companyMembers: Model<any>,
     private readonly activity: ActivityService,
     private readonly users: UsersService,
+    private readonly companies: CompaniesService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -84,20 +95,41 @@ export class ProjectsService {
     return projects.map((p) => ({ ...p, milestones: byProject.get(p.id) ?? [] }));
   }
 
+  private companyMemberToTeamMember(m: Record<string, any>): VendorTeamMember {
+    return {
+      userId: m.userId ? String(m.userId) : null,
+      email: String(m.email),
+      name: m.name ?? null,
+      // map company role -> the legacy vendorTeam enum for existing UI badges
+      role: m.role === "owner" || m.role === "admin" ? "owner" : "member",
+      invitePending: m.userId == null,
+    };
+  }
+
   /**
-   * Resolve every project's assigned teams / members and fold the current
-   * membership into `project.vendorTeam` (live reference — Team Management
-   * feature). All downstream permission checks and UI keep reading
-   * `vendorTeam`, so nothing else has to change.
+   * Resolve each project's effective people from the company model (company-unification
+   * PR2) and, when a `user` is given, compute their `myAccess`:
+   *  - `vendorTeam`   = delivering-company owners/admins + people on assigned
+   *                     delivery teams / assigned individually
+   *  - `clientContacts` = receiving-company owners/admins + people on assigned
+   *                     review teams / assigned individually
+   * Legacy embedded `vendorTeam` / `clientContacts` rows are merged in so
+   * grandfathered projects still render.
    */
-  private async hydrateVendorTeams<T extends Project>(projects: T[]): Promise<T[]> {
+  private async hydrateProjectPeople<T extends Project>(
+    projects: T[],
+    user?: SessionUser,
+  ): Promise<T[]> {
     const teamIds = new Set<string>();
     const memberIds = new Set<string>();
+    const companyIds = new Set<string>();
     for (const p of projects) {
-      for (const id of p.assignedTeamIds ?? []) teamIds.add(id);
-      for (const id of p.assignedMemberIds ?? []) memberIds.add(id);
+      for (const id of [...(p.assignedTeamIds ?? []), ...(p.receivingTeamIds ?? [])]) teamIds.add(id);
+      for (const id of [...(p.assignedMemberIds ?? []), ...(p.receivingMemberIds ?? [])])
+        memberIds.add(id);
+      if (p.deliveringCompanyId) companyIds.add(p.deliveringCompanyId);
+      if (p.receivingCompanyId) companyIds.add(p.receivingCompanyId);
     }
-    if (teamIds.size === 0 && memberIds.size === 0) return projects;
 
     const teamDocs = teamIds.size
       ? await this.teams
@@ -112,75 +144,173 @@ export class ProjectsService {
       for (const id of ids) memberIds.add(id);
     }
 
-    const memberDocs = memberIds.size
-      ? await this.vendorMembers.find({ _id: { $in: toObjectIds([...memberIds]) } }).lean()
-      : [];
-    const memberById = new Map<string, Record<string, any>>(
-      memberDocs.map((m) => [String(m._id), m as Record<string, any>]),
-    );
+    // Every membership we might need: assigned individuals/team members, plus
+    // all owners/admins of the two companies.
+    const membershipDocs: Record<string, any>[] = [];
+    if (memberIds.size) {
+      membershipDocs.push(
+        ...((await this.companyMembers
+          .find({ _id: { $in: toObjectIds([...memberIds]) } })
+          .lean()) as Record<string, any>[]),
+      );
+    }
+    if (companyIds.size) {
+      membershipDocs.push(
+        ...((await this.companyMembers
+          .find({ companyId: { $in: toObjectIds([...companyIds]) }, role: { $in: ["owner", "admin"] } })
+          .lean()) as Record<string, any>[]),
+      );
+    }
+    const memberById = new Map<string, Record<string, any>>();
+    const membersByCompany = new Map<string, Record<string, any>[]>();
+    for (const m of membershipDocs) {
+      memberById.set(String(m._id), m);
+      const k = String(m.companyId);
+      (membersByCompany.get(k) ?? membersByCompany.set(k, []).get(k)!).push(m);
+    }
 
-    return projects.map((p) => {
-      const wanted = new Set<string>(p.assignedMemberIds ?? []);
-      for (const tid of p.assignedTeamIds ?? []) {
-        for (const mid of teamMembers.get(tid) ?? []) wanted.add(mid);
-      }
-      const resolved: VendorTeamMember[] = [];
+    const resolveSide = (
+      companyId: string | null,
+      sideTeamIds: string[],
+      sideMemberIds: string[],
+    ): { people: VendorTeamMember[]; myRole: string | null; assigned: boolean } => {
+      const wanted = new Set<string>(sideMemberIds);
+      for (const tid of sideTeamIds) for (const mid of teamMembers.get(tid) ?? []) wanted.add(mid);
+      const seen = new Set<string>();
+      const people: VendorTeamMember[] = [];
+      const push = (m: Record<string, any>) => {
+        const key = String(m.email).toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        people.push(this.companyMemberToTeamMember(m));
+      };
+      for (const m of companyId ? membersByCompany.get(companyId) ?? [] : []) push(m);
       for (const mid of wanted) {
         const m = memberById.get(mid);
-        if (!m) continue;
-        resolved.push({
-          userId: m.userId ? String(m.userId) : null,
-          email: String(m.email),
-          name: m.name ?? null,
-          role: m.role === "owner" ? "owner" : "member",
-          invitePending: m.userId == null,
-        });
+        if (m) push(m);
       }
-      return { ...p, vendorTeam: mergeVendorTeam(p.vendorTeam, resolved) };
+      let myMembershipId: string | null = null;
+      let myRole: string | null = null;
+      if (user && companyId) {
+        for (const m of membershipDocs) {
+          if (String(m.companyId) === companyId && m.userId && String(m.userId) === user.id) {
+            myMembershipId = String(m._id);
+            myRole = String(m.role);
+            break;
+          }
+        }
+      }
+      return { people, myRole, assigned: myMembershipId != null && wanted.has(myMembershipId) };
+    };
+
+    return projects.map((p) => {
+      const delivery = resolveSide(
+        p.deliveringCompanyId,
+        p.assignedTeamIds ?? [],
+        p.assignedMemberIds ?? [],
+      );
+      const review = resolveSide(
+        p.receivingCompanyId,
+        p.receivingTeamIds ?? [],
+        p.receivingMemberIds ?? [],
+      );
+
+      const out: T = {
+        ...p,
+        vendorTeam: mergeVendorTeam(p.vendorTeam, delivery.people),
+        clientContacts: mergeClientContacts(
+          p.clientContacts,
+          review.people.map((x) => ({
+            userId: x.userId,
+            email: x.email,
+            name: x.name,
+            designation: x.role === "owner" ? "Primary Contact" : "Contact",
+            role: x.role === "owner" ? "primary" : "collaborator",
+            invitePending: x.invitePending,
+          })),
+        ),
+      };
+      if (user) {
+        out.myAccess = {
+          deliveryRole: (delivery.myRole as CompanyRole | null) ?? null,
+          reviewRole: (review.myRole as CompanyRole | null) ?? null,
+          assignedDelivery: delivery.assigned,
+          assignedReview: review.assigned,
+        };
+      }
+      return out;
     });
   }
 
   /**
-   * The ids of every project a vendor user belongs to — whether as a stored
-   * vendorTeam row (founding owner / grandfathered) or via an assigned team or
-   * an individual assignment that resolves to a directory member linked to
-   * their account. Returns null when there is no vendor scope to apply.
+   * Ids of every project the user can access on the given side(s).
+   * Owners/admins of an company reach all its projects; plain members reach only
+   * projects they're assigned to (team or individual). Legacy embedded rows are
+   * still matched for grandfathered projects.
    */
-  async projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
-    if (!vendorUserId || !isValidId(vendorUserId)) return null;
-    const uid = new Types.ObjectId(vendorUserId);
+  async projectIdsForUser(
+    userId?: string,
+    side: "delivery" | "review" | "any" = "any",
+  ): Promise<Types.ObjectId[] | null> {
+    if (!userId || !isValidId(userId)) return null;
+    const uid = new Types.ObjectId(userId);
 
-    const myMembers = await this.vendorMembers.find({ userId: uid }).select({ _id: 1 }).lean();
-    const myMemberIds = myMembers.map((m) => m._id as Types.ObjectId);
+    const myMemberships = (await this.companyMembers
+      .find({ userId: uid })
+      .select({ _id: 1, companyId: 1, role: 1 })
+      .lean()) as Record<string, any>[];
+    const leadCompanyIds = myMemberships
+      .filter((m) => m.role === "owner" || m.role === "admin")
+      .map((m) => m.companyId as Types.ObjectId);
+    const myMemberIds = myMemberships.map((m) => m._id as Types.ObjectId);
     const myTeams = myMemberIds.length
       ? await this.teams.find({ memberIds: { $in: myMemberIds } }).select({ _id: 1 }).lean()
       : [];
     const myTeamIds = myTeams.map((t) => t._id as Types.ObjectId);
 
-    const or: Record<string, unknown>[] = [{ "vendorTeam.userId": uid }];
-    if (myMemberIds.length) or.push({ assignedMemberIds: { $in: myMemberIds } });
-    if (myTeamIds.length) or.push({ assignedTeamIds: { $in: myTeamIds } });
+    const deliveryOr: Record<string, unknown>[] = [{ "vendorTeam.userId": uid }];
+    const reviewOr: Record<string, unknown>[] = [{ "clientContacts.userId": uid }];
+    if (leadCompanyIds.length) {
+      deliveryOr.push({ deliveringCompanyId: { $in: leadCompanyIds } });
+      reviewOr.push({ receivingCompanyId: { $in: leadCompanyIds } });
+    }
+    if (myMemberIds.length) {
+      deliveryOr.push({ assignedMemberIds: { $in: myMemberIds } });
+      reviewOr.push({ receivingMemberIds: { $in: myMemberIds } });
+    }
+    if (myTeamIds.length) {
+      deliveryOr.push({ assignedTeamIds: { $in: myTeamIds } });
+      reviewOr.push({ receivingTeamIds: { $in: myTeamIds } });
+    }
 
+    const or =
+      side === "delivery" ? deliveryOr : side === "review" ? reviewOr : [...deliveryOr, ...reviewOr];
     const docs = await this.projects.find({ $or: or }).select({ _id: 1 }).lean();
     return docs.map((d) => d._id as Types.ObjectId);
+  }
+
+  /** @deprecated kept for callers not yet migrated — delegates to projectIdsForUser. */
+  projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
+    return this.projectIdsForUser(vendorUserId, "delivery");
   }
 
   // -------------------------------------------------------------------------
   // reads (ported from data.ts)
   // -------------------------------------------------------------------------
 
-  async countProjects(vendorUserId?: string): Promise<number> {
-    const ids = await this.projectIdsForVendor(vendorUserId);
+  async countProjects(userId?: string): Promise<number> {
+    const ids = await this.projectIdsForUser(userId, "delivery");
     return this.projects.countDocuments(ids ? { _id: { $in: ids } } : {});
   }
 
   async listProjectsWithMilestones(filter: {
     status?: string;
     q?: string;
-    vendorUserId?: string;
+    userId?: string;
+    side?: "delivery" | "review" | "any";
   } = {}): Promise<ProjectWithMilestones[]> {
     const clauses: Record<string, unknown>[] = [];
-    const ids = await this.projectIdsForVendor(filter.vendorUserId);
+    const ids = await this.projectIdsForUser(filter.userId, filter.side ?? "delivery");
     if (ids) clauses.push({ _id: { $in: ids } });
     if (filter.status) clauses.push({ status: filter.status });
     if (filter.q) {
@@ -190,31 +320,30 @@ export class ProjectsService {
     const query = clauses.length ? { $and: clauses } : {};
     const projectDocs = await this.projects.find(query).sort({ updatedAt: -1 }).lean();
     const projects = projectDocs.map((p) => serializeProject(p as Record<string, unknown>));
-    return this.attachMilestones(await this.hydrateVendorTeams(projects));
+    return this.attachMilestones(await this.hydrateProjectPeople(projects));
   }
 
-  async listProjectsForUser(userId: string): Promise<ProjectWithMilestones[]> {
-    if (!isValidId(userId)) return [];
-    const docs = await this.projects
-      .find({ "clientContacts.userId": new Types.ObjectId(userId) })
-      .sort({ updatedAt: -1 })
-      .lean();
+  async listProjectsForUser(user: SessionUser): Promise<ProjectWithMilestones[]> {
+    const ids = await this.projectIdsForUser(user.id, "review");
+    if (!ids || ids.length === 0) return [];
+    const docs = await this.projects.find({ _id: { $in: ids } }).sort({ updatedAt: -1 }).lean();
     const projects = docs.map((p) => serializeProject(p as Record<string, unknown>));
-    return this.attachMilestones(await this.hydrateVendorTeams(projects));
+    return this.attachMilestones(await this.hydrateProjectPeople(projects, user));
   }
 
-  async getProject(id: string): Promise<Project | null> {
+  async getProject(id: string, user?: SessionUser): Promise<Project | null> {
     if (!isValidId(id)) return null;
     const doc = await this.projects.findById(id).lean();
     if (!doc) return null;
-    const [hydrated] = await this.hydrateVendorTeams([
-      serializeProject(doc as Record<string, unknown>),
-    ]);
+    const [hydrated] = await this.hydrateProjectPeople(
+      [serializeProject(doc as Record<string, unknown>)],
+      user,
+    );
     return hydrated;
   }
 
-  async getProjectOrThrow(id: string): Promise<Project> {
-    const project = await this.getProject(id);
+  async getProjectOrThrow(id: string, user?: SessionUser): Promise<Project> {
+    const project = await this.getProject(id, user);
     if (!project) throw new NotFoundException("Project not found.");
     return project;
   }
@@ -223,7 +352,7 @@ export class ProjectsService {
     const query: Record<string, unknown> = {};
     if (filter.adminStatus) query.adminStatus = filter.adminStatus;
     const docs = await this.projects.find(query).sort({ updatedAt: -1 }).lean();
-    return this.hydrateVendorTeams(docs.map((p) => serializeProject(p as Record<string, unknown>)));
+    return this.hydrateProjectPeople(docs.map((p) => serializeProject(p as Record<string, unknown>)));
   }
 
   async listProjectsAwaitingCompletionTimeout(timeoutDays: number): Promise<Project[]> {
@@ -232,11 +361,11 @@ export class ProjectsService {
       .find({ executionStatus: "awaiting_completion", completionRequestedAt: { $lte: cutoff } })
       .sort({ completionRequestedAt: 1 })
       .lean();
-    return this.hydrateVendorTeams(docs.map((p) => serializeProject(p as Record<string, unknown>)));
+    return this.hydrateProjectPeople(docs.map((p) => serializeProject(p as Record<string, unknown>)));
   }
 
-  async getProjectWithMilestones(id: string): Promise<ProjectWithMilestones | null> {
-    const project = await this.getProject(id);
+  async getProjectWithMilestones(id: string, user?: SessionUser): Promise<ProjectWithMilestones | null> {
+    const project = await this.getProject(id, user);
     if (!project) return null;
     const [withMilestones] = await this.attachMilestones([project]);
     return withMilestones;
@@ -244,8 +373,9 @@ export class ProjectsService {
 
   async getProjectDetail(
     id: string,
+    user?: SessionUser,
   ): Promise<(ProjectWithMilestones & { activities: ActivityWithMilestoneName[] }) | null> {
-    const withMilestones = await this.getProjectWithMilestones(id);
+    const withMilestones = await this.getProjectWithMilestones(id, user);
     if (!withMilestones) return null;
 
     const activityDocs = await this.activities
@@ -278,15 +408,15 @@ export class ProjectsService {
   // shared write helpers (ported from actions.ts)
   // -------------------------------------------------------------------------
 
-  /** Load the serialized project and enforce a per-project role check (spec §7). */
+  /** Load the project (with the user's `myAccess`) and enforce a check on it. */
   async requirePermission(
     projectId: string,
     user: SessionUser,
-    check: (u: SessionUser, p: Project) => boolean,
+    check: (a: ProjectAccess) => boolean,
     message?: string,
   ): Promise<Project> {
-    const project = await this.getProjectOrThrow(projectId);
-    assertPermission(check(user, project), message);
+    const project = await this.getProjectOrThrow(projectId, user);
+    if (user.role !== "admin") assertPermission(check(access(project.myAccess)), message);
     return project;
   }
 
@@ -321,83 +451,65 @@ export class ProjectsService {
   // -------------------------------------------------------------------------
 
   /**
-   * Resolve the client company for a new project: an existing directory entry
-   * picked by id, or one created inline from `newCompany*` fields. Falls back to
-   * the legacy free-text `clientCompanyName` / `clientEmail` body fields so
-   * direct API callers and older forms keep working.
+   * Resolve the receiving company for a new project: an existing company picked
+   * by id, or a stub created inline from `newCompany*` (legacy free-text
+   * `clientCompanyName` fields are still accepted).
    */
-  private async resolveClientCompany(
+  private async resolveReceivingCompany(
     user: SessionUser,
     body: Record<string, unknown>,
   ): Promise<{
-    companyId: string | null;
+    companyId: string;
     name: string;
     contactEmail: string;
     contactName: string | null;
     designation: string;
   }> {
-    const pickedId = optStr(body, "clientCompanyId");
+    const designation =
+      optStr(body, "newCompanyDesignation") ?? optStr(body, "contactDesignation") ?? "Client Contact";
+
+    const pickedId = optStr(body, "receivingCompanyId") ?? optStr(body, "clientCompanyId");
     if (pickedId) {
-      if (!isValidId(pickedId)) throw new BadRequestException("Invalid client company.");
-      const company = (await this.clientCompanies.findById(pickedId).lean()) as Record<
-        string,
-        any
-      > | null;
-      if (!company) throw new BadRequestException("The selected client company no longer exists.");
+      const company = await this.companies.getOrThrow(pickedId);
+      const contact = await this.companies.primaryContact(pickedId);
       return {
-        companyId: String(company._id),
-        name: String(company.name),
-        contactEmail: String(company.contactEmail ?? "").toLowerCase(),
-        contactName: (company.contactName as string | null) ?? null,
-        designation: (company.designation as string) || "Client Contact",
+        companyId: company.id,
+        name: company.name,
+        contactEmail: contact?.email ?? str(body, "clientEmail").toLowerCase(),
+        contactName: contact?.name ?? optStr(body, "clientContactName"),
+        designation,
       };
     }
 
-    const newName = optStr(body, "newCompanyName");
-    if (newName) {
-      const created = await this.clientCompanies.create({
-        name: newName,
-        contactName: optStr(body, "newCompanyContactName"),
-        contactEmail: str(body, "newCompanyContactEmail").toLowerCase(),
-        designation: optStr(body, "newCompanyDesignation") ?? "",
-        createdByUserId: user.id,
-      });
-      return {
-        companyId: String(created._id),
-        name: created.name,
-        contactEmail: String(created.contactEmail ?? "").toLowerCase(),
-        contactName: created.contactName ?? null,
-        designation: (created.designation as string) || "Client Contact",
-      };
-    }
+    const newName =
+      optStr(body, "newCompanyName") ?? optStr(body, "clientCompanyName");
+    const contactEmail = (
+      optStr(body, "newCompanyContactEmail") ?? str(body, "clientEmail")
+    ).toLowerCase();
+    const contactName =
+      optStr(body, "newCompanyContactName") ?? optStr(body, "clientContactName");
+    if (!newName) throw new BadRequestException("Select or add a client company.");
+    if (!contactEmail) throw new BadRequestException("The client company needs a contact email.");
 
-    return {
-      companyId: null,
-      name: str(body, "clientCompanyName"),
-      contactEmail: str(body, "clientEmail").toLowerCase(),
-      contactName: optStr(body, "clientContactName"),
-      designation: optStr(body, "contactDesignation") ?? "Client Contact",
-    };
+    const company = await this.companies.createStub(user, { name: newName, contactName, contactEmail });
+    return { companyId: company.id, name: company.name, contactEmail, contactName, designation };
   }
 
-  /** Keep only assignment ids that are real directory entities owned by this vendor. */
+  /** Keep only assignment ids that are real teams/members of the delivering company. */
   private async ownedAssignments(
-    ownerUserId: string,
+    companyId: string,
     teamIds: string[],
     memberIds: string[],
   ): Promise<{ teamIds: Types.ObjectId[]; memberIds: Types.ObjectId[] }> {
-    const owner = new Types.ObjectId(ownerUserId);
+    const company = new Types.ObjectId(companyId);
     const teamOids = toObjectIds(teamIds);
     const memberOids = toObjectIds(memberIds);
     const [teams, members] = await Promise.all([
       teamOids.length
-        ? this.teams.find({ _id: { $in: teamOids }, ownerUserId: owner }).select({ _id: 1 }).lean()
+        ? this.teams.find({ _id: { $in: teamOids }, companyId: company }).select({ _id: 1 }).lean()
         : [],
       memberOids.length
-        ? this.vendorMembers
-            .find({ _id: { $in: memberOids }, ownerUserId: owner })
-            .select({ _id: 1 })
-            .lean()
+        ? this.companyMembers.find({ _id: { $in: memberOids }, companyId: company }).select({ _id: 1 }).lean()
         : [],
     ]);
     return {
@@ -407,16 +519,18 @@ export class ProjectsService {
   }
 
   async createProject(user: SessionUser, body: Record<string, unknown>): Promise<{ id: string }> {
-    if (user.role !== "vendor") throw new ForbiddenException("Only vendors can create projects.");
-
-    const company = await this.resolveClientCompany(user, body);
-    if (!company.name) throw new BadRequestException("Select or add a client company.");
-    if (!company.contactEmail) {
-      throw new BadRequestException("The client company needs a contact email.");
+    // Anyone in an company can start a project their company delivers.
+    const deliveringCompanyId = await this.companies.resolveActingCompany(
+      user,
+      optStr(body, "deliveringCompanyId") ?? undefined,
+    );
+    const company = await this.resolveReceivingCompany(user, body);
+    if (company.companyId === deliveringCompanyId) {
+      throw new BadRequestException("A project's client company must differ from your own.");
     }
 
     const assignments = await this.ownedAssignments(
-      user.id,
+      deliveringCompanyId,
       strList(body, "teamIds"),
       strList(body, "memberIds"),
     );
@@ -424,7 +538,8 @@ export class ProjectsService {
     const project = await this.projects.create({
       name: str(body, "name"),
       clientCompanyName: company.name,
-      clientCompanyId: company.companyId,
+      deliveringCompanyId: new Types.ObjectId(deliveringCompanyId),
+      receivingCompanyId: new Types.ObjectId(company.companyId),
       clientContactName: company.contactName,
       clientEmail: company.contactEmail,
       services: optStr(body, "services"),
@@ -546,14 +661,17 @@ export class ProjectsService {
    * these ids, so there is nothing else to sync.
    */
   async setAssignedTeams(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(
+    const project = await this.requirePermission(
       projectId,
       user,
       canManageProject,
       "Only a project owner can change project staffing.",
     );
+    const deliveringCompanyId =
+      project.deliveringCompanyId ??
+      (await this.companies.resolveActingCompany(user, optStr(body, "deliveringCompanyId") ?? undefined));
     const assignments = await this.ownedAssignments(
-      user.id,
+      deliveringCompanyId,
       strList(body, "teamIds"),
       strList(body, "memberIds"),
     );
@@ -603,8 +721,8 @@ export class ProjectsService {
     const project = await this.requirePermission(
       projectId,
       user,
-      (u, p) => this.isVendorOwner(u, p),
-      "Only a project owner can request completion.",
+      canManageProject,
+      "Only a delivering-company owner or admin can request completion.",
     );
     if (project.executionStatus !== "ongoing") {
       throw new BadRequestException("Completion can only be requested while the project is ongoing.");
@@ -630,8 +748,8 @@ export class ProjectsService {
     await this.requirePermission(
       projectId,
       user,
-      (u, p) => this.isPrimaryContact(u, p),
-      "Only the primary client contact can confirm completion.",
+      canConfirmCompletion,
+      "Only a receiving-company owner or admin can confirm completion.",
     );
     await this.recomputeProjectScore(projectId);
     const doc = await this.projects.findById(projectId);
@@ -684,8 +802,8 @@ export class ProjectsService {
     await this.requirePermission(
       projectId,
       user,
-      (u, p) => this.isVendorOwner(u, p),
-      "Only a project owner can request a capstone endorsement.",
+      canRequestCapstone,
+      "Only a delivering-company owner or admin can request a capstone endorsement.",
     );
     const doc = await this.projects.findById(projectId);
     if (!doc) throw new NotFoundException("Project not found.");
@@ -719,8 +837,8 @@ export class ProjectsService {
     await this.requirePermission(
       projectId,
       user,
-      (u, p) => this.isPrimaryContact(u, p),
-      "Only the primary client contact can submit the capstone endorsement.",
+      canSubmitCapstone,
+      "Only a receiving-company owner or admin can submit the capstone endorsement.",
     );
     const doc = await this.projects.findById(projectId);
     if (!doc) throw new NotFoundException("Project not found.");
@@ -796,219 +914,33 @@ export class ProjectsService {
   }
 
   // -------------------------------------------------------------------------
-  // People & invitations (spec §4.3, §4.4, §7, §8)
+  // Review-side staffing (company-unification PR2). Mirror of setAssignedTeams for
+  // the receiving company. The receiving company's owner/admin picks which of their
+  // teams / people are on the project.
   // -------------------------------------------------------------------------
 
-  private isVendorOwner(u: SessionUser, p: Project): boolean {
-    return !!p.vendorTeam.find((v) => !v.invitePending && v.userId === u.id && v.role === "owner");
-  }
-  private isPrimaryContact(u: SessionUser, p: Project): boolean {
-    return !!p.clientContacts.find((c) => !c.invitePending && c.userId === u.id && c.role === "primary");
-  }
-
-  async inviteVendorTeamMember(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can invite teammates.");
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    if (!email) throw new BadRequestException("An email address is required.");
-    const role = str(body, "role") === "owner" ? "owner" : "member";
-
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-    if (doc.vendorTeam.some((v: any) => v.email === email)) {
-      throw new BadRequestException("That person is already on the vendor team.");
-    }
-    await this.invitations.create({
-      email,
-      projectId,
-      kind: "vendor_team",
-      proposedRole: role,
-      invitedByUserId: user.id,
-    });
-    doc.vendorTeam.push({ userId: null, email, name: null, role, invitePending: true });
-    await doc.save();
-    await this.activity.log({
-      projectId,
-      type: "PROJECT_UPDATED",
-      message: `Invited ${email} to the vendor team as ${role}`,
-    });
-  }
-
-  async removeVendorTeamMember(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can remove teammates.");
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-
-    const target = doc.vendorTeam.find((v: any) => v.email === email);
-    if (!target) throw new BadRequestException("That person is not on the vendor team.");
-
-    const activeOwners = doc.vendorTeam.filter((v: any) => v.role === "owner" && !v.invitePending);
-    if (target.role === "owner" && !target.invitePending && activeOwners.length <= 1) {
-      throw new BadRequestException("A project must always keep at least one vendor owner.");
-    }
-    doc.vendorTeam = doc.vendorTeam.filter((v: any) => v.email !== email);
-    await doc.save();
-    await this.invitations.updateMany(
-      { projectId, email, kind: "vendor_team", status: "pending" },
-      { $set: { status: "revoked" } },
-    );
-    await this.activity.log({
-      projectId,
-      type: "PROJECT_UPDATED",
-      message: `Removed ${email} from the vendor team`,
-    });
-  }
-
-  async inviteClientContact(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can invite the client contact.");
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    if (!email) throw new BadRequestException("An email address is required.");
-    const designation = optStr(body, "designation") ?? "Client Contact";
-
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-
-    for (const c of doc.clientContacts) {
-      if (c.role === "primary" && !c.invitePending && c.email !== email) c.role = "collaborator";
-    }
-    doc.clientContacts = doc.clientContacts.filter(
-      (c: any) => !(c.role === "primary" && c.invitePending && c.email !== email),
-    );
-    await this.invitations.updateMany(
-      {
-        projectId,
-        kind: "client_contact",
-        proposedRole: "primary",
-        status: "pending",
-        email: { $ne: email },
-      },
-      { $set: { status: "revoked" } },
-    );
-
-    const existing = doc.clientContacts.find((c: any) => c.email === email);
-    if (existing) {
-      existing.role = "primary";
-      existing.designation = designation;
-      if (!existing.userId) existing.invitePending = true;
-    } else {
-      doc.clientContacts.push({
-        userId: null,
-        email,
-        name: null,
-        designation,
-        role: "primary",
-        invitePending: true,
-      });
-    }
-    await doc.save();
-
-    if (!existing?.userId) {
-      await this.invitations.create({
-        email,
-        projectId,
-        kind: "client_contact",
-        proposedRole: "primary",
-        designation,
-        invitedByUserId: user.id,
-      });
-    }
-    await this.activity.log({
-      projectId,
-      type: "PROJECT_UPDATED",
-      message: `Invited ${email} as the primary client contact`,
-    });
-  }
-
-  async reassignPrimaryContact(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can reassign the primary contact.");
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-
-    const target = doc.clientContacts.find((c: any) => c.email === email && !c.invitePending);
-    if (!target) throw new BadRequestException("That person is not an active client contact on this project.");
-
-    for (const c of doc.clientContacts) {
-      if (c.role === "primary" && !c.invitePending) c.role = "collaborator";
-    }
-    target.role = "primary";
-    await doc.save();
-    await this.activity.log({
-      projectId,
-      type: "PROJECT_UPDATED",
-      message: `${email} is now the primary client contact`,
-    });
-  }
-
-  async inviteCollaborator(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(
+  async setReviewStaffing(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
+    const project = await this.requirePermission(
       projectId,
       user,
-      (u, p) => this.isPrimaryContact(u, p),
-      "Only the primary contact can invite collaborators.",
+      canManageReviewStaffing,
+      "Only a receiving-company owner or admin can change review staffing.",
     );
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    if (!email) throw new BadRequestException("An email address is required.");
-
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-    if (doc.clientContacts.some((c: any) => c.email === email)) {
-      throw new BadRequestException("That person is already a client contact.");
-    }
-    await this.invitations.create({
-      email,
-      projectId,
-      kind: "client_contact",
-      proposedRole: "collaborator",
-      invitedByUserId: user.id,
+    if (!project.receivingCompanyId) throw new BadRequestException("This project has no client company.");
+    const assignments = await this.ownedAssignments(
+      project.receivingCompanyId,
+      strList(body, "teamIds"),
+      strList(body, "memberIds"),
+    );
+    await this.projects.findByIdAndUpdate(projectId, {
+      receivingTeamIds: assignments.teamIds,
+      receivingMemberIds: assignments.memberIds,
     });
-    doc.clientContacts.push({
-      userId: null,
-      email,
-      name: null,
-      designation: "Collaborator",
-      role: "collaborator",
-      invitePending: true,
-    });
-    await doc.save();
     await this.activity.log({
       projectId,
       type: "PROJECT_UPDATED",
-      message: `Invited ${email} as a collaborator`,
+      message: `Client staffing updated — ${assignments.teamIds.length} team(s), ${assignments.memberIds.length} individual(s)`,
     });
   }
 
-  async removeClientContact(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    const project = await this.getProjectOrThrow(projectId);
-    const isOwner = this.isVendorOwner(user, project);
-    const isPrimary = this.isPrimaryContact(user, project);
-    if (!isOwner && !isPrimary) {
-      throw new ForbiddenException("You cannot manage this project's client contacts.");
-    }
-
-    const email = (optStr(body, "email") ?? "").toLowerCase();
-    const doc = await this.projects.findById(projectId);
-    if (!doc) throw new NotFoundException("Project not found.");
-
-    const target = doc.clientContacts.find((c: any) => c.email === email);
-    if (!target) throw new BadRequestException("That person is not a client contact on this project.");
-
-    if (!isOwner && target.role !== "collaborator") {
-      throw new ForbiddenException("The primary contact can only remove collaborators.");
-    }
-    if (target.role === "primary" && !target.invitePending) {
-      throw new BadRequestException("Reassign the primary contact before removing them.");
-    }
-    doc.clientContacts = doc.clientContacts.filter((c: any) => c.email !== email);
-    await doc.save();
-    await this.invitations.updateMany(
-      { projectId, email, kind: "client_contact", status: "pending" },
-      { $set: { status: "revoked" } },
-    );
-    await this.activity.log({
-      projectId,
-      type: "PROJECT_UPDATED",
-      message: `Removed client contact ${email}`,
-    });
-  }
 }

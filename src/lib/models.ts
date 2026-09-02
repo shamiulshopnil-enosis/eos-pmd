@@ -89,15 +89,6 @@ const vendorMemberSchema = new Schema(
 );
 vendorMemberSchema.index({ ownerUserId: 1, email: 1 }, { unique: true });
 
-const teamSchema = new Schema(
-  {
-    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    name: { type: String, required: true, trim: true },
-    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
-  },
-  { timestamps: true },
-);
-
 const clientCompanySchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -110,11 +101,48 @@ const clientCompanySchema = new Schema(
 );
 clientCompanySchema.index({ name: 1 });
 
+// --- Company model (company-unification PR1) — in sync with api/src/schemas ---
+const COMPANY_ROLE = ["owner", "admin", "member"] as const;
+
+const companySchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    claimed: { type: Boolean, default: false },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+companySchema.index({ name: 1 });
+
+const companyMemberSchema = new Schema(
+  {
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: COMPANY_ROLE, default: "member" },
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+companyMemberSchema.index({ companyId: 1, email: 1 }, { unique: true });
+
+const teamSchema = new Schema(
+  {
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", index: true },
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User" }, // legacy
+    name: { type: String, required: true, trim: true },
+    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
+  },
+  { timestamps: true },
+);
+
 const projectSchema = new Schema(
   {
     name: { type: String, required: true },
     clientCompanyName: { type: String, required: true },
-    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null },
+    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null }, // legacy
+    deliveringCompanyId: { type: Schema.Types.ObjectId, ref: "Company", default: null, index: true },
+    receivingCompanyId: { type: Schema.Types.ObjectId, ref: "Company", default: null, index: true },
     clientContactName: { type: String, default: null },
     clientEmail: { type: String, required: true },
     services: { type: String, default: null },
@@ -145,9 +173,11 @@ const projectSchema = new Schema(
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
 
-    // --- Team Management feature — live-reference vendor staffing ---
+    // --- company-unification live-reference staffing (delivery + receiving) ---
     assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
-    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
+    receivingTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
+    receivingMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
 
     // --- Milestones plan, Phase 7 ---
     capstone: { type: capstoneEndorsementSchema, default: null },
@@ -236,14 +266,14 @@ const activitySchema = new Schema({
 
 // --- Identity (Milestones plan, Phase 0) ---
 
-const USER_ROLE = ["buyer", "vendor", "admin"] as const;
+const USER_ROLE = ["admin", "member"] as const;
 const LOGIN_CODE_PURPOSE = ["login", "invite"] as const;
 
 const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, default: null },
-    role: { type: String, enum: USER_ROLE, default: "buyer" },
+    role: { type: String, enum: USER_ROLE, default: "member" },
     emailVerified: { type: Boolean, default: false },
   },
   { timestamps: true },
@@ -280,6 +310,8 @@ export type InvitationDoc = InferSchemaType<typeof invitationSchema>;
 export type VendorMemberDoc = InferSchemaType<typeof vendorMemberSchema>;
 export type TeamDoc = InferSchemaType<typeof teamSchema>;
 export type ClientCompanyDoc = InferSchemaType<typeof clientCompanySchema>;
+export type CompanyDoc = InferSchemaType<typeof companySchema>;
+export type CompanyMemberDoc = InferSchemaType<typeof companyMemberSchema>;
 
 export const ProjectModel =
   (models.Project as mongoose.Model<ProjectDoc>) ?? model<ProjectDoc>("Project", projectSchema);
@@ -304,3 +336,9 @@ export const TeamModel =
 export const ClientCompanyModel =
   (models.ClientCompany as mongoose.Model<ClientCompanyDoc>) ??
   model<ClientCompanyDoc>("ClientCompany", clientCompanySchema);
+export const CompanyModel =
+  (models.Company as mongoose.Model<CompanyDoc>) ??
+  model<CompanyDoc>("Company", companySchema);
+export const CompanyMemberModel =
+  (models.CompanyMember as mongoose.Model<CompanyMemberDoc>) ??
+  model<CompanyMemberDoc>("CompanyMember", companyMemberSchema);

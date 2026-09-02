@@ -13,6 +13,7 @@ const MILESTONE_STATUS = ["draft", "sent", "reviewed"] as const;
 const CAPSTONE_TIER = ["promoter", "neutral", "detractor"] as const;
 const VENDOR_TEAM_ROLE = ["owner", "member"] as const;
 const VENDOR_MEMBER_ROLE = ["owner", "member"] as const;
+const COMPANY_ROLE = ["owner", "admin", "member"] as const;
 const CLIENT_CONTACT_ROLE = ["primary", "collaborator"] as const;
 const INVITATION_KIND = ["vendor_team", "client_contact"] as const;
 const INVITATION_ROLE = ["owner", "member", "primary", "collaborator"] as const;
@@ -31,7 +32,7 @@ const ACTIVITY_TYPE = [
   "PROJECT_PUBLISHED",
 ] as const;
 
-const USER_ROLE = ["buyer", "vendor", "admin"] as const;
+const USER_ROLE = ["admin", "member"] as const;
 const LOGIN_CODE_PURPOSE = ["login", "invite"] as const;
 
 const vendorTeamMemberSchema = new Schema(
@@ -71,10 +72,39 @@ const capstoneEndorsementSchema = new Schema(
   { _id: false },
 );
 
-// Vendor-owned people directory. A vendor maintains a pool of teammates once
-// (name + email + a default project role); teams and individual project
-// assignments reference these by id. `userId` is filled the first time the
-// person signs in with this email (see UsersService.findOrCreate).
+// --- Company model (company-unification PR1) ---
+// One entity for every company. It is neither "a vendor" nor "a client" by
+// itself — it is delivering or receiving per project. A vendor-created stub has
+// `claimed: false` and one invite-pending owner membership; the contact's first
+// sign-in claims it. `isPlatformVendor` is transition scaffolding: it marks the
+// seeded delivering company so plain-login auto-join / vendor-role promotion still
+// works until per-project roles are removed in PR2/PR3.
+export const CompanySchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    claimed: { type: Boolean, default: false },
+    createdByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+CompanySchema.index({ name: 1 });
+
+// A person in an company. Replaces VendorMember and the people half of the
+// project's clientContacts. `userId` fills on the first sign-in with this email.
+export const CompanyMemberSchema = new Schema(
+  {
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", required: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, default: null },
+    role: { type: String, enum: COMPANY_ROLE, default: "member" },
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { timestamps: true },
+);
+CompanyMemberSchema.index({ companyId: 1, email: 1 }, { unique: true });
+CompanyMemberSchema.index({ userId: 1 });
+
+// Legacy — kept registered so migration 007 can read old rows. No longer written.
 export const VendorMemberSchema = new Schema(
   {
     ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -87,21 +117,20 @@ export const VendorMemberSchema = new Schema(
 );
 VendorMemberSchema.index({ ownerUserId: 1, email: 1 }, { unique: true });
 
-// A named grouping of VendorMember ids, owned by one vendor. Assigning a team to
-// a project is a live reference: the project's vendor team always reflects the
-// team's current membership.
+// A named grouping of CompanyMember ids, owned by one company. Assigning a
+// team to a project is a live reference: the effective team on the project
+// always reflects the team's current membership.
 export const TeamSchema = new Schema(
   {
-    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", index: true },
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User" }, // legacy, unused after migration
     name: { type: String, required: true, trim: true },
-    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+    memberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
   },
   { timestamps: true },
 );
 
-// Global, shared directory of client companies. A vendor searches this when
-// creating a project; if the company is not found they add it once and it is
-// reusable on every later project.
+// Legacy — kept registered so migration 007 can read old rows. No longer written.
 export const ClientCompanySchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -118,7 +147,11 @@ export const ProjectSchema = new Schema(
   {
     name: { type: String, required: true },
     clientCompanyName: { type: String, required: true },
-    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null },
+    clientCompanyId: { type: Schema.Types.ObjectId, ref: "ClientCompany", default: null }, // legacy
+    // company-unification PR1 — the two companies a project connects. Populated
+    // by migration 007 + createProject; not yet driving permissions (PR2).
+    deliveringCompanyId: { type: Schema.Types.ObjectId, ref: "Company", default: null, index: true },
+    receivingCompanyId: { type: Schema.Types.ObjectId, ref: "Company", default: null, index: true },
     clientContactName: { type: String, default: null },
     clientEmail: { type: String, required: true },
     services: { type: String, default: null },
@@ -147,11 +180,14 @@ export const ProjectSchema = new Schema(
     vendorTeam: { type: [vendorTeamMemberSchema], default: [] },
     clientContacts: { type: [clientContactSchema], default: [] },
 
-    // Live-reference vendor staffing (Team Management feature). The effective
-    // vendor team on a project read is `vendorTeam` (the founding owner + any
-    // grandfathered rows) merged with the current membership of these.
+    // Live-reference staffing (company-unification). `assigned*` = delivering side,
+    // `receiving*` = client side. The effective people lists (`vendorTeam` /
+    // `clientContacts` on a read) are resolved from these plus each company's
+    // owners/admins.
     assignedTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
-    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "VendorMember" }], default: [] },
+    assignedMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
+    receivingTeamIds: { type: [{ type: Schema.Types.ObjectId, ref: "Team" }], default: [] },
+    receivingMemberIds: { type: [{ type: Schema.Types.ObjectId, ref: "CompanyMember" }], default: [] },
 
     capstone: { type: capstoneEndorsementSchema, default: null },
 
@@ -247,7 +283,7 @@ export const UserSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, default: null },
-    role: { type: String, enum: USER_ROLE, default: "buyer" },
+    role: { type: String, enum: USER_ROLE, default: "member" },
     emailVerified: { type: Boolean, default: false },
   },
   { timestamps: true },
@@ -287,4 +323,6 @@ export const MODEL = {
   VendorMember: "VendorMember",
   Team: "Team",
   ClientCompany: "ClientCompany",
+  Company: "Company",
+  CompanyMember: "CompanyMember",
 } as const;

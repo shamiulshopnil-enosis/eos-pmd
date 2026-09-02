@@ -1,16 +1,17 @@
 import { apiFetch } from "./api-client";
 import type {
   ActivityWithMilestoneName,
-  ClientCompany,
   Invitation,
   Milestone,
   MilestoneWithFullProject,
   MilestoneWithProject,
+  Company,
+  CompanySummary,
+  CompanyMember,
   Project,
   ProjectWithMilestones,
   RecentActivity,
   Team,
-  VendorMember,
 } from "./types";
 
 // Read layer. Previously these talked to MongoDB through Mongoose; they now call
@@ -30,27 +31,23 @@ function qs(params: Record<string, string | number | undefined>): string {
 // projects
 // ---------------------------------------------------------------------------
 
-export async function countProjects(vendorUserId?: string): Promise<number> {
-  const { count } = await apiFetch<{ count: number }>(
-    `/projects/count${qs({ scope: vendorUserId ? "vendor" : undefined })}`,
-  );
+/** Count of projects the signed-in user is on the delivery side of. */
+export async function countProjects(): Promise<number> {
+  const { count } = await apiFetch<{ count: number }>(`/projects/count`);
   return count;
 }
 
+/** Projects the signed-in user can act on. `side` defaults to "delivery". */
 export async function listProjectsWithMilestones(
-  filter: { status?: string; q?: string; vendorUserId?: string } = {},
+  filter: { status?: string; q?: string; side?: "delivery" | "review" | "any" } = {},
 ): Promise<ProjectWithMilestones[]> {
   return apiFetch<ProjectWithMilestones[]>(
-    `/projects${qs({
-      status: filter.status,
-      q: filter.q,
-      scope: filter.vendorUserId ? "vendor" : undefined,
-    })}`,
+    `/projects${qs({ status: filter.status, q: filter.q, side: filter.side })}`,
   );
 }
 
-/** Projects where the given user is an accepted client contact (buyer "My Projects"). */
-export async function listProjectsForUser(_userId: string): Promise<ProjectWithMilestones[]> {
+/** Projects the signed-in user reviews (their company is the receiving side). */
+export async function listReviewProjects(): Promise<ProjectWithMilestones[]> {
   return apiFetch<ProjectWithMilestones[]>(`/projects/mine`);
 }
 
@@ -100,22 +97,15 @@ export async function getProjectDetail(
 // milestones
 // ---------------------------------------------------------------------------
 
-export async function countMilestones(vendorUserId?: string): Promise<number> {
-  const { count } = await apiFetch<{ count: number }>(
-    `/milestones/count${qs({ scope: vendorUserId ? "vendor" : undefined })}`,
-  );
+export async function countMilestones(): Promise<number> {
+  const { count } = await apiFetch<{ count: number }>(`/milestones/count`);
   return count;
 }
 
 export async function listMilestonesWithProject(
-  filter: { status?: string; vendorUserId?: string } = {},
+  filter: { status?: string } = {},
 ): Promise<MilestoneWithProject[]> {
-  return apiFetch<MilestoneWithProject[]>(
-    `/milestones${qs({
-      status: filter.status,
-      scope: filter.vendorUserId ? "vendor" : undefined,
-    })}`,
-  );
+  return apiFetch<MilestoneWithProject[]>(`/milestones${qs({ status: filter.status })}`);
 }
 
 export async function getMilestone(id: string): Promise<Milestone | null> {
@@ -151,33 +141,38 @@ export async function listPendingInvitations(projectId: string): Promise<Invitat
 }
 
 // ---------------------------------------------------------------------------
-// team directory (Team Management feature)
+// companies & teams (company-unification PR1)
 // ---------------------------------------------------------------------------
 
-/** The signed-in vendor's reusable people directory. */
-export async function listVendorMembers(): Promise<VendorMember[]> {
-  return apiFetch<VendorMember[]>(`/vendor-members`);
+/** The company the signed-in user acts as (their single membership). */
+export async function getMyCompany(): Promise<Company> {
+  return apiFetch<Company>(`/companies/me`);
 }
 
-/** The signed-in vendor's teams, each with its members resolved. */
+/** Members of the given company. */
+export async function listCompanyMembers(companyId: string): Promise<CompanyMember[]> {
+  return apiFetch<CompanyMember[]>(`/companies/${companyId}/members`);
+}
+
+/** The signed-in user's teams (acting company), each with its members resolved. */
 export async function listTeams(): Promise<Team[]> {
   return apiFetch<Team[]>(`/teams`);
 }
 
-/** The shared client-company directory. Pass `q` to filter by name. */
-export async function listClientCompanies(q?: string): Promise<ClientCompany[]> {
-  return apiFetch<ClientCompany[]>(`/client-companies${qs({ q })}`);
+/** Companies the signed-in user belongs to. */
+export async function listMyCompanies(): Promise<Company[]> {
+  return apiFetch<Company[]>(`/companies`);
+}
+
+/** Name search across every company — for the project-creation picker. */
+export async function searchCompanies(q?: string): Promise<CompanySummary[]> {
+  return apiFetch<CompanySummary[]>(`/companies${qs({ q, scope: "search" })}`);
 }
 
 // ---------------------------------------------------------------------------
 // activity
 // ---------------------------------------------------------------------------
 
-export async function recentActivities(
-  limit: number,
-  vendorUserId?: string,
-): Promise<RecentActivity[]> {
-  return apiFetch<RecentActivity[]>(
-    `/activity/recent${qs({ limit, scope: vendorUserId ? "vendor" : undefined })}`,
-  );
+export async function recentActivities(limit: number): Promise<RecentActivity[]> {
+  return apiFetch<RecentActivity[]>(`/activity/recent${qs({ limit })}`);
 }

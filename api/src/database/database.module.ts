@@ -8,6 +8,8 @@ import {
   LoginCodeSchema,
   MilestoneSchema,
   MODEL,
+  CompanySchema,
+  CompanyMemberSchema,
   ProjectSchema,
   TeamSchema,
   UserSchema,
@@ -24,6 +26,8 @@ const features = MongooseModule.forFeature([
   { name: MODEL.VendorMember, schema: VendorMemberSchema },
   { name: MODEL.Team, schema: TeamSchema },
   { name: MODEL.ClientCompany, schema: ClientCompanySchema },
+  { name: MODEL.Company, schema: CompanySchema },
+  { name: MODEL.CompanyMember, schema: CompanyMemberSchema },
 ]);
 
 // One shared connection pool (mirrors the Next.js app's cached connection) plus

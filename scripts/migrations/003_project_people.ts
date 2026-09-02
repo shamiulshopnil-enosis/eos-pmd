@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { connectToDatabase } from "../../src/lib/mongoose";
 import { ProjectModel, UserModel } from "../../src/lib/models";
-import { SEED_USERS } from "../seed-users";
+import { SEED_VENDOR_EMAIL } from "../seed-users";
 
 // Milestones plan, Phase 3. Backfills per-project people on existing projects:
 //   npm run migrate:003
@@ -11,7 +11,7 @@ import { SEED_USERS } from "../seed-users";
 async function main() {
   await connectToDatabase();
 
-  const vendorEmail = SEED_USERS.find((u) => u.role === "vendor")!.email;
+  const vendorEmail = SEED_VENDOR_EMAIL;
   const vendor = await UserModel.findOne({ email: vendorEmail });
   if (!vendor) throw new Error(`Seed vendor ${vendorEmail} not found - run migrate:000 first.`);
 

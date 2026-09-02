@@ -85,10 +85,7 @@ export class AuthController {
     const ok = await this.auth.verifyLoginCode(inv.email, code, "invite");
     if (!ok) return { ok: false as const, error: "That code is invalid or has expired." };
 
-    const user = await this.users.findOrCreate(
-      inv.email,
-      inv.kind === "vendor_team" ? "vendor" : "buyer",
-    );
+    const user = await this.users.findOrCreate(inv.email);
     const result = await this.invitations.applyAcceptance(id, user);
     if (!result.ok) return { ok: false as const, error: result.error };
 

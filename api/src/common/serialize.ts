@@ -4,13 +4,13 @@
 import type {
   Activity,
   CapstoneEndorsement,
-  ClientCompany,
   ClientContact,
   Invitation,
   Milestone,
+  Company,
+  CompanyMember,
   Project,
   Team,
-  VendorMember,
   VendorTeamMember,
 } from "./types";
 
@@ -57,42 +57,40 @@ function serializeCapstone(c: Raw | null | undefined): CapstoneEndorsement | nul
   };
 }
 
-export function serializeVendorMember(v: Raw): VendorMember {
+export function serializeCompany(o: Raw): Company {
   return {
-    id: String(v._id),
-    ownerUserId: String(v.ownerUserId),
-    email: String(v.email ?? ""),
-    name: str(v.name),
-    role: (v.role as VendorMember["role"]) ?? "member",
-    userId: v.userId == null ? null : String(v.userId),
-    invitePending: v.userId == null,
-    createdAt: date(v.createdAt) ?? new Date(0),
-    updatedAt: date(v.updatedAt) ?? new Date(0),
+    id: String(o._id),
+    name: String(o.name ?? ""),
+    claimed: Boolean(o.claimed),
+    createdByUserId: o.createdByUserId == null ? null : String(o.createdByUserId),
+    createdAt: date(o.createdAt) ?? new Date(0),
+    updatedAt: date(o.updatedAt) ?? new Date(0),
   };
 }
 
-export function serializeTeam(t: Raw, members: VendorMember[] = []): Team {
+export function serializeCompanyMember(m: Raw): CompanyMember {
+  return {
+    id: String(m._id),
+    companyId: String(m.companyId),
+    email: String(m.email ?? ""),
+    name: str(m.name),
+    role: (m.role as CompanyMember["role"]) ?? "member",
+    userId: m.userId == null ? null : String(m.userId),
+    invitePending: m.userId == null,
+    createdAt: date(m.createdAt) ?? new Date(0),
+    updatedAt: date(m.updatedAt) ?? new Date(0),
+  };
+}
+
+export function serializeTeam(t: Raw, members: CompanyMember[] = []): Team {
   return {
     id: String(t._id),
-    ownerUserId: String(t.ownerUserId),
+    companyId: String(t.companyId),
     name: String(t.name ?? ""),
     memberIds: idList(t.memberIds),
     members,
     createdAt: date(t.createdAt) ?? new Date(0),
     updatedAt: date(t.updatedAt) ?? new Date(0),
-  };
-}
-
-export function serializeClientCompany(c: Raw): ClientCompany {
-  return {
-    id: String(c._id),
-    name: String(c.name ?? ""),
-    contactName: str(c.contactName),
-    contactEmail: String(c.contactEmail ?? ""),
-    designation: (c.designation as string) ?? "",
-    createdByUserId: c.createdByUserId == null ? null : String(c.createdByUserId),
-    createdAt: date(c.createdAt) ?? new Date(0),
-    updatedAt: date(c.updatedAt) ?? new Date(0),
   };
 }
 
@@ -116,6 +114,8 @@ export function serializeProject(p: Raw): Project {
     name: p.name as string,
     clientCompanyName: p.clientCompanyName as string,
     clientCompanyId: p.clientCompanyId == null ? null : String(p.clientCompanyId),
+    deliveringCompanyId: p.deliveringCompanyId == null ? null : String(p.deliveringCompanyId),
+    receivingCompanyId: p.receivingCompanyId == null ? null : String(p.receivingCompanyId),
     clientContactName: str(p.clientContactName),
     clientEmail: p.clientEmail as string,
     services: str(p.services),
@@ -147,6 +147,8 @@ export function serializeProject(p: Raw): Project {
       : [],
     assignedTeamIds: idList(p.assignedTeamIds),
     assignedMemberIds: idList(p.assignedMemberIds),
+    receivingTeamIds: idList(p.receivingTeamIds),
+    receivingMemberIds: idList(p.receivingMemberIds),
     capstone: serializeCapstone(p.capstone as Raw | null | undefined),
     publicSummary: str(p.publicSummary),
     publicKeyChallenges: str(p.publicKeyChallenges),
