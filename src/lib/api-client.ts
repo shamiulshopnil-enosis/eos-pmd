@@ -6,20 +6,14 @@ import { SESSION_COOKIE } from "./session";
 // here. The session JWT is pulled from the `eos_session` cookie and forwarded as
 // a Bearer token; the API verifies it with the shared AUTH_SECRET.
 
-// Resolve the API base URL from the environment:
-//   API_BASE_URL — a full URL, wins when set (local dev: http://localhost:4000/api)
-//   API_HOST     — a bare hostname (Render blueprint injects the API service's host);
-//                  becomes https://<host>/api
-// Falls back to the local dev port.
+// API_BASE_URL points at the NestJS backend. Local dev: http://localhost:4000/api
+// Production (Vercel): https://<render-service>.onrender.com/api
+// A bare host (no scheme) is accepted and assumed https.
 function resolveBaseUrl(): string {
-  const explicit = process.env.API_BASE_URL?.trim();
-  if (explicit) {
-    const withProto = /^https?:\/\//i.test(explicit) ? explicit : `https://${explicit}`;
-    return withProto.replace(/\/$/, "");
-  }
-  const host = process.env.API_HOST?.trim();
-  if (host) return `https://${host.replace(/^https?:\/\//i, "").replace(/\/$/, "")}/api`;
-  return "http://localhost:4000/api";
+  const raw = process.env.API_BASE_URL?.trim();
+  if (!raw) return "http://localhost:4000/api";
+  const withProto = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return withProto.replace(/\/$/, "");
 }
 
 const BASE_URL = resolveBaseUrl();

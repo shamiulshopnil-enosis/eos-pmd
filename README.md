@@ -39,19 +39,26 @@ npm run dev            # http://localhost:3000
 `npm run build` runs a production build. `npm test` runs the unit tests (pure logic only —
 `scoring`, `permissions`, and the milestone/flag guards).
 
-## Deploy (Render)
+## Deploy
 
-[`render.yaml`](./render.yaml) is a Blueprint that stands up both services and links them:
+The frontend runs on **Vercel**; the API runs on **Render**.
 
-1. Render dashboard → **New → Blueprint** → pick this repo. It creates `eos-pmd-api` and `eos-pmd-web`,
-   generates one shared `AUTH_SECRET`, and injects the API's host into the web service (`API_HOST`,
-   which [`api-client.ts`](./src/lib/api-client.ts) turns into `https://<host>/api`).
-2. Set `MONGODB_URI` on the **`eos-pmd-api`** service (the web service does not need it).
-3. On the Atlas cluster's Network Access, allowlist `0.0.0.0/0` — Render only gives static outbound IPs
-   on paid instance types.
+**API — Render.** [`render.yaml`](./render.yaml) is a one-service Blueprint:
 
-The `free` instance type sleeps after 15 min idle, so the first request pays a cold start plus the Atlas
-handshake; use `starter` for the API if that matters. Node is pinned to 24 via `.node-version`.
+1. Render dashboard → **New → Blueprint** → pick this repo (root dir `api`, health check `/api/health`).
+2. When prompted, set `AUTH_SECRET` (the **same** value as the Vercel project's) and `MONGODB_URI`
+   (the Atlas string).
+3. Atlas → Network Access must allow Render's egress (`0.0.0.0/0` unless you buy static outbound IPs).
+
+**Frontend — Vercel.** After the API is live:
+
+1. Add `API_BASE_URL` = `https://<your-api>.onrender.com/api` to the Vercel project's environment
+   variables (Production, and Preview if you use it).
+2. Keep `AUTH_SECRET` (must match Render). `MONGODB_URI` is no longer used by the frontend.
+3. Redeploy.
+
+The `free` Render instance sleeps after 15 min idle (cold start + Atlas handshake on the next hit); use
+`starter` to avoid it. Node is pinned to 24 via `.node-version`.
 
 ## Authentication
 
