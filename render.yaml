@@ -1,22 +1,18 @@
-# Render Blueprint — deploys the NestJS API only. The Next.js frontend runs on
-# Vercel and reaches this service through the API_BASE_URL env var set there.
+# Render Blueprint — deploys the NestJS API only. The Next.js frontend is hosted
+# separately (Vercel) and reaches this service through its API_BASE_URL env var.
 # Spec: https://render.com/docs/blueprint-spec
 #
-# First deploy:
-#   1. Render dashboard -> New -> Blueprint -> pick this repo.
-#   2. When prompted, set:
-#        AUTH_SECRET  = the SAME value as the Vercel project's AUTH_SECRET
-#        MONGODB_URI  = the Atlas connection string (same DB the app already uses)
-#   3. After it goes live, add API_BASE_URL = https://<this-service>.onrender.com/api
-#      to the Vercel project and redeploy the frontend.
+# The API service already exists as `eos-pmd` (https://eos-pmd.onrender.com).
+# Required env vars (dashboard, marked sync:false):
+#   AUTH_SECRET  = the SAME value as the frontend host's AUTH_SECRET
+#   MONGODB_URI  = the Atlas connection string
 #
-# Atlas Network Access must allow Render's egress (you've set 0.0.0.0/0).
-# The `free` instance type sleeps after 15 min idle; use `starter` to avoid
-# cold starts.
+# Atlas Network Access must allow Render's egress (0.0.0.0/0 unless on a paid
+# instance with static outbound IPs). `free` instances sleep after 15 min idle.
 
 services:
   - type: web
-    name: eos-pmd-api
+    name: eos-pmd
     runtime: node
     plan: free
     region: oregon
@@ -28,6 +24,6 @@ services:
     autoDeploy: true
     envVars:
       - key: AUTH_SECRET
-        sync: false # must match the Vercel project's AUTH_SECRET exactly
+        sync: false
       - key: MONGODB_URI
-        sync: false # Atlas connection string
+        sync: false

@@ -41,24 +41,19 @@ npm run dev            # http://localhost:3000
 
 ## Deploy
 
-The frontend runs on **Vercel**; the API runs on **Render**.
+**API — Render.** [`render.yaml`](./render.yaml) deploys the `api/` directory as the `eos-pmd` service
+(`https://eos-pmd.onrender.com`). Set `AUTH_SECRET` (same value as the frontend host) and `MONGODB_URI`
+in the dashboard. Atlas → Network Access must allow Render's egress (`0.0.0.0/0` unless you buy static
+outbound IPs). The `free` instance sleeps after 15 min idle.
 
-**API — Render.** [`render.yaml`](./render.yaml) is a one-service Blueprint:
+**Frontend — Vercel.** Set two env vars on the project: `AUTH_SECRET` (must match Render) and
+`API_BASE_URL=https://eos-pmd.onrender.com/api`, then redeploy. `MONGODB_URI` is no longer used by the
+frontend.
 
-1. Render dashboard → **New → Blueprint** → pick this repo (root dir `api`, health check `/api/health`).
-2. When prompted, set `AUTH_SECRET` (the **same** value as the Vercel project's) and `MONGODB_URI`
-   (the Atlas string).
-3. Atlas → Network Access must allow Render's egress (`0.0.0.0/0` unless you buy static outbound IPs).
-
-**Frontend — Vercel.** After the API is live:
-
-1. Add `API_BASE_URL` = `https://<your-api>.onrender.com/api` to the Vercel project's environment
-   variables (Production, and Preview if you use it).
-2. Keep `AUTH_SECRET` (must match Render). `MONGODB_URI` is no longer used by the frontend.
-3. Redeploy.
-
-The `free` Render instance sleeps after 15 min idle (cold start + Atlas handshake on the next hit); use
-`starter` to avoid it. Node is pinned to 24 via `.node-version`.
+[`.vercelignore`](./.vercelignore) excludes `/api` from the Vercel deployment — Vercel treats any
+top-level `/api` directory as raw Serverless Functions (one per file), which would blow past the Hobby
+plan's 12-function limit. The NestJS backend only ever runs on Render. Node is pinned to 24 via
+`.node-version`.
 
 ## Authentication
 

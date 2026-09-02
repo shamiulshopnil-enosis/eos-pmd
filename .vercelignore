@@ -1,0 +1,5 @@
+# The NestJS backend lives in /api but deploys to Render, not Vercel.
+# Without this, Vercel's zero-config convention turns every file under a
+# top-level /api directory into its own Serverless Function, which blows past
+# the Hobby plan's 12-function limit. The Next.js app does not import from here.
+/api
