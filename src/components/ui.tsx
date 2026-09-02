@@ -1,5 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Button } from "primereact/button";
+import { Tag } from "primereact/tag";
+import { Card as PrimeCard } from "primereact/card";
+import { Message } from "primereact/message";
+import { Icon } from "@/components/icon";
 import {
   PROJECT_STATUS_LABELS,
   MILESTONE_STATUS_LABELS,
@@ -10,67 +17,73 @@ import {
   EXECUTION_STATUS_LABELS,
 } from "@/lib/constants";
 
+/* ------------------------------------------------------------------ *
+ * Shared UI vocabulary, built on the PrimeReact component library.
+ * Buttons are <Button>, tags are <Tag>, panels are <Card>, ratings are
+ * <Rating>. The layout helpers (page header, section heading, empty
+ * state) frame those components on the page.
+ * ------------------------------------------------------------------ */
+
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>
-      {children}
-    </div>
-  );
+  // Legacy call sites pass padding utilities (p-4/p-5/p-6); PrimeReact <Card>
+  // already pads its body, so drop those to avoid doubling up.
+  const outer = className.replace(/\bp-\d+(\.\d+)?\b/g, "").trim();
+  return <PrimeCard className={`eos-card ${outer}`}>{children}</PrimeCard>;
 }
 
 export function SectionHeading({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{children}</h2>
-      {action}
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-sm font-semibold text-ink">{children}</h2>
+      {action ? <div className="text-sm text-ink-muted">{action}</div> : null}
     </div>
   );
 }
 
-const toneClasses: Record<string, string> = {
-  slate: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  blue: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  green: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  amber: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  red: "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-  purple: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+/* --- Tags (PrimeReact <Tag>) --------------------------------------- */
+
+type Tone = "slate" | "blue" | "green" | "amber" | "red" | "purple";
+
+const toneSeverity: Record<Tone, "info" | "success" | "warning" | "danger" | null> = {
+  slate: null,
+  blue: "info",
+  green: "success",
+  amber: "warning",
+  red: "danger",
+  purple: "info",
 };
 
-export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: keyof typeof toneClasses }) {
+export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: Tone }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${toneClasses[tone]}`}>
-      {children}
-    </span>
+    <Tag
+      severity={toneSeverity[tone] ?? undefined}
+      className={`eos-tag${tone === "slate" ? " eos-tag-slate" : ""}`}
+      value={<span className="inline-flex items-center gap-1">{children}</span>}
+    />
   );
 }
 
-const projectStatusTone: Record<string, keyof typeof toneClasses> = {
+const projectStatusTone: Record<string, Tone> = {
   ACTIVE: "green",
   ON_HOLD: "amber",
   COMPLETED: "blue",
   CANCELLED: "red",
   ARCHIVED: "slate",
 };
-
 export function ProjectStatusBadge({ status }: { status: string }) {
   return <Badge tone={projectStatusTone[status] ?? "slate"}>{PROJECT_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const milestoneStatusTone: Record<string, keyof typeof toneClasses> = {
-  draft: "slate",
-  sent: "amber",
-  reviewed: "green",
-};
-
+const milestoneStatusTone: Record<string, Tone> = { draft: "slate", sent: "amber", reviewed: "green" };
 export function MilestoneStatusBadge({ status }: { status: string }) {
   return <Badge tone={milestoneStatusTone[status] ?? "slate"}>{MILESTONE_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
 export function ProjectTypeBadge({ type }: { type: string }) {
-  return <Badge tone={type === "milestone" ? "purple" : "slate"}>{PROJECT_TYPE_LABELS[type] ?? type}</Badge>;
+  return <Badge tone="slate">{PROJECT_TYPE_LABELS[type] ?? type}</Badge>;
 }
 
-const adminStatusTone: Record<string, keyof typeof toneClasses> = {
+const adminStatusTone: Record<string, Tone> = {
   draft: "slate",
   pending_approval: "amber",
   published: "green",
@@ -78,94 +91,246 @@ const adminStatusTone: Record<string, keyof typeof toneClasses> = {
   edited: "amber",
   trashed: "slate",
 };
-
 export function AdminStatusBadge({ status }: { status: string }) {
   return <Badge tone={adminStatusTone[status] ?? "slate"}>{ADMIN_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const executionStatusTone: Record<string, keyof typeof toneClasses> = {
+const executionStatusTone: Record<string, Tone> = {
   ongoing: "blue",
   awaiting_completion: "amber",
   completed: "green",
 };
-
 export function ExecutionStatusBadge({ status }: { status: string }) {
   return <Badge tone={executionStatusTone[status] ?? "slate"}>{EXECUTION_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const healthTone: Record<ClientHealth, keyof typeof toneClasses> = {
-  HAPPY: "green",
-  NEEDS_ATTENTION: "amber",
-  AT_RISK: "red",
-  NO_DATA: "slate",
+/* --- Client health: icon + word --------------------------------- */
+
+const healthIcon: Record<ClientHealth, { icon: string; cls: string }> = {
+  HAPPY: { icon: "check_circle", cls: "text-rag-good" },
+  NEEDS_ATTENTION: { icon: "error", cls: "text-rag-warn" },
+  AT_RISK: { icon: "warning", cls: "text-rag-bad" },
+  NO_DATA: { icon: "remove", cls: "text-ink-muted" },
 };
 
 export function HealthBadge({ health }: { health: ClientHealth }) {
-  return <Badge tone={healthTone[health]}>{CLIENT_HEALTH_LABELS[health]}</Badge>;
-}
-
-export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null }) {
-  if (!flag) return null;
-  if (flag === "OVERDUE") return <Badge tone="red">Overdue</Badge>;
-  if (flag === "DUE_SOON") return <Badge tone="amber">Due Soon</Badge>;
-  return <Badge tone="amber">Awaiting Review</Badge>;
-}
-
-export function StarRating({ value, size = "sm" }: { value: number | null; size?: "sm" | "lg" }) {
-  if (value == null) return <span className="text-slate-400">No rating yet</span>;
-  const full = Math.round(value);
-  const starClass = size === "lg" ? "text-2xl" : "text-base";
+  const h = healthIcon[health];
   return (
-    <span className={`inline-flex items-center gap-1 ${starClass}`} aria-label={`${value} out of 5`}>
-      <span className="text-amber-400">{"★".repeat(full)}</span>
-      <span className="text-slate-300 dark:text-slate-700">{"★".repeat(5 - full)}</span>
-      <span className="ml-1 text-sm font-medium text-slate-600 dark:text-slate-400">{value.toFixed(1)}</span>
+    <span className={`inline-flex items-center gap-1 text-[0.6875rem] font-semibold uppercase tracking-[0.04em] ${h.cls}`}>
+      <Icon name={h.icon} className="text-[13px]" />
+      {CLIENT_HEALTH_LABELS[health]}
     </span>
   );
 }
 
-export function StatCard({
-  label,
-  value,
-  sub,
-  tone = "slate",
-}: {
-  label: string;
-  value: ReactNode;
-  sub?: string;
-  tone?: keyof typeof toneClasses;
-}) {
+export function RagDisc({ health, className = "" }: { health: ClientHealth; className?: string }) {
+  const fill: Record<ClientHealth, string> = {
+    HAPPY: "bg-rag-good-fill ring-black/15 dark:ring-white/25",
+    NEEDS_ATTENTION: "bg-rag-warn-fill ring-black/15 dark:ring-white/25",
+    AT_RISK: "bg-rag-bad-fill ring-black/15 dark:ring-white/25",
+    NO_DATA: "bg-transparent ring-rule-strong",
+  };
   return (
-    <Card className="p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{value}</div>
-      {sub ? <div className={`mt-1 text-xs ${toneClasses[tone]} inline-block rounded px-1.5 py-0.5`}>{sub}</div> : null}
-    </Card>
+    <span
+      role="img"
+      aria-label={CLIENT_HEALTH_LABELS[health]}
+      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ${fill[health]} ${className}`}
+    />
   );
 }
+
+export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null }) {
+  if (!flag) return null;
+  if (flag === "OVERDUE")
+    return (
+      <Badge tone="red">
+        <Icon name="event_busy" className="text-[11px]" />
+        Overdue
+      </Badge>
+    );
+  if (flag === "DUE_SOON")
+    return (
+      <Badge tone="amber">
+        <Icon name="schedule" className="text-[11px]" />
+        Due soon
+      </Badge>
+    );
+  return (
+    <Badge tone="amber">
+      <Icon name="hourglass_top" className="text-[11px]" />
+      Awaiting review
+    </Badge>
+  );
+}
+
+/* --- Rating: numeric score + thin meter (no stars) ------------------ */
+
+function scoreColor(v: number) {
+  if (v >= 4) return "var(--rag-good-fill)";
+  if (v >= 3) return "var(--rag-warn-fill)";
+  return "var(--rag-bad-fill)";
+}
+
+/** Kept as `StarRating` for call-site compatibility — renders a compact
+ *  numeric score with a thin proportional meter, the enterprise register
+ *  read rather than a row of stars. */
+export function StarRating({ value, size = "sm" }: { value: number | null; size?: "sm" | "lg" }) {
+  if (value == null) return <span className="text-sm text-ink-muted">Not rated</span>;
+  const pct = Math.max(0, Math.min(100, (value / 5) * 100));
+  const big = size === "lg";
+  return (
+    <span
+      className={`inline-flex items-center gap-2 ${big ? "eos-score-lg" : ""}`}
+      aria-label={`${value.toFixed(1)} out of 5`}
+    >
+      <span className={`font-medium tabular-nums text-ink ${big ? "text-2xl" : "text-sm"}`}>
+        {value.toFixed(1)}
+      </span>
+      <span className="eos-score-track" aria-hidden="true">
+        <span style={{ width: `${pct}%`, background: scoreColor(value) }} />
+      </span>
+    </span>
+  );
+}
+
+/** A run of recent ratings drawn as a thin plotted line (1–5 domain). */
+export function Sparkline({
+  values,
+  className = "",
+  width = 68,
+  height = 18,
+}: {
+  values: number[];
+  className?: string;
+  width?: number;
+  height?: number;
+}) {
+  const pts = values.filter((v) => typeof v === "number" && !Number.isNaN(v));
+  if (pts.length === 0) {
+    return (
+      <span className={`inline-block text-ink-muted ${className}`} aria-hidden="true">
+        —
+      </span>
+    );
+  }
+  const pad = 2;
+  const stepX = pts.length > 1 ? (width - pad * 2) / (pts.length - 1) : 0;
+  const y = (v: number) => pad + (height - pad * 2) * (1 - (Math.max(1, Math.min(5, v)) - 1) / 4);
+  const d = pts.map((v, i) => `${i === 0 ? "M" : "L"}${(pad + stepX * i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className={className}
+      role="img"
+      aria-label={`Recent ratings: ${pts.map((v) => v.toFixed(1)).join(", ")}`}
+    >
+      {pts.length > 1 ? (
+        <path d={d} fill="none" stroke="currentColor" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <circle cx={width / 2} cy={y(pts[0])} r={1.6} fill="currentColor" />
+      )}
+    </svg>
+  );
+}
+
+/* --- Buttons (PrimeReact <Button>) ------------------------------- */
+
+function linkButtonClass(variant: "ink" | "ghost") {
+  return [
+    "p-button p-component eos-linkbtn",
+    variant === "ink" ? "" : "p-button-outlined p-button-secondary",
+  ].join(" ");
+}
+
+export function InkLink({ href, children, icon }: { href: string; children: ReactNode; icon?: string }) {
+  return (
+    <Link href={href} className={linkButtonClass("ink")}>
+      {icon ? <Icon name={icon} className="p-button-icon p-button-icon-left" /> : null}
+      <span className="p-button-label">{children}</span>
+    </Link>
+  );
+}
+
+export function GhostLink({ href, children, icon }: { href: string; children: ReactNode; icon?: string }) {
+  return (
+    <Link href={href} className={linkButtonClass("ghost")}>
+      {icon ? <Icon name={icon} className="p-button-icon p-button-icon-left" /> : null}
+      <span className="p-button-label">{children}</span>
+    </Link>
+  );
+}
+
+type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: string };
+
+export function InkButton({ children, icon, className = "", ...props }: BtnProps) {
+  return (
+    <Button
+      {...props}
+      className={`eos-btn ${className}`}
+      icon={icon ? <Icon name={icon} className="p-button-icon p-button-icon-left" /> : undefined}
+      label={typeof children === "string" ? children : undefined}
+    >
+      {typeof children === "string" ? null : children}
+    </Button>
+  );
+}
+
+export function GhostButton({ children, icon, className = "", ...props }: BtnProps) {
+  return (
+    <Button
+      {...props}
+      outlined
+      severity="secondary"
+      className={`eos-btn ${className}`}
+      icon={icon ? <Icon name={icon} className="p-button-icon p-button-icon-left" /> : undefined}
+      label={typeof children === "string" ? children : undefined}
+    >
+      {typeof children === "string" ? null : children}
+    </Button>
+  );
+}
+
+export function LedgerLink({ href, children, className = "" }: { href: string; children: ReactNode; className?: string }) {
+  return (
+    <Link
+      href={href}
+      className={`text-link underline decoration-rule-strong underline-offset-2 hover:text-link-strong hover:decoration-current ${className}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/* --- Empty state & page header --------------------------------- */
 
 export function EmptyState({
   title,
   description,
   actionHref,
   actionLabel,
+  actionIcon = "add",
+  icon = "description",
 }: {
   title: string;
   description: string;
   actionHref?: string;
   actionLabel?: string;
+  actionIcon?: string;
+  icon?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/50">
-      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{description}</p>
+    <div className="flex flex-col items-center justify-center rounded-[8px] border border-rule bg-panel px-6 py-14 text-center">
+      <Icon name={icon} className="text-2xl text-ink-subtle" />
+      <h3 className="mt-3 text-base font-semibold text-ink">{title}</h3>
+      <p className="mt-1.5 max-w-sm text-sm text-ink-muted">{description}</p>
       {actionHref && actionLabel ? (
-        <Link
-          href={actionHref}
-          className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {actionLabel}
-        </Link>
+        <div className="mt-5">
+          <InkLink href={actionHref} icon={actionIcon}>
+            {actionLabel}
+          </InkLink>
+        </div>
       ) : null}
     </div>
   );
@@ -183,17 +348,33 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0">
         {back ? (
-          <Link href={back.href} className="mb-1 inline-block text-sm text-blue-600 hover:underline">
-            ← {back.label}
+          <Link
+            href={back.href}
+            className="mb-1.5 inline-flex items-center gap-1 text-xs text-link hover:text-link-strong"
+          >
+            <Icon name="arrow_back" className="text-[13px]" />
+            {back.label}
           </Link>
         ) : null}
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{title}</h1>
-        {description ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
+        <h1 className="text-2xl font-semibold leading-tight text-ink">{title}</h1>
+        {description ? <p className="mt-1 max-w-[70ch] text-sm text-ink-muted">{description}</p> : null}
       </div>
-      {action}
+      {action ? <div className="flex flex-wrap items-center gap-2">{action}</div> : null}
     </div>
   );
+}
+
+/** Inline informational banner — PrimeReact <Message>. */
+export function InlineNote({
+  severity = "info",
+  children,
+}: {
+  severity?: "info" | "warn" | "success" | "error";
+  children: ReactNode;
+}) {
+  const map = { info: "info", warn: "warn", success: "success", error: "error" } as const;
+  return <Message severity={map[severity]} content={<div className="text-sm">{children}</div>} className="w-full justify-start" />;
 }

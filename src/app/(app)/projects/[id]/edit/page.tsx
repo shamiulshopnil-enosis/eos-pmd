@@ -68,13 +68,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
               <TextInput name="engagementModel" defaultValue={project.engagementModel ?? ""} />
             </Field>
             <Field label="Project Status">
-              <Select name="status" defaultValue={project.status}>
-                {Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
+              <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} />
             </Field>
           </div>
 
@@ -87,7 +81,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
             </Field>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Save Changes</SubmitButton>
           </div>
         </form>

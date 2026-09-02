@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { InputText } from "primereact/inputtext";
+import { InputTextarea } from "primereact/inputtextarea";
+import { Button } from "primereact/button";
 
 type Row = { title: string; startDate: string; dueDate: string; description: string };
 
@@ -34,13 +37,13 @@ export default function ProjectMilestonesField() {
   const payload = JSON.stringify(rows.filter((r) => r.title.trim() !== ""));
 
   return (
-    <fieldset ref={ref} className="space-y-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-      <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">
-        Milestones <span className="font-normal text-slate-400">— optional, add more later</span>
+    <fieldset ref={ref} className="space-y-3 border-t border-rule pt-5">
+      <legend className="text-sm font-medium text-ink">
+        Milestones <span className="font-normal text-ink-muted">— optional, add more later</span>
       </legend>
 
       {!isMilestoneType ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-muted">
           A Whole Project has a single delivery. Switch to “Milestone Project” above to plan milestones here.
         </p>
       ) : (
@@ -48,64 +51,61 @@ export default function ProjectMilestonesField() {
           <input type="hidden" name="milestonesJson" value={payload} />
           <div className="space-y-3">
             {rows.map((row, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-slate-200 p-3 dark:border-slate-800"
-              >
+              <div key={i} className="rounded-ledger border border-rule p-3">
                 <div className="flex items-start gap-2">
-                  <input
-                    type="text"
+                  <InputText
                     value={row.title}
                     onChange={(e) => update(i, { title: e.target.value })}
                     placeholder={`Milestone ${i + 1} title`}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                    className="w-full"
                   />
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => remove(i)}
+                    text
+                    severity="danger"
+                    icon="pi pi-times"
                     aria-label="Remove milestone"
-                    className="rounded-lg px-2 py-2 text-sm text-slate-400 hover:bg-slate-100 hover:text-rose-600 dark:hover:bg-slate-800"
-                  >
-                    ✕
-                  </button>
+                    onClick={() => remove(i)}
+                  />
                 </div>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <label className="text-xs text-slate-500 dark:text-slate-400">
+                  <label className="text-xs text-ink-muted">
                     Start date
-                    <input
+                    <InputText
                       type="date"
                       value={row.startDate}
                       onChange={(e) => update(i, { startDate: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                      className="mt-1 w-full"
                     />
                   </label>
-                  <label className="text-xs text-slate-500 dark:text-slate-400">
+                  <label className="text-xs text-ink-muted">
                     Due date
-                    <input
+                    <InputText
                       type="date"
                       value={row.dueDate}
                       onChange={(e) => update(i, { dueDate: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                      className="mt-1 w-full"
                     />
                   </label>
                 </div>
-                <textarea
+                <InputTextarea
                   value={row.description}
                   onChange={(e) => update(i, { description: e.target.value })}
                   placeholder="What's delivered in this milestone? (optional)"
                   rows={2}
-                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                  className="mt-2 w-full"
                 />
               </div>
             ))}
           </div>
-          <button
+          <Button
             type="button"
+            text
+            size="small"
+            icon="pi pi-plus"
+            label="Add milestone"
             onClick={() => setRows((rs) => [...rs, blank()])}
-            className="text-sm font-medium text-blue-600 hover:underline"
-          >
-            + Add milestone
-          </button>
+          />
         </>
       )}
     </fieldset>

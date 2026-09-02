@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 import type { ProjectWithMilestones } from "@/lib/types";
 import { computeProjectPerformance } from "@/lib/derived";
 import {
@@ -15,26 +17,14 @@ import { formatRating } from "@/lib/format";
 import {
   AdminStatusBadge,
   Badge,
-  Card,
   EmptyState,
   ExecutionStatusBadge,
   HealthBadge,
   ProjectStatusBadge,
   ProjectTypeBadge,
+  RagDisc,
 } from "@/components/ui";
-import { FilterBar, FilterDateRange, FilterSelect, FilterText, SortHeader, cmp, nextSort } from "@/components/filters";
-
-type SortKey =
-  | "name"
-  | "client"
-  | "status"
-  | "approval"
-  | "execution"
-  | "visibility"
-  | "type"
-  | "milestones"
-  | "rating"
-  | "health";
+import { FilterBar, FilterDateRange, FilterSelect, FilterText } from "@/components/filters";
 
 const RATING_BANDS: [string, string][] = [
   ["any", "Any rating"],
@@ -69,19 +59,54 @@ function inRange(d: Date | null, from: string, to: string): boolean {
   return true;
 }
 
+type Row = {
+  id: string;
+  name: string;
+  client: string;
+  status: string;
+  approval: string;
+  execution: string;
+  visibility: string;
+  type: string;
+  milestones: number;
+  rating: number | null;
+  health: string;
+  healthRank: number;
+  project: ProjectWithMilestones;
+  perf: ReturnType<typeof computeProjectPerformance>;
+};
+
 export default function ProjectsTable({ projects }: { projects: ProjectWithMilestones[] }) {
   const [f, setF] = useState({ ...EMPTY });
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
   const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
 
-  const rows = useMemo(
-    () => projects.map((project) => ({ project, perf: computeProjectPerformance(project) })),
+  const rows = useMemo<Row[]>(
+    () =>
+      projects.map((project) => {
+        const perf = computeProjectPerformance(project);
+        return {
+          id: project.id,
+          name: project.name,
+          client: project.clientCompanyName,
+          status: project.status,
+          approval: project.adminStatus,
+          execution: project.executionStatus,
+          visibility: project.visibility,
+          type: project.projectType,
+          milestones: perf.totalMilestones,
+          rating: perf.avgRating,
+          health: perf.health,
+          healthRank: HEALTH_ORDER[perf.health] ?? 9,
+          project,
+          perf,
+        };
+      }),
     [projects],
   );
 
   const filtered = useMemo(() => {
     const q = f.q.trim().toLowerCase();
-    const out = rows.filter(({ project, perf }) => {
+    return rows.filter(({ project, perf }) => {
       if (q && !`${project.name} ${project.clientCompanyName}`.toLowerCase().includes(q)) return false;
       if (f.status && project.status !== f.status) return false;
       if (f.approval && project.adminStatus !== f.approval) return false;
@@ -100,145 +125,81 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
       if (!inRange(project.expectedCompletionDate, f.dueFrom, f.dueTo)) return false;
       return true;
     });
-
-    const val = (r: { project: ProjectWithMilestones; perf: ReturnType<typeof computeProjectPerformance> }) => {
-      switch (sort.key) {
-        case "name": return r.project.name.toLowerCase();
-        case "client": return r.project.clientCompanyName.toLowerCase();
-        case "status": return r.project.status;
-        case "approval": return r.project.adminStatus;
-        case "execution": return r.project.executionStatus;
-        case "visibility": return r.project.visibility;
-        case "type": return r.project.projectType;
-        case "milestones": return r.perf.totalMilestones;
-        case "rating": return r.perf.avgRating;
-        case "health": return HEALTH_ORDER[r.perf.health] ?? 9;
-      }
-    };
-    return [...out].sort((a, b) => {
-      const d = cmp(val(a), val(b));
-      return sort.dir === "asc" ? d : -d;
-    });
-  }, [rows, f, sort]);
+  }, [rows, f]);
 
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
-  const onSort = (k: SortKey) => setSort((s) => nextSort(s, k));
-  const th = (label: string, key: SortKey, align?: "left" | "right") => (
-    <SortHeader label={label} sortKey={key} active={sort.key === key} dir={sort.dir} onSort={onSort} align={align} />
-  );
+  const activeCount = (Object.keys(EMPTY) as (keyof typeof EMPTY)[]).filter((k) => f[k] !== EMPTY[k]).length;
 
   return (
     <>
-      <FilterBar active={active} onClear={() => { setF({ ...EMPTY }); }}>
+      <FilterBar active={active} count={activeCount} onClear={() => setF({ ...EMPTY })}>
         <FilterText label="Search" value={f.q} onChange={(v) => set({ q: v })} placeholder="Project or client…" />
-        <FilterSelect
-          label="Status"
-          value={f.status}
-          onChange={(v) => set({ status: v })}
-          options={[["", "Any"], ...Object.entries(PROJECT_STATUS_LABELS)]}
-        />
-        <FilterSelect
-          label="Approval"
-          value={f.approval}
-          onChange={(v) => set({ approval: v })}
-          options={[["", "Any"], ...Object.entries(ADMIN_STATUS_LABELS)]}
-        />
-        <FilterSelect
-          label="Execution"
-          value={f.execution}
-          onChange={(v) => set({ execution: v })}
-          options={[["", "Any"], ...Object.entries(EXECUTION_STATUS_LABELS)]}
-        />
-        <FilterSelect
-          label="Visibility"
-          value={f.visibility}
-          onChange={(v) => set({ visibility: v })}
-          width="w-36"
-          options={[["", "Any"], ["PRIVATE", "Private"], ["PUBLIC", "Public"]]}
-        />
-        <FilterSelect
-          label="Type"
-          value={f.type}
-          onChange={(v) => set({ type: v })}
-          width="w-40"
-          options={[["", "Any"], ...Object.entries(PROJECT_TYPE_LABELS)]}
-        />
-        <FilterSelect
-          label="Client health"
-          value={f.health}
-          onChange={(v) => set({ health: v })}
-          options={[["", "Any"], ...Object.entries(CLIENT_HEALTH_LABELS)]}
-        />
-        <FilterSelect
-          label="Avg rating"
-          value={f.rating}
-          onChange={(v) => set({ rating: v })}
-          width="w-32"
-          options={RATING_BANDS}
-        />
-        <FilterDateRange
-          label="Start date"
-          from={f.startFrom}
-          to={f.startTo}
-          onFrom={(v) => set({ startFrom: v })}
-          onTo={(v) => set({ startTo: v })}
-        />
-        <FilterDateRange
-          label="Expected completion"
-          from={f.dueFrom}
-          to={f.dueTo}
-          onFrom={(v) => set({ dueFrom: v })}
-          onTo={(v) => set({ dueTo: v })}
-        />
+        <FilterSelect label="Status" value={f.status} onChange={(v) => set({ status: v })} options={[["", "Any"], ...Object.entries(PROJECT_STATUS_LABELS)]} />
+        <FilterSelect label="Approval" value={f.approval} onChange={(v) => set({ approval: v })} options={[["", "Any"], ...Object.entries(ADMIN_STATUS_LABELS)]} />
+        <FilterSelect label="Execution" value={f.execution} onChange={(v) => set({ execution: v })} options={[["", "Any"], ...Object.entries(EXECUTION_STATUS_LABELS)]} />
+        <FilterSelect label="Visibility" value={f.visibility} onChange={(v) => set({ visibility: v })} width="w-36" options={[["", "Any"], ["PRIVATE", "Private"], ["PUBLIC", "Public"]]} />
+        <FilterSelect label="Type" value={f.type} onChange={(v) => set({ type: v })} width="w-40" options={[["", "Any"], ...Object.entries(PROJECT_TYPE_LABELS)]} />
+        <FilterSelect label="Client health" value={f.health} onChange={(v) => set({ health: v })} options={[["", "Any"], ...Object.entries(CLIENT_HEALTH_LABELS)]} />
+        <FilterSelect label="Avg rating" value={f.rating} onChange={(v) => set({ rating: v })} width="w-32" options={RATING_BANDS} />
+        <FilterDateRange label="Start date" from={f.startFrom} to={f.startTo} onFrom={(v) => set({ startFrom: v })} onTo={(v) => set({ startTo: v })} />
+        <FilterDateRange label="Expected completion" from={f.dueFrom} to={f.dueTo} onFrom={(v) => set({ dueFrom: v })} onTo={(v) => set({ dueTo: v })} />
       </FilterBar>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No projects match your filters" description="Adjust or clear the filters above." />
+        <EmptyState icon="filter_alt_off" title="No projects match your filters" description="Adjust or clear the filters above." />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              <tr>
-                {th("Project", "name")}
-                {th("Client", "client")}
-                {th("Status", "status")}
-                {th("Approval", "approval")}
-                {th("Execution", "execution")}
-                {th("Visibility", "visibility")}
-                {th("Type", "type")}
-                {th("Milestones", "milestones", "right")}
-                {th("Avg. Rating", "rating", "right")}
-                {th("Client Health", "health")}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map(({ project, perf }) => (
-                <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3">
-                    <Link href={`/projects/${project.id}`} className="font-medium text-blue-600 hover:underline">
-                      {project.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{project.clientCompanyName}</td>
-                  <td className="px-4 py-3"><ProjectStatusBadge status={project.status} /></td>
-                  <td className="px-4 py-3"><AdminStatusBadge status={project.adminStatus} /></td>
-                  <td className="px-4 py-3"><ExecutionStatusBadge status={project.executionStatus} /></td>
-                  <td className="px-4 py-3">
-                    <Badge tone={project.visibility === "PUBLIC" ? "blue" : "slate"}>
-                      {project.visibility === "PUBLIC" ? "Public" : "Private"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3"><ProjectTypeBadge type={project.projectType} /></td>
-                  <td className="px-4 py-3 text-right">{perf.totalMilestones}</td>
-                  <td className="px-4 py-3 text-right">{formatRating(perf.avgRating)}</td>
-                  <td className="px-4 py-3"><HealthBadge health={perf.health} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable
+          value={filtered}
+          dataKey="id"
+          removableSort
+          className="eos-table"
+          tableStyle={{ minWidth: "1040px" }}
+          scrollable
+        >
+          <Column
+            field="name"
+            header="Project"
+            sortable
+            body={(r: Row) => (
+              <span className="flex items-center gap-2">
+                <RagDisc health={r.perf.health} />
+                <Link href={`/projects/${r.id}`} className="font-medium text-ink hover:text-link hover:underline">
+                  {r.name}
+                </Link>
+              </span>
+            )}
+          />
+          <Column field="client" header="Client" sortable body={(r: Row) => <span className="text-ink-muted">{r.client}</span>} />
+          <Column field="status" header="Status" sortable body={(r: Row) => <ProjectStatusBadge status={r.status} />} />
+          <Column field="approval" header="Approval" sortable body={(r: Row) => <AdminStatusBadge status={r.approval} />} />
+          <Column field="execution" header="Execution" sortable body={(r: Row) => <ExecutionStatusBadge status={r.execution} />} />
+          <Column
+            field="visibility"
+            header="Visibility"
+            sortable
+            body={(r: Row) => (
+              <Badge tone={r.visibility === "PUBLIC" ? "blue" : "slate"}>{r.visibility === "PUBLIC" ? "Public" : "Private"}</Badge>
+            )}
+          />
+          <Column field="type" header="Type" sortable body={(r: Row) => <ProjectTypeBadge type={r.type} />} />
+          <Column
+            field="milestones"
+            header="Milestones"
+            sortable
+            align="right"
+            body={(r: Row) => <span className="font-mono tabular-nums text-ink">{r.milestones}</span>}
+          />
+          <Column
+            field="rating"
+            header="Avg. rating"
+            sortable
+            align="right"
+            body={(r: Row) => <span className="font-mono tabular-nums text-ink">{formatRating(r.rating)}</span>}
+          />
+          <Column field="healthRank" header="Client health" sortable body={(r: Row) => <HealthBadge health={r.perf.health} />} />
+        </DataTable>
       )}
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 font-mono text-xs text-ink-muted">
         {filtered.length} of {rows.length} shown
       </p>
     </>

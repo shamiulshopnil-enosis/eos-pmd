@@ -1,66 +1,69 @@
-/** Average milestone rating over time. Plain inline SVG, no chart library. */
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Chart } from "primereact/chart";
+
+/** Average milestone rating over time — a PrimeReact <Chart> (line). */
 export function TrendChart({ points }: { points: { label: string; avgRating: number | null }[] }) {
   const hasData = points.some((p) => p.avgRating != null);
+
+  const [tokens, setTokens] = useState({ ink: "#23201a", muted: "#655d4b", rule: "#dbd2bd" });
+  useEffect(() => {
+    const s = getComputedStyle(document.documentElement);
+    setTokens({
+      ink: s.getPropertyValue("--ink").trim() || "#23201a",
+      muted: s.getPropertyValue("--ink-muted").trim() || "#655d4b",
+      rule: s.getPropertyValue("--rule").trim() || "#dbd2bd",
+    });
+  }, []);
+
+  const data = useMemo(
+    () => ({
+      labels: points.map((p) => p.label),
+      datasets: [
+        {
+          label: "Avg rating",
+          data: points.map((p) => p.avgRating),
+          borderColor: tokens.ink,
+          backgroundColor: tokens.ink,
+          borderWidth: 1.75,
+          pointRadius: 2.5,
+          pointStyle: "rect",
+          tension: 0,
+          spanGaps: true,
+        },
+      ],
+    }),
+    [points, tokens],
+  );
+
+  const options = useMemo(
+    () => ({
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          min: 1,
+          max: 5,
+          ticks: { stepSize: 1, color: tokens.muted, font: { family: "var(--font-roboto-mono)", size: 11 } },
+          grid: { color: tokens.rule },
+        },
+        x: {
+          ticks: { color: tokens.muted, font: { family: "var(--font-roboto-mono)", size: 11 } },
+          grid: { display: false },
+        },
+      },
+    }),
+    [tokens],
+  );
+
   if (!hasData) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-slate-400">
-        Not enough reviewed milestones yet to show a trend.
+      <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-ink-muted">
+        Not enough reviewed milestones yet to plot a trend.
       </div>
     );
   }
 
-  const width = 640;
-  const height = 200;
-  const padding = { top: 12, right: 16, bottom: 28, left: 28 };
-  const chartW = width - padding.left - padding.right;
-  const chartH = height - padding.top - padding.bottom;
-  const min = 1;
-  const max = 5;
-
-  const step = points.length > 1 ? chartW / (points.length - 1) : 0;
-  const yFor = (v: number) => padding.top + chartH - ((v - min) / (max - min)) * chartH;
-  const xFor = (i: number) => padding.left + step * i;
-
-  const known = points
-    .map((p, i) => (p.avgRating != null ? { x: xFor(i), y: yFor(p.avgRating), v: p.avgRating } : null))
-    .filter((p): p is { x: number; y: number; v: number } => p != null);
-
-  const path = known.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="Average milestone rating over time">
-      {[1, 2, 3, 4, 5].map((v) => (
-        <g key={v}>
-          <line
-            x1={padding.left}
-            x2={width - padding.right}
-            y1={yFor(v)}
-            y2={yFor(v)}
-            className="stroke-slate-100 dark:stroke-slate-800"
-            strokeWidth={1}
-          />
-          <text x={4} y={yFor(v) + 4} className="fill-slate-400 text-[10px]">
-            {v}
-          </text>
-        </g>
-      ))}
-
-      {path ? <path d={path} fill="none" className="stroke-blue-500" strokeWidth={2} /> : null}
-      {known.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3.5} className="fill-blue-500" />
-      ))}
-
-      {points.map((p, i) => (
-        <text
-          key={p.label}
-          x={xFor(i)}
-          y={height - 6}
-          textAnchor="middle"
-          className="fill-slate-400 text-[10px]"
-        >
-          {p.label}
-        </text>
-      ))}
-    </svg>
-  );
+  return <Chart type="line" data={data} options={options} className="h-48 w-full" />;
 }

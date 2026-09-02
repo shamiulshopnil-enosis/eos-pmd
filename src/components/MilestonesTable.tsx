@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 import type { MilestoneWithProject } from "@/lib/types";
 import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { MILESTONE_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import { Card, EmptyState, FlagBadge, MilestoneStatusBadge, StarRating } from "@/components/ui";
-import { FilterBar, FilterDateRange, FilterSelect, FilterText, SortHeader, cmp, nextSort } from "@/components/filters";
-
-type SortKey = "title" | "project" | "client" | "start" | "due" | "reviewed" | "status" | "rating";
+import { EmptyState, FlagBadge, MilestoneStatusBadge, StarRating } from "@/components/ui";
+import { FilterBar, FilterDateRange, FilterSelect, FilterText } from "@/components/filters";
 
 const FLAGS: [string, string][] = [
   ["", "Any flag"],
@@ -20,11 +20,11 @@ const FLAGS: [string, string][] = [
 
 const RATINGS: [string, string][] = [
   ["any", "Any rating"],
-  ["5", "5 ★"],
-  ["4", "4 – 4.9 ★"],
-  ["3", "3 – 3.9 ★"],
-  ["2", "2 – 2.9 ★"],
-  ["1", "< 2 ★"],
+  ["5", "5.0"],
+  ["4", "4.0 – 4.9"],
+  ["3", "3.0 – 3.9"],
+  ["2", "2.0 – 2.9"],
+  ["1", "Below 2.0"],
   ["none", "Unrated"],
 ];
 
@@ -60,9 +60,22 @@ function ratingMatches(band: string, r: number | null): boolean {
   return r >= lo && r < lo + 1;
 }
 
+type Row = {
+  id: string;
+  title: string;
+  project: string;
+  projectId: string;
+  client: string;
+  start: number | null;
+  due: number | null;
+  reviewed: number | null;
+  status: string;
+  rating: number | null;
+  m: MilestoneWithProject;
+};
+
 export default function MilestonesTable({ milestones }: { milestones: MilestoneWithProject[] }) {
   const [f, setF] = useState({ ...EMPTY });
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "due", dir: "asc" });
   const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
 
   const projectOptions = useMemo<[string, string][]>(() => {
@@ -77,11 +90,28 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
     return [["", "Any client"], ...[...s].sort().map((c) => [c, c] as [string, string])];
   }, [milestones]);
 
+  const rows = useMemo<Row[]>(
+    () =>
+      milestones.map((m) => ({
+        id: m.id,
+        title: m.title,
+        project: m.project.name,
+        projectId: m.project.id,
+        client: m.project.clientCompanyName,
+        start: m.startDate ? new Date(m.startDate).getTime() : null,
+        due: m.dueDate ? new Date(m.dueDate).getTime() : null,
+        reviewed: m.reviewedAt ? new Date(m.reviewedAt).getTime() : null,
+        status: m.status,
+        rating: m.rating,
+        m,
+      })),
+    [milestones],
+  );
+
   const filtered = useMemo(() => {
     const q = f.q.trim().toLowerCase();
-    const out = milestones.filter((m) => {
-      if (q && !`${m.title} ${m.project.name} ${m.project.clientCompanyName}`.toLowerCase().includes(q))
-        return false;
+    return rows.filter(({ m }) => {
+      if (q && !`${m.title} ${m.project.name} ${m.project.clientCompanyName}`.toLowerCase().includes(q)) return false;
       if (f.status && m.status !== f.status) return false;
       if (f.flag && getMilestoneFlag(m) !== f.flag) return false;
       if (f.project && m.project.id !== f.project) return false;
@@ -92,42 +122,16 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
       if (!inRange(m.reviewedAt, f.reviewedFrom, f.reviewedTo)) return false;
       return true;
     });
-
-    const val = (m: MilestoneWithProject) => {
-      switch (sort.key) {
-        case "title": return m.title.toLowerCase();
-        case "project": return m.project.name.toLowerCase();
-        case "client": return m.project.clientCompanyName.toLowerCase();
-        case "start": return m.startDate ? new Date(m.startDate).getTime() : null;
-        case "due": return m.dueDate ? new Date(m.dueDate).getTime() : null;
-        case "reviewed": return m.reviewedAt ? new Date(m.reviewedAt).getTime() : null;
-        case "status": return m.status;
-        case "rating": return m.rating;
-      }
-    };
-    return [...out].sort((a, b) => {
-      const d = cmp(val(a), val(b));
-      return sort.dir === "asc" ? d : -d;
-    });
-  }, [milestones, f, sort]);
+  }, [rows, f]);
 
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
-  const onSort = (k: SortKey) => setSort((s) => nextSort(s, k));
-  const th = (label: string, key: SortKey, align?: "left" | "right") => (
-    <SortHeader label={label} sortKey={key} active={sort.key === key} dir={sort.dir} onSort={onSort} align={align} />
-  );
+  const activeCount = (Object.keys(EMPTY) as (keyof typeof EMPTY)[]).filter((k) => f[k] !== EMPTY[k]).length;
 
   return (
     <>
-      <FilterBar active={active} onClear={() => setF({ ...EMPTY })}>
+      <FilterBar active={active} count={activeCount} onClear={() => setF({ ...EMPTY })}>
         <FilterText label="Search" value={f.q} onChange={(v) => set({ q: v })} placeholder="Milestone, project, client…" />
-        <FilterSelect
-          label="Status"
-          value={f.status}
-          onChange={(v) => set({ status: v })}
-          width="w-40"
-          options={[["", "Any"], ...Object.entries(MILESTONE_STATUS_LABELS)]}
-        />
+        <FilterSelect label="Status" value={f.status} onChange={(v) => set({ status: v })} width="w-40" options={[["", "Any"], ...Object.entries(MILESTONE_STATUS_LABELS)]} />
         <FilterSelect label="Flag" value={f.flag} onChange={(v) => set({ flag: v })} width="w-40" options={FLAGS} />
         <FilterSelect label="Project" value={f.project} onChange={(v) => set({ project: v })} width="w-52" options={projectOptions} />
         <FilterSelect label="Client" value={f.client} onChange={(v) => set({ client: v })} width="w-44" options={clientOptions} />
@@ -138,58 +142,54 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
       </FilterBar>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No milestones match your filters" description="Adjust or clear the filters above." />
+        <EmptyState icon="filter_alt_off" title="No milestones match your filters" description="Adjust or clear the filters above." />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              <tr>
-                {th("Milestone", "title")}
-                {th("Project", "project")}
-                {th("Client", "client")}
-                {th("Start", "start")}
-                {th("Due", "due")}
-                {th("Reviewed", "reviewed")}
-                {th("Status", "status")}
-                {th("Rating", "rating", "right")}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/projects/${m.project.id}/milestones/${m.id}`}
-                      className="font-medium text-blue-600 hover:underline"
-                    >
-                      {m.title}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    <Link href={`/projects/${m.project.id}`} className="hover:underline">
-                      {m.project.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{m.project.clientCompanyName}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(m.startDate)}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(m.dueDate)}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(m.reviewedAt)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <MilestoneStatusBadge status={m.status} />
-                      <FlagBadge flag={getMilestoneFlag(m)} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {isMilestoneReviewed(m) ? <StarRating value={m.rating} /> : <span className="text-slate-400">—</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable value={filtered} dataKey="id" removableSort className="eos-table" tableStyle={{ minWidth: "960px" }} scrollable>
+          <Column
+            field="title"
+            header="Milestone"
+            sortable
+            body={(r: Row) => (
+              <Link href={`/projects/${r.projectId}/milestones/${r.id}`} className="font-medium text-ink hover:text-link hover:underline">
+                {r.title}
+              </Link>
+            )}
+          />
+          <Column
+            field="project"
+            header="Project"
+            sortable
+            body={(r: Row) => (
+              <Link href={`/projects/${r.projectId}`} className="text-ink-muted hover:text-link hover:underline">
+                {r.project}
+              </Link>
+            )}
+          />
+          <Column field="client" header="Client" sortable body={(r: Row) => <span className="text-ink-muted">{r.client}</span>} />
+          <Column field="start" header="Start" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.startDate)}</span>} />
+          <Column field="due" header="Due" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.dueDate)}</span>} />
+          <Column field="reviewed" header="Reviewed" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.reviewedAt)}</span>} />
+          <Column
+            field="status"
+            header="Status"
+            sortable
+            body={(r: Row) => (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <MilestoneStatusBadge status={r.status} />
+                <FlagBadge flag={getMilestoneFlag(r.m)} />
+              </div>
+            )}
+          />
+          <Column
+            field="rating"
+            header="Rating"
+            sortable
+            align="right"
+            body={(r: Row) => (isMilestoneReviewed(r.m) ? <StarRating value={r.rating} /> : <span className="text-ink-muted">—</span>)}
+          />
+        </DataTable>
       )}
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 font-mono text-xs text-ink-muted">
         {filtered.length} of {milestones.length} shown
       </p>
     </>

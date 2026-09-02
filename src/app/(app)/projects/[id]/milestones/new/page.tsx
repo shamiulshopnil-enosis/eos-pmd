@@ -3,9 +3,10 @@ import { requireUser } from "@/lib/auth";
 import { getProject } from "@/lib/data";
 import { canAccessDelivery } from "@/lib/permissions";
 import { createMilestone } from "@/lib/actions";
-import { Field, SubmitButton, TextInput } from "@/components/form";
+import { Field, FileInput, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { RichTextField } from "@/components/RichTextField";
+import AssigneeCheckboxes from "@/components/AssigneeCheckboxes";
 
 export default async function NewMilestonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,9 +33,9 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
           </Field>
 
           <div>
-            <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
+            <span className="mb-1 block text-sm font-medium text-ink">Description</span>
             <RichTextField name="description" placeholder="Features and deliverables in this milestone…" />
-            <span className="mt-1 block text-xs text-slate-400">Supports bold and bulleted lists.</span>
+            <span className="mt-1 block text-xs text-ink-muted">Supports bold and bulleted lists.</span>
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -50,38 +51,15 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
-              Assign to
-            </legend>
-            {project.vendorTeam.length === 0 ? (
-              <p className="text-xs text-slate-400">No vendor team members to assign yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {project.vendorTeam.map((m) => (
-                  <label
-                    key={m.email}
-                    className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
-                  >
-                    <input type="checkbox" name="assigneeEmails" value={m.email} />
-                    {m.name ? `${m.name} · ` : ""}
-                    {m.email}
-                    {m.invitePending ? <span className="text-xs text-amber-500">(pending)</span> : null}
-                  </label>
-                ))}
-              </div>
-            )}
+            <legend className="mb-1 text-sm font-medium text-ink">Assign to</legend>
+            <AssigneeCheckboxes people={project.vendorTeam} />
           </fieldset>
 
           <Field label="Files" hint="Optional — up to 10 files, 15 MB each.">
-            <input
-              type="file"
-              name="files"
-              multiple
-              className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
-            />
+            <FileInput name="files" multiple />
           </Field>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Add Milestone</SubmitButton>
           </div>
         </form>

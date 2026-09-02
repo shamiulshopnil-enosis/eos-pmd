@@ -1,6 +1,11 @@
+"use client";
+
+import { Button } from "primereact/button";
 import { removeMilestoneAttachment, uploadMilestoneAttachments } from "@/lib/actions";
 import { formatDateTime } from "@/lib/format";
 import type { Milestone } from "@/lib/types";
+import { Icon } from "@/components/icon";
+import { FileInput } from "@/components/form";
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -9,9 +14,10 @@ function humanSize(bytes: number): string {
 }
 
 /**
- * Attachment list + upload form for a milestone. Rendered on both the vendor and
- * client milestone views. Either side may upload while the project is active; a
- * file can be removed by whoever uploaded it, or by a vendor owner.
+ * Attachment list + upload form for a milestone. Either side may upload while
+ * the project is active; a file can be removed by whoever uploaded it, or by a
+ * vendor owner. Buttons are PrimeReact <Button>; the file field stays a native
+ * input so the server action reads it from FormData.
  */
 export default function MilestoneAttachments({
   projectId,
@@ -31,9 +37,9 @@ export default function MilestoneAttachments({
   return (
     <div>
       {attachments.length === 0 ? (
-        <p className="text-sm text-slate-400">No files attached.</p>
+        <p className="text-sm text-ink-muted">No files attached.</p>
       ) : (
-        <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+        <ul className="divide-y divide-rule text-sm">
           {attachments.map((a) => {
             const canRemove = isVendorOwner || a.uploadedByUserId === currentUserId;
             return (
@@ -41,26 +47,27 @@ export default function MilestoneAttachments({
                 <div className="min-w-0">
                   <a
                     href={`/files/milestones/${milestone.id}/${a.id}`}
-                    className="block truncate font-medium text-blue-600 hover:underline"
+                    className="flex items-center gap-1.5 truncate font-medium text-link hover:text-link-strong hover:underline"
                   >
-                    {a.filename}
+                    <Icon name="attach_file" className="shrink-0 text-[13px]" />
+                    <span className="truncate">{a.filename}</span>
                   </a>
-                  <div className="text-xs text-slate-400">
+                  <div className="mt-0.5 font-mono text-xs text-ink-muted">
                     {humanSize(a.size)}
-                    {a.uploadedByName || a.uploadedByEmail
-                      ? ` · ${a.uploadedByName ?? a.uploadedByEmail}`
-                      : ""}{" "}
-                    · {formatDateTime(a.uploadedAt)}
+                    {a.uploadedByName || a.uploadedByEmail ? ` · ${a.uploadedByName ?? a.uploadedByEmail}` : ""} ·{" "}
+                    {formatDateTime(a.uploadedAt)}
                   </div>
                 </div>
                 {canRemove ? (
                   <form action={removeMilestoneAttachment.bind(null, projectId, milestone.id, a.id)}>
-                    <button
+                    <Button
                       type="submit"
-                      className="shrink-0 text-xs font-medium text-rose-600 hover:underline dark:text-rose-400"
-                    >
-                      Remove
-                    </button>
+                      text
+                      severity="danger"
+                      size="small"
+                      icon="pi pi-trash"
+                      label="Remove"
+                    />
                   </form>
                 ) : null}
               </li>
@@ -72,21 +79,11 @@ export default function MilestoneAttachments({
       {canUpload ? (
         <form
           action={uploadMilestoneAttachments.bind(null, projectId, milestone.id)}
-          className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 dark:border-slate-800"
+          className="mt-3 flex flex-wrap items-center gap-3 border-t border-rule pt-3"
         >
-          <input
-            type="file"
-            name="files"
-            multiple
-            className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Upload
-          </button>
-          <span className="w-full text-xs text-slate-400">Up to 10 files, 15 MB each.</span>
+          <FileInput name="files" multiple className="max-w-xs" />
+          <Button type="submit" size="small" icon="pi pi-upload" label="Upload" />
+          <span className="w-full font-mono text-xs text-ink-muted">Up to 10 files, 15 MB each.</span>
         </form>
       ) : null}
     </div>

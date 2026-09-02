@@ -9,6 +9,7 @@ import { publishProject } from "@/lib/actions";
 import { formatPercent, formatRating } from "@/lib/format";
 import { Card, PageHeader } from "@/components/ui";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { SingleCheckbox } from "@/components/CheckboxField";
 
 export default async function PublishProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,12 +28,12 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Publish Project"
-        description="PRD §19-20 — private project fields are carried over automatically; complete anything the public project page still needs."
+        description="Private project fields are carried over automatically; complete anything the public project page still needs."
         back={{ href: `/projects/${project.id}`, label: "Back to Project" }}
       />
 
-      <Card className="mb-6 p-4 text-sm text-slate-600 dark:text-slate-300">
-        <div className="mb-1 font-medium text-slate-800 dark:text-slate-100">Carried over automatically</div>
+      <Card className="mb-6 p-4 text-sm text-ink-muted">
+        <div className="mb-1 font-medium text-ink">Carried over automatically</div>
         <p>
           Project Name, Client, Services, Duration, Team Size, Description, Dates and Engagement Model already exist
           on this private project and will populate the public page without re-entry.
@@ -71,39 +72,36 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
             <TextInput name="publicBudget" placeholder="e.g. 10K – 49K" />
           </Field>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-100">Verified Delivery Performance (PRD §21)</div>
+          <div className="rounded-ledger border border-rule bg-band p-4">
+            <div className="mb-2 text-sm font-medium text-ink">Verified delivery performance</div>
             {reviewedCount === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-ink-muted">
                 No reviewed milestones yet — this section won&apos;t appear on the public page until at least one milestone has a client rating.
               </p>
             ) : (
               <>
                 {thresholdMet ? (
-                  <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="mb-3 text-sm text-ink-muted">
                     {reviewedCount} Milestone{reviewedCount === 1 ? "" : "s"} Reviewed · Average Client Rating {formatRating(perf.avgRating)}/5 · {formatPercent(perf.responseRate)} Response Rate
                   </p>
                 ) : (
-                  <p className="mb-3 text-sm text-amber-700 dark:text-amber-300">
+                  <p className="mb-3 text-sm text-rag-warn">
                     {reviewedCount} of {totalMilestones} milestones reviewed — below the {threshold}-milestone threshold, so
-                    the summary stays hidden on the public page until then (spec §6.7). You can still record consent now.
+                    the summary stays hidden on the public page until then. You can still record consent now.
                   </p>
                 )}
-                <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                  <input type="checkbox" name="publicPerformanceConsent" className="mt-0.5" defaultChecked={project.publicPerformanceConsent} />
-                  <span>
-                    I have client consent to display this aggregate performance summary publicly. Individual milestone
-                    ratings and comments will remain private (PRD §21) regardless of this choice.
-                  </span>
-                </label>
+                <SingleCheckbox name="publicPerformanceConsent" defaultChecked={project.publicPerformanceConsent}>
+                  I have client consent to display this aggregate performance summary publicly. Individual milestone
+                  ratings and comments will remain private regardless of this choice.
+                </SingleCheckbox>
               </>
             )}
           </div>
 
           {project.capstone?.submitted ? (
-            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950">
-              <div className="mb-1 text-sm font-medium text-violet-800 dark:text-violet-200">Client Endorsement</div>
-              <p className="text-sm text-violet-700 dark:text-violet-300">
+            <div className="rounded-ledger border border-rule bg-band p-4">
+              <div className="mb-1 text-sm font-medium text-link">Client Endorsement</div>
+              <p className="text-sm text-link">
                 The capstone endorsement the client submitted ({project.capstone.attributes.length} attribute
                 {project.capstone.attributes.length === 1 ? "" : "s"} + testimonial) will appear on the public page
                 {project.capstone.anonymous ? " without the client's name" : ""}.
@@ -111,7 +109,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
             </div>
           ) : null}
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
             <SubmitButton>Publish Project</SubmitButton>
           </div>
         </form>

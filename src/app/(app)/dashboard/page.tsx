@@ -6,25 +6,32 @@ import {
   computeDashboardKpis,
   computeProjectPerformance,
   computeRatingTrend,
+  getMilestoneFlag,
 } from "@/lib/derived";
 import { reviewRoleLabel } from "@/lib/permissions";
-import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
+import { formatDate, formatPercent, formatRating } from "@/lib/format";
+import { CLIENT_HEALTH_LABELS, type ClientHealth } from "@/lib/constants";
 import {
-  Badge,
-  Card,
   EmptyState,
-  ExecutionStatusBadge,
-  HealthBadge,
+  InkLink,
   MilestoneStatusBadge,
   PageHeader,
-  ProjectStatusBadge,
   SectionHeading,
-  StatCard,
 } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { TrendChart } from "@/components/TrendChart";
+import { DashboardLedger, type LedgerRow } from "@/components/DashboardLedger";
+import { ProjectPerformanceTable, type PerfRow } from "@/components/ProjectPerformanceTable";
 
 // Live metrics — always render against the current database, never a build snapshot.
 export const dynamic = "force-dynamic";
+
+const HEALTH_RANK: Record<ClientHealth, number> = {
+  AT_RISK: 0,
+  NEEDS_ATTENTION: 1,
+  NO_DATA: 2,
+  HAPPY: 3,
+};
 
 function ReviewSection({
   reviewProjects,
@@ -35,67 +42,52 @@ function ReviewSection({
     p.milestones.filter((m) => m.status === "sent").map((m) => ({ project: p, milestone: m })),
   );
   return (
-    <div className="mt-8">
-      <SectionHeading>Projects You Review</SectionHeading>
+    <section className="mt-10">
+      <SectionHeading>Projects you review</SectionHeading>
       {awaiting.length > 0 ? (
-        <Card className="mb-4 p-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-            Awaiting your review ({awaiting.length})
+        <div className="mb-4 rounded-ledger border border-rule bg-panel p-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-rag-warn">
+            <Icon name="hourglass_top" className="text-[14px]" />
+            Awaiting your review · {awaiting.length}
           </div>
-          <ul className="space-y-2 text-sm">
+          <ul className="divide-y divide-rule">
             {awaiting.map(({ project, milestone }) => (
-              <li key={milestone.id} className="flex items-center justify-between">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="text-slate-700 hover:underline dark:text-slate-200"
-                >
-                  {project.name} <span className="text-slate-400">· {milestone.title}</span>
+              <li key={milestone.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                <Link href={`/projects/${project.id}`} className="truncate text-ink hover:text-link hover:underline">
+                  {project.name}
+                  <span className="text-ink-muted"> · {milestone.title}</span>
                 </Link>
                 <MilestoneStatusBadge status={milestone.status} />
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       ) : null}
-      <Card className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
-          <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-3 font-medium">Project</th>
-              <th className="px-4 py-3 font-medium">Your role</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium text-right">Milestones reviewed</th>
-              <th className="px-4 py-3 font-medium">Last activity</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {reviewProjects.map((p) => {
-              const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
-              const role = reviewRoleLabel(p);
-              return (
-                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3">
-                    <Link href={`/projects/${p.id}`} className="font-medium text-blue-600 hover:underline">
-                      {p.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={role === "owner" ? "blue" : "slate"}>{role}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <ExecutionStatusBadge status={p.executionStatus} />
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                    {reviewed} / {p.milestones.length}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDateTime(p.updatedAt)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
-    </div>
+      <div className="rounded-ledger border border-rule bg-panel">
+        <ul className="divide-y divide-rule">
+          {reviewProjects.map((p) => {
+            const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
+            const role = reviewRoleLabel(p);
+            return (
+              <li
+                key={p.id}
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
+              >
+                <div className="min-w-0">
+                  <Link href={`/projects/${p.id}`} className="truncate font-medium text-ink hover:text-link hover:underline">
+                    {p.name}
+                  </Link>
+                  <div className="text-xs capitalize text-ink-muted">{role}</div>
+                </div>
+                <div className="font-mono text-xs tabular-nums text-ink-muted">
+                  {reviewed} / {p.milestones.length} reviewed
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -111,10 +103,11 @@ export default async function DashboardPage() {
       <div>
         <PageHeader title="Dashboard" />
         <EmptyState
-          title="Nothing here yet"
+          icon="menu_book"
+          title="The register is empty"
           description="Create your first project, break it into milestones, collect client reviews, and track performance over time."
           actionHref="/projects/new"
-          actionLabel="Create Project"
+          actionLabel="Create project"
         />
       </div>
     );
@@ -133,141 +126,261 @@ export default async function DashboardPage() {
   const alerts = computeAlerts(projects);
   const trend = computeRatingTrend(projects);
 
-  const table = projects
-    .map((p) => ({ project: p, perf: computeProjectPerformance(p) }))
+  const allMilestones = projects.flatMap((p) => p.milestones);
+  const overdueCount = allMilestones.filter((m) => getMilestoneFlag(m) === "OVERDUE").length;
+  const dueSoonCount = allMilestones.filter((m) => getMilestoneFlag(m) === "DUE_SOON").length;
+
+  const sorted = projects
+    .map((p) => {
+      const perf = computeProjectPerformance(p);
+      const lastActivity = p.milestones.reduce(
+        (acc, m) => Math.max(acc, m.updatedAt.getTime()),
+        p.updatedAt.getTime(),
+      );
+      const spark = p.milestones
+        .filter((m) => m.status === "reviewed" && m.rating != null)
+        .sort((a, b) => (a.reviewedAt?.getTime() ?? 0) - (b.reviewedAt?.getTime() ?? 0))
+        .map((m) => m.rating as number)
+        .slice(-6);
+      return { project: p, perf, lastActivity, spark };
+    })
     .sort((a, b) => {
-      const lastA = a.project.milestones.reduce(
-        (acc, m) => Math.max(acc, m.updatedAt.getTime()),
-        a.project.updatedAt.getTime(),
-      );
-      const lastB = b.project.milestones.reduce(
-        (acc, m) => Math.max(acc, m.updatedAt.getTime()),
-        b.project.updatedAt.getTime(),
-      );
-      return lastB - lastA;
+      const rank =
+        (HEALTH_RANK[a.perf.health] - (a.perf.satisfactionDeclined ? 0.5 : 0)) -
+        (HEALTH_RANK[b.perf.health] - (b.perf.satisfactionDeclined ? 0.5 : 0));
+      if (rank !== 0) return rank;
+      return b.lastActivity - a.lastActivity;
     });
+
+  const rows: LedgerRow[] = sorted.map(({ project: p, perf, spark }) => ({
+    id: p.id,
+    name: p.name,
+    client: p.clientCompanyName,
+    href: `/projects/${p.id}`,
+    health: perf.health,
+    latestText: formatRating(perf.latestRating),
+    avgText: formatRating(perf.avgRating),
+    reviewedText: `${perf.milestonesReviewed} / ${perf.totalMilestones}`,
+    execStatus: p.executionStatus,
+    visibility: p.visibility,
+    spark,
+    declining: perf.satisfactionDeclined,
+    milestones: p.milestones.map((m) => ({
+      id: m.id,
+      title: m.title,
+      status: m.status,
+      ratingText: m.status === "reviewed" && m.rating != null ? formatRating(m.rating) : null,
+      due: m.dueDate ? formatDate(m.dueDate) : "—",
+    })),
+  }));
+
+  const needingAttention = rows.filter(
+    (r) => r.health === "AT_RISK" || r.health === "NEEDS_ATTENTION" || r.declining,
+  ).length;
+
+  const perfRows: PerfRow[] = sorted.map(({ project: p, perf, lastActivity }) => ({
+    id: p.id,
+    name: p.name,
+    client: p.clientCompanyName,
+    status: p.status,
+    visibility: p.visibility,
+    health: perf.health,
+    active: perf.activeMilestones,
+    total: perf.totalMilestones,
+    reviewed: perf.milestonesReviewed,
+    responseText: formatPercent(perf.responseRate),
+    avgText: formatRating(perf.avgRating),
+    latestText: formatRating(perf.latestRating),
+    declined: perf.satisfactionDeclined,
+    lastActivityText: formatDate(new Date(lastActivity)),
+  }));
 
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        description="Delivery performance and client satisfaction across your projects."
+        title="Delivery register"
+        description="Every client engagement, ruled and scored."
+        action={<InkLink href="/projects/new" icon="add">New project</InkLink>}
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
-        <StatCard label="Active Projects" value={kpis.activeProjects} />
-        <StatCard label="Active Milestones" value={kpis.activeMilestones} />
-        <StatCard label="Milestones Reviewed" value={kpis.milestonesReviewed} />
-        <StatCard
-          label="Awaiting Review"
-          value={kpis.awaitingReview}
-          tone={kpis.awaitingReview > 0 ? "amber" : "slate"}
-        />
-        <StatCard label="Avg. Milestone Rating" value={formatRating(kpis.averageMilestoneRating)} />
-        <StatCard label="Client Satisfaction Rate" value={formatPercent(kpis.clientSatisfactionRate)} />
-        <StatCard
-          label="At-Risk Projects"
-          value={kpis.atRiskProjects}
-          tone={kpis.atRiskProjects > 0 ? "red" : "slate"}
-        />
-      </div>
-
-      {alerts.length > 0 ? (
-        <div className="mt-6">
-          <SectionHeading>Attention Required</SectionHeading>
-          <div className="space-y-2">
-            {alerts.map((a) => (
-              <Link
-                key={a.id}
-                href={a.href}
-                className={`flex items-center justify-between rounded-lg border px-4 py-2.5 text-sm ${
-                  a.severity === "critical"
-                    ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200"
-                    : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                }`}
-              >
-                <span className="font-medium">{a.message}</span>
-                <span aria-hidden>→</span>
-              </Link>
-            ))}
-          </div>
+      {/* Summary — the headline figures */}
+      <section>
+        <SectionHeading>Summary</SectionHeading>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <FigureBlock label="Active projects" value={`${kpis.activeProjects} / ${projects.length}`} />
+          <FigureBlock label="Active milestones" value={kpis.activeMilestones} />
+          <FigureBlock label="Milestones reviewed" value={kpis.milestonesReviewed} />
+          <FigureBlock
+            label="Awaiting client review"
+            value={kpis.awaitingReview}
+            tone={kpis.awaitingReview > 0 ? "warn" : undefined}
+            href={kpis.awaitingReview > 0 ? "/milestones?status=sent" : undefined}
+          />
+          <FigureBlock
+            label="Overdue milestones"
+            value={overdueCount}
+            tone={overdueCount > 0 ? "bad" : undefined}
+            href={overdueCount > 0 ? "/milestones?flag=OVERDUE" : undefined}
+          />
+          <FigureBlock
+            label="Due soon"
+            value={dueSoonCount}
+            tone={dueSoonCount > 0 ? "warn" : undefined}
+            href={dueSoonCount > 0 ? "/milestones?flag=DUE_SOON" : undefined}
+          />
+          <FigureBlock
+            label="Avg. milestone rating"
+            value={formatRating(kpis.averageMilestoneRating)}
+            hint={
+              kpis.milestonesReviewed > 0
+                ? `across ${kpis.milestonesReviewed} reviewed`
+                : "none reviewed yet"
+            }
+          />
+          <FigureBlock
+            label="Client satisfaction rate"
+            value={formatPercent(kpis.clientSatisfactionRate)}
+          />
+          <FigureBlock
+            label="At-risk projects"
+            value={kpis.atRiskProjects}
+            tone={kpis.atRiskProjects > 0 ? "bad" : undefined}
+          />
         </div>
-      ) : null}
+      </section>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-2">
-          <SectionHeading>Average Milestone Rating — Last 6 Months</SectionHeading>
-          <TrendChart points={trend} />
-        </Card>
-
-        <Card className="p-4">
-          <SectionHeading>Client Health</SectionHeading>
-          <ul className="space-y-2">
-            {table.map(({ project, perf }) => (
-              <li key={project.id} className="flex items-center justify-between text-sm">
-                <Link href={`/projects/${project.id}`} className="truncate text-slate-700 hover:underline dark:text-slate-200">
-                  {project.clientCompanyName}
-                </Link>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 dark:text-slate-400">{formatRating(perf.latestRating)}</span>
-                  <HealthBadge health={perf.health} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      <div className="mt-6">
-        <SectionHeading>Project Performance</SectionHeading>
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-3 font-medium">Project</th>
-                <th className="px-4 py-3 font-medium">Client</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium text-right">Active Milestones</th>
-                <th className="px-4 py-3 font-medium text-right">Total Milestones</th>
-                <th className="px-4 py-3 font-medium text-right">Avg. Rating</th>
-                <th className="px-4 py-3 font-medium text-right">Latest Rating</th>
-                <th className="px-4 py-3 font-medium">Client Health</th>
-                <th className="px-4 py-3 font-medium">Last Activity</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {table.map(({ project, perf }) => (
-                <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3">
-                    <Link href={`/projects/${project.id}`} className="font-medium text-blue-600 hover:underline">
-                      {project.name}
-                    </Link>
-                    {project.visibility === "PUBLIC" ? (
-                      <span className="ml-2">
-                        <Badge tone="blue">Public</Badge>
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{project.clientCompanyName}</td>
-                  <td className="px-4 py-3">
-                    <ProjectStatusBadge status={project.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right">{perf.activeMilestones}</td>
-                  <td className="px-4 py-3 text-right">{perf.totalMilestones}</td>
-                  <td className="px-4 py-3 text-right">{formatRating(perf.avgRating)}</td>
-                  <td className="px-4 py-3 text-right">{formatRating(perf.latestRating)}</td>
-                  <td className="px-4 py-3">
-                    <HealthBadge health={perf.health} />
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(project.updatedAt)}</td>
-                </tr>
+      {/* Attention + trend */}
+      <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <section>
+          <SectionHeading>Attention</SectionHeading>
+          {alerts.length === 0 ? (
+            <p className="flex items-center gap-1.5 text-sm text-ink-muted">
+              <Icon name="check_circle" className="text-[15px] text-rag-good" fill />
+              Nothing needs attention.
+            </p>
+          ) : (
+            <ul className="divide-y divide-rule rounded-ledger border border-rule bg-panel">
+              {alerts.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    href={a.href}
+                    className="flex items-start gap-2 px-3 py-2.5 text-sm text-ink hover:bg-band hover:text-link"
+                  >
+                    <Icon
+                      name={a.severity === "critical" ? "warning" : "error"}
+                      className={`mt-0.5 shrink-0 text-[15px] ${
+                        a.severity === "critical" ? "text-rag-bad" : "text-rag-warn"
+                      }`}
+                      fill
+                    />
+                    <span className="flex-1">{a.message}</span>
+                    <Icon name="chevron_right" className="mt-0.5 shrink-0 text-[16px] text-ink-muted" />
+                  </Link>
+                </li>
               ))}
-            </tbody>
-          </table>
-        </Card>
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <SectionHeading>Rating trend</SectionHeading>
+          <div className="rounded-ledger border border-rule bg-panel px-3 pb-2 pt-3">
+            <TrendChart points={trend} />
+          </div>
+        </section>
       </div>
+
+      {/* Client ledger */}
+      <section className="mt-10">
+        <SectionHeading
+          action={
+            needingAttention > 0 ? (
+              <span className="font-mono text-xs tabular-nums text-rag-warn">
+                {needingAttention} need attention
+              </span>
+            ) : (
+              <span className="font-mono text-xs tabular-nums text-ink-muted">
+                {rows.length} nominal
+              </span>
+            )
+          }
+        >
+          Client ledger
+        </SectionHeading>
+        <DashboardLedger rows={rows} />
+        <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+          {(["AT_RISK", "NEEDS_ATTENTION", "HAPPY", "NO_DATA"] as ClientHealth[]).map((h) => (
+            <span key={h} className="inline-flex items-center gap-1.5">
+              <RagKey health={h} />
+              {CLIENT_HEALTH_LABELS[h]}
+            </span>
+          ))}
+        </p>
+      </section>
+
+      {/* Full performance record */}
+      <section className="mt-10">
+        <SectionHeading
+          action={
+            <Link href="/projects" className="text-sm text-link hover:text-link-strong">
+              Open projects
+            </Link>
+          }
+        >
+          Project performance
+        </SectionHeading>
+        <ProjectPerformanceTable rows={perfRows} />
+      </section>
 
       {reviewProjects.length > 0 ? <ReviewSection reviewProjects={reviewProjects} /> : null}
     </div>
   );
+}
+
+function FigureBlock({
+  label,
+  value,
+  hint,
+  tone,
+  href,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  tone?: "warn" | "bad";
+  href?: string;
+}) {
+  const figCls = `text-[1.625rem] font-semibold leading-none tabular-nums ${
+    tone === "bad" ? "text-rag-bad" : tone === "warn" ? "text-rag-warn" : "text-ink"
+  }`;
+  const cls = `flex flex-col gap-2 rounded-[8px] border border-rule bg-panel px-4 py-3.5 ${
+    href ? "transition-colors hover:border-link" : ""
+  }`;
+  const body = (
+    <>
+      <span className="flex items-center gap-1 text-xs font-medium text-ink-muted">
+        {label}
+        {href ? <Icon name="north_east" className="text-[12px]" /> : null}
+      </span>
+      <span className={figCls}>{value}</span>
+      {hint ? <span className="text-xs text-ink-subtle">{hint}</span> : null}
+    </>
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
+function RagKey({ health }: { health: ClientHealth }) {
+  const cls: Record<ClientHealth, string> = {
+    HAPPY: "bg-rag-good-fill ring-black/15 dark:ring-white/25",
+    NEEDS_ATTENTION: "bg-rag-warn-fill ring-black/15 dark:ring-white/25",
+    AT_RISK: "bg-rag-bad-fill ring-black/15 dark:ring-white/25",
+    NO_DATA: "bg-transparent ring-rule-strong",
+  };
+  return <span className={`inline-block h-2 w-2 rounded-full ring-1 ring-inset ${cls[health]}`} />;
 }
