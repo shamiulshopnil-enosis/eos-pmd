@@ -1,19 +1,15 @@
 import { Module } from "@nestjs/common";
-import { VendorMembersService } from "./vendor-members.service";
+import { CompaniesService } from "./companies.service";
+import { CompanyMembersService } from "./company-members.service";
 import { TeamsService } from "./teams.service";
-import { ClientCompaniesService } from "./client-companies.service";
-import {
-  ClientCompaniesController,
-  TeamsController,
-  VendorMembersController,
-} from "./directory.controller";
+import { CompaniesController, TeamsController } from "./directory.controller";
 
-// Team Management feature: the vendor-owned people directory (VendorMember),
-// named Teams over it, and the global ClientCompany directory. Models come from
-// the global DatabaseModule.
+// Company-model unification PR1: Companies, their members (CompanyMember) and Teams.
+// Replaces the vendor-only VendorMember directory + the global ClientCompany
+// directory. Models come from the global DatabaseModule.
 @Module({
-  controllers: [VendorMembersController, TeamsController, ClientCompaniesController],
-  providers: [VendorMembersService, TeamsService, ClientCompaniesService],
-  exports: [VendorMembersService, TeamsService, ClientCompaniesService],
+  controllers: [CompaniesController, TeamsController],
+  providers: [CompaniesService, CompanyMembersService, TeamsService],
+  exports: [CompaniesService, CompanyMembersService, TeamsService],
 })
 export class DirectoryModule {}

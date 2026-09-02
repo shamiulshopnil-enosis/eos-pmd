@@ -14,13 +14,14 @@ import { serializeMilestone, serializeProject } from "../common/serialize";
 import { sanitizeMilestoneHtml } from "../common/richtext";
 import { MILESTONE_REVIEW_DIMENSION_KEYS, RATING_SELF_CORRECTION_HOURS } from "../common/constants";
 import {
+  access,
   assertPermission,
   canAttachToMilestone,
   canEditMilestone,
+  canManageProject,
   canRateMilestone,
   canSendMilestone,
-  isPrimaryContact,
-  isVendorOwner,
+  reviewLead,
 } from "../common/permissions";
 import { optDate, optStr, str, strList } from "../common/input";
 import type {
@@ -86,13 +87,8 @@ export class MilestonesService {
     return out;
   }
 
-  private async projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
-    if (!vendorUserId || !isValidId(vendorUserId)) return null;
-    const docs = await this.projects
-      .find({ "vendorTeam.userId": new Types.ObjectId(vendorUserId) })
-      .select({ _id: 1 })
-      .lean();
-    return docs.map((d) => d._id as Types.ObjectId);
+  private projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
+    return this.projectsService.projectIdsForUser(vendorUserId, "delivery");
   }
 
   // -------------------------------------------------------------------------
@@ -417,10 +413,10 @@ export class MilestonesService {
       throw new BadRequestException("This milestone has not been reviewed yet.");
     }
     // Only the person who submitted the rating may change it. Legacy milestones
-    // reviewed before reviewer stamping fall back to "any primary contact".
+    // reviewed before reviewer stamping fall back to "a receiving-company lead".
     const isReviewer = milestone.reviewedByUserId
       ? String(milestone.reviewedByUserId) === user.id
-      : isPrimaryContact(user, project);
+      : reviewLead(access(project.myAccess));
     if (!isReviewer) {
       throw new ForbiddenException("Only the client contact who submitted this rating can change it.");
     }
@@ -481,12 +477,12 @@ export class MilestonesService {
 
   // --- Attachments (GridFS-backed, either side can upload) ---
 
-  private async loadMilestoneAndProject(milestoneId: string) {
+  private async loadMilestoneAndProject(milestoneId: string, user?: SessionUser) {
     if (!isValidId(milestoneId)) throw new NotFoundException("Milestone not found.");
     const milestone = await this.milestones.findById(milestoneId);
     if (!milestone) throw new NotFoundException("Milestone not found.");
     const projectId = String(milestone.projectId);
-    const project = await this.projectsService.getProjectOrThrow(projectId);
+    const project = await this.projectsService.getProjectOrThrow(projectId, user);
     return { milestone, project, projectId };
   }
 
@@ -495,9 +491,9 @@ export class MilestonesService {
     milestoneId: string,
     files: UploadedFileLike[],
   ): Promise<{ projectId: string; milestoneId: string }> {
-    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId);
+    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId, user);
     assertPermission(
-      canAttachToMilestone(user, project),
+      canAttachToMilestone(access(project.myAccess)),
       "You are not on this project, so you cannot attach files.",
     );
     this.projectsService.assertActiveProject(project);
@@ -547,12 +543,12 @@ export class MilestonesService {
     milestoneId: string,
     attachmentId: string,
   ): Promise<{ projectId: string; milestoneId: string }> {
-    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId);
+    const { milestone, project, projectId } = await this.loadMilestoneAndProject(milestoneId, user);
     const attachment = milestone.attachments.id(attachmentId);
     if (!attachment) throw new NotFoundException("Attachment not found.");
 
     const isUploader = String(attachment.uploadedByUserId ?? "") === user.id;
-    if (!isUploader && !isVendorOwner(user, project)) {
+    if (!isUploader && !canManageProject(access(project.myAccess))) {
       throw new ForbiddenException(
         "Only the person who uploaded a file, or a project owner, can remove it.",
       );
@@ -585,9 +581,9 @@ export class MilestonesService {
     contentType: string;
     size: number;
   }> {
-    const { milestone, project } = await this.loadMilestoneAndProject(milestoneId);
+    const { milestone, project } = await this.loadMilestoneAndProject(milestoneId, user);
     assertPermission(
-      canAttachToMilestone(user, project),
+      canAttachToMilestone(access(project.myAccess)),
       "You do not have access to this milestone's files.",
     );
     const attachment = milestone.attachments.id(attachmentId);

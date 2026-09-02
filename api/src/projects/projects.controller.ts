@@ -21,24 +21,25 @@ export class ProjectsController {
   @Get()
   async list(
     @CurrentUser() user: SessionUser,
-    @Query("scope") scope?: string,
+    @Query("side") side?: string,
     @Query("status") status?: string,
     @Query("q") q?: string,
   ) {
-    // Vendors are scoped to their own projects; admins see everything.
-    const vendorUserId = scope === "vendor" || user.role === "vendor" ? user.id : undefined;
-    return this.projects.listProjectsWithMilestones({ status, q, vendorUserId });
+    // Admins see everything; everyone else is scoped to projects they're on.
+    const userId = user.role === "admin" ? undefined : user.id;
+    const s = side === "review" || side === "any" ? side : "delivery";
+    return this.projects.listProjectsWithMilestones({ status, q, userId, side: s });
   }
 
   @Get("count")
-  async count(@CurrentUser() user: SessionUser, @Query("scope") scope?: string) {
-    const vendorUserId = scope === "vendor" || user.role === "vendor" ? user.id : undefined;
-    return { count: await this.projects.countProjects(vendorUserId) };
+  async count(@CurrentUser() user: SessionUser) {
+    const userId = user.role === "admin" ? undefined : user.id;
+    return { count: await this.projects.countProjects(userId) };
   }
 
   @Get("mine")
   mine(@CurrentUser() user: SessionUser) {
-    return this.projects.listProjectsForUser(user.id);
+    return this.projects.listProjectsForUser(user);
   }
 
   @Get("admin")
@@ -55,22 +56,22 @@ export class ProjectsController {
   }
 
   @Get(":id")
-  async getOne(@Param("id") id: string) {
-    const project = await this.projects.getProject(id);
+  async getOne(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const project = await this.projects.getProject(id, user);
     if (!project) throw new NotFoundException("Project not found.");
     return project;
   }
 
   @Get(":id/with-milestones")
-  async withMilestones(@Param("id") id: string) {
-    const project = await this.projects.getProjectWithMilestones(id);
+  async withMilestones(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const project = await this.projects.getProjectWithMilestones(id, user);
     if (!project) throw new NotFoundException("Project not found.");
     return project;
   }
 
   @Get(":id/detail")
-  async detail(@Param("id") id: string) {
-    const project = await this.projects.getProjectDetail(id);
+  async detail(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    const project = await this.projects.getProjectDetail(id, user);
     if (!project) throw new NotFoundException("Project not found.");
     return project;
   }
@@ -124,6 +125,16 @@ export class ProjectsController {
     @Body() body: Record<string, unknown>,
   ) {
     await this.projects.setAssignedTeams(user, id, body);
+    return { ok: true };
+  }
+
+  @Post(":id/review-staffing")
+  async setReviewStaffing(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    await this.projects.setReviewStaffing(user, id, body);
     return { ok: true };
   }
 
@@ -188,65 +199,4 @@ export class ProjectsController {
     return { ok: true };
   }
 
-  // --- people & invitations ---
-
-  @Post(":id/vendor-team")
-  async inviteVendor(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.inviteVendorTeamMember(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/vendor-team/remove")
-  async removeVendor(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.removeVendorTeamMember(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/client-contacts")
-  async inviteClient(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.inviteClientContact(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/client-contacts/collaborator")
-  async inviteCollaborator(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.inviteCollaborator(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/client-contacts/reassign-primary")
-  async reassignPrimary(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.reassignPrimaryContact(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/client-contacts/remove")
-  async removeClient(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.removeClientContact(user, id, body);
-    return { ok: true };
-  }
 }

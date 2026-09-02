@@ -88,16 +88,10 @@ export class InvitationsService {
     inv.status = "accepted";
     await inv.save();
 
-    let role: UserRole = user.role;
-    if (inv.kind === "vendor_team" && user.role === "buyer") {
-      role = "vendor";
-      await this.users.setRole(user.id, "vendor");
-    }
-
     return {
       ok: true,
-      sessionUser: { id: user.id, email: user.email, name: user.name, role },
-      redirectTo: inv.kind === "vendor_team" ? `/projects/${String(project._id)}` : "/my-projects",
+      sessionUser: { id: user.id, email: user.email, name: user.name, role: user.role },
+      redirectTo: `/projects/${String(project._id)}`,
     };
   }
 }

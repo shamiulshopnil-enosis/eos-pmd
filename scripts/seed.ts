@@ -10,7 +10,7 @@ import {
 import { minReviewThreshold } from "../src/lib/constants";
 import { runningAverage } from "../src/lib/scoring";
 import { tierForScore } from "../src/lib/attributes";
-import { SEED_USERS, seedUsers } from "./seed-users";
+import { SEED_VENDOR_EMAIL, seedUsers } from "./seed-users";
 
 function daysAgo(n: number) {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
@@ -20,7 +20,7 @@ function daysFromNow(n: number) {
 }
 
 /** Upsert someone a seed project attaches (already accepted + signed in). Idempotent. */
-async function ensureUser(email: string, name: string, role: "buyer" | "vendor" | "admin" = "buyer") {
+async function ensureUser(email: string, name: string, role: "admin" | "member" = "member") {
   return UserModel.findOneAndUpdate(
     { email },
     { $setOnInsert: { email, role }, $set: { name, emailVerified: true } },
@@ -67,11 +67,11 @@ async function main() {
 
   // Sign-in accounts are not wiped, only ensured (see scripts/seed-users.ts).
   await seedUsers();
-  const vendorEmail = SEED_USERS.find((u) => u.role === "vendor")!.email;
+  const vendorEmail = SEED_VENDOR_EMAIL;
   const vendorOwner = await UserModel.findOne({ email: vendorEmail });
 
   // Extra people the seed projects attach as accepted members.
-  const vendorMember = await ensureUser("member@eos.local", "Riley Chen", "vendor");
+  const vendorMember = await ensureUser("member@eos.local", "Riley Chen", "member");
   const primaryContact = await ensureUser("dana.okafor@northpeak.example", "Dana Okafor");
   const collaborator = await ensureUser("wes.hart@northpeak.example", "Wes Hart");
   const completedContact = await ensureUser("priya.menon@brightwave.example", "Priya Menon");

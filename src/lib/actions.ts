@@ -116,7 +116,7 @@ export async function uploadMilestoneAttachments(
   await uploadAttachments(milestoneId, filesFrom(formData));
   revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath(`/my-projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
 }
 
 export async function removeMilestoneAttachment(
@@ -127,7 +127,7 @@ export async function removeMilestoneAttachment(
   await del(`/milestones/${milestoneId}/attachments/${attachmentId}`);
   revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath(`/my-projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}`);
 }
 
 export async function updateMilestone(projectId: string, milestoneId: string, formData: FormData) {
@@ -170,8 +170,8 @@ export async function reopenMilestone(projectId: string, milestoneId: string) {
 function revalidateReview(projectId: string, milestoneId: string) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
-  revalidatePath(`/my-projects/${projectId}`);
-  revalidatePath("/my-projects");
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
   revalidatePath("/milestones");
   revalidatePath("/dashboard");
 }
@@ -197,8 +197,8 @@ export async function requestRatingReconsideration(projectId: string, milestoneI
 
 function revalidateCompletion(projectId: string) {
   revalidatePath(`/projects/${projectId}`);
-  revalidatePath(`/my-projects/${projectId}`);
-  revalidatePath("/my-projects");
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
   revalidatePath("/projects");
   revalidatePath("/dashboard");
   revalidatePath("/admin/projects");
@@ -228,8 +228,8 @@ function revalidateCapstone(projectId: string) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/public-preview`);
   revalidatePath(`/projects/${projectId}/publish`);
-  revalidatePath(`/my-projects/${projectId}`);
-  revalidatePath(`/my-projects/${projectId}/capstone`);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/capstone`);
 }
 
 export async function requestCapstone(projectId: string) {
@@ -240,7 +240,7 @@ export async function requestCapstone(projectId: string) {
 export async function submitCapstone(projectId: string, formData: FormData) {
   await post(`/projects/${projectId}/submit-capstone`, formToObject(formData));
   revalidateCapstone(projectId);
-  redirect(`/my-projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,59 +261,28 @@ export async function unpublishProject(projectId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// People & invitations (Milestones plan, Phase 3 — spec §4.3, §4.4, §7, §8)
+// Companies, members, teams (company-unification)
 // ---------------------------------------------------------------------------
 
-export async function inviteVendorTeamMember(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/vendor-team`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-}
-
-export async function removeVendorTeamMember(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/vendor-team/remove`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-}
-
-export async function inviteClientContact(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/client-contacts`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-}
-
-export async function reassignPrimaryContact(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/client-contacts/reassign-primary`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-  revalidatePath(`/my-projects/${projectId}/people`);
-}
-
-export async function inviteCollaborator(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/client-contacts/collaborator`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-  revalidatePath(`/my-projects/${projectId}/people`);
-}
-
-export async function removeClientContact(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/client-contacts/remove`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}/team`);
-  revalidatePath(`/my-projects/${projectId}/people`);
-}
-
-// ---------------------------------------------------------------------------
-// Team directory: vendor members, teams, client companies (Team Management)
-// ---------------------------------------------------------------------------
-
-export async function createVendorMember(formData: FormData) {
-  await post(`/vendor-members`, formToObject(formData));
+export async function addCompanyMember(companyId: string, formData: FormData) {
+  await post(`/companies/${companyId}/members`, formToObject(formData));
   revalidatePath("/team");
 }
 
-export async function updateVendorMember(memberId: string, formData: FormData) {
-  await patch(`/vendor-members/${memberId}`, formToObject(formData));
+export async function updateCompanyMember(companyId: string, membershipId: string, formData: FormData) {
+  await patch(`/companies/${companyId}/members/${membershipId}`, formToObject(formData));
   revalidatePath("/team");
 }
 
-export async function removeVendorMember(memberId: string) {
-  await del(`/vendor-members/${memberId}`);
+export async function removeCompanyMember(companyId: string, membershipId: string) {
+  await del(`/companies/${companyId}/members/${membershipId}`);
   revalidatePath("/team");
+}
+
+export async function renameCompany(companyId: string, formData: FormData) {
+  await patch(`/companies/${companyId}`, formToObject(formData));
+  revalidatePath("/team");
+  revalidatePath("/companies");
 }
 
 export async function createTeam(formData: FormData) {
@@ -331,25 +300,18 @@ export async function deleteTeam(teamId: string) {
   revalidatePath("/team");
 }
 
-export async function createClientCompany(formData: FormData) {
-  await post(`/client-companies`, formToObject(formData));
-  revalidatePath("/client-companies");
-}
-
-export async function updateClientCompany(companyId: string, formData: FormData) {
-  await patch(`/client-companies/${companyId}`, formToObject(formData));
-  revalidatePath("/client-companies");
-}
-
-export async function deleteClientCompany(companyId: string) {
-  await del(`/client-companies/${companyId}`);
-  revalidatePath("/client-companies");
-}
-
-/** Replace a project's assigned teams / individual members (live reference). */
+/** Replace a project's assigned delivery teams / individual members. */
 export async function setProjectStaffing(projectId: string, formData: FormData) {
   await post(`/projects/${projectId}/assigned-teams`, formToObject(formData));
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/team`);
+}
+
+/** Replace a project's client-side (review) teams / individual members. */
+export async function setReviewStaffing(projectId: string, formData: FormData) {
+  await post(`/projects/${projectId}/review-staffing`, formToObject(formData));
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/team`);
   revalidatePath(`/projects/${projectId}/team`);
 }
 
@@ -357,7 +319,7 @@ export async function setProjectStaffing(projectId: string, formData: FormData) 
 export async function acceptInvitation(invitationId: string) {
   const res = await acceptInvitationSignedIn(invitationId);
   if (!res.ok) throw new Error(res.error ?? "This invitation is no longer valid.");
-  revalidatePath("/my-projects");
+  revalidatePath("/projects");
   if (res.redirectTo) {
     revalidatePath(res.redirectTo);
     redirect(res.redirectTo);

@@ -33,13 +33,13 @@ export class MilestonesController {
     @Query("scope") scope?: string,
     @Query("status") status?: string,
   ) {
-    const vendorUserId = scope === "vendor" || user.role === "vendor" ? user.id : undefined;
+    const vendorUserId = user.role === "admin" ? undefined : user.id;
     return this.milestones.listMilestonesWithProject({ status, vendorUserId });
   }
 
   @Get("count")
   async count(@CurrentUser() user: SessionUser, @Query("scope") scope?: string) {
-    const vendorUserId = scope === "vendor" || user.role === "vendor" ? user.id : undefined;
+    const vendorUserId = user.role === "admin" ? undefined : user.id;
     return { count: await this.milestones.countMilestones(vendorUserId) };
   }
 

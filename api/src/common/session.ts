@@ -8,14 +8,8 @@ import type { SessionUser, UserRole } from "./types";
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
-export const ROLE_HOME: Record<UserRole, string> = {
-  vendor: "/dashboard",
-  buyer: "/my-projects",
-  admin: "/admin",
-};
-
-export function homePathForRole(role: UserRole): string {
-  return ROLE_HOME[role] ?? "/login";
+export function homePathForRole(role: UserRole | string): string {
+  return role === "admin" ? "/admin" : "/dashboard";
 }
 
 function secretKey(): Uint8Array {
@@ -42,7 +36,7 @@ export async function verifySessionToken(token: string | undefined | null): Prom
       id: payload.sub,
       email: String(payload.email ?? ""),
       name: (payload.name as string | null) ?? null,
-      role: payload.role as UserRole,
+      role: payload.role === "admin" ? "admin" : "member",
     };
   } catch {
     return null;

@@ -16,7 +16,7 @@ export class ActivityController {
     @Query("scope") scope?: string,
   ) {
     const n = Math.min(Math.max(Number.parseInt(limit ?? "8", 10) || 8, 1), 50);
-    const vendorUserId = scope === "vendor" || user.role === "vendor" ? user.id : undefined;
+    const vendorUserId = user.role === "admin" ? undefined : user.id;
     return this.activity.recent(n, vendorUserId);
   }
 }

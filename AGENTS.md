@@ -5,7 +5,11 @@ This is the `eos-pmd` milestones-feature prototype. Two things that differ from 
 - **Auth is required.** Every page outside `/login` and `/invite/[code]` runs behind a JWT session
   cookie (`src/lib/auth.ts`, `middleware.ts`). Server components call `requireUser(role?)`; server
   actions guard with `src/lib/permissions.ts`. No passwords — sign-in is an emailed one-time code shown
-  on screen and in the server console.
+  on screen and in the server console. **`User.role` is just `"admin" | "member"`** — one unified
+  workspace under the `src/app/(app)` route group (the old `(vendor)`/`(client)` split is gone;
+  `/my-projects` and `/company` redirect). Everyone lands on `/dashboard`; the project detail
+  page (`/projects/[id]`), its team page, and the dashboard are one page each, shaped by
+  `project.myAccess`.
 - **`Release` / `FeedbackRequest` are gone.** Projects own a `Milestone` collection (one for a Whole
   project, many for a Milestone project). A milestone goes `draft → sent → reviewed`; **any** client
   contact (not just the Primary) submits the review, and the reviewer is stamped on
@@ -20,14 +24,25 @@ This is the `eos-pmd` milestones-feature prototype. Two things that differ from 
   `/files/milestones/[milestoneId]/[attachmentId]` which proxies the API with the session token. See
   `private_docs/plan1.md` for the phased design and the `spec §N` comments in `src/lib`.
 
-- **Team Management + Client Company directory.** A vendor keeps a reusable people directory
-  (`VendorMember`, linked to a `User` on first sign-in with that email) grouped into `Team`s, both
-  managed at `/team`. Projects reference `assignedTeamIds` / `assignedMemberIds`; the effective
-  `project.vendorTeam` is recomputed live from them on every read in `projects.service` (grandfathered
-  embedded `vendorTeam` rows are merged in, stored rows win). Client companies are a global directory
-  (`ClientCompany`, `/client-companies`); creating a project picks one (or adds it inline) and its
-  contact becomes the primary client contact. Migration: `npm run migrate:005` backfills companies
-  from existing projects.
+- **Companies (company-unification, PR1 + PR2 of 3 done).** One `Company` per company —
+  delivering or receiving *per project*, no `type`. `CompanyMember` `{companyId, userId|null, email, name,
+  role: owner|admin|member}` (multiple owners; links to a `User` on first sign-in) replaces
+  `VendorMember`; managed at `/team` (renders `CompanyManager`). `Team` is keyed by `companyId`.
+  `Project` has `deliveringCompanyId` + `receivingCompanyId` and two live-reference staffing pairs —
+  `assignedTeamIds`/`assignedMemberIds` (delivery) and `receivingTeamIds`/`receivingMemberIds`
+  (review), both set on `/projects/[id]/team` (shows the section(s) the viewer can manage).
+  **Permissions** derive from the API-attached `project.myAccess` `{deliveryRole, reviewRole,
+  assignedDelivery, assignedReview}` (see `src/lib/permissions.ts` / `api/src/common/permissions.ts`):
+  an company owner/admin reaches every project on their side; a plain member reaches only projects they're
+  assigned to. `canManageProject` = delivery owner/admin; milestone CRUD = any delivery member;
+  `canRateMilestone` = any review member; confirm-completion / capstone-submit = review owner/admin.
+  Per-project roles (primary/collaborator, vendor owner/member) and the ad-hoc "invite to project"
+  endpoints are gone — you add people to an company and assign teams.
+  Migrations, in order: `migrate:007` (build companies) → `008` (backfill staffing so existing people keep
+  access) → `009` (narrow `User.role` to `admin|member`, drop `isPlatformVendor`). `migrate:005` is
+  superseded; `ClientCompany`/`VendorMember` schemas stay registered for migrations only. All three
+  company-unification PRs live on branch `feat/company-unification` (uncommitted — the user commits
+  on request).
 
 Run `npm test` for the pure-logic unit tests; `npm run db:seed` for a demo database.
 

@@ -1,92 +1,76 @@
 import { describe, it, expect } from "vitest";
 import {
-  vendorRole,
-  clientRole,
-  isVendorOwner,
-  isVendorMember,
-  isPrimaryContact,
-  isCollaborator,
-  canEditMilestone,
+  canAccessDelivery,
+  canAccessReview,
   canManageProject,
+  canManageReview,
   canRateMilestone,
-  canRequestCompletion,
-  canInviteCollaborator,
-  canRequestCapstone,
-  canSubmitCapstone,
+  canViewProject,
+  deliveryLead,
+  reviewLead,
 } from "./permissions";
-import type { SessionUser } from "./session";
+import type { ProjectAccess } from "./types";
 
-const owner: SessionUser = { id: "u_owner", email: "owner@v.example", name: null, role: "vendor" };
-const member: SessionUser = { id: "u_member", email: "member@v.example", name: null, role: "vendor" };
-const primary: SessionUser = { id: "u_primary", email: "primary@c.example", name: null, role: "buyer" };
-const collab: SessionUser = { id: "u_collab", email: "collab@c.example", name: null, role: "buyer" };
-const stranger: SessionUser = { id: "u_stranger", email: "no@one.example", name: null, role: "buyer" };
+const mk = (a: Partial<ProjectAccess>): { myAccess: ProjectAccess } => ({
+  myAccess: {
+    deliveryRole: null,
+    reviewRole: null,
+    assignedDelivery: false,
+    assignedReview: false,
+    ...a,
+  },
+});
 
-const project = {
-  vendorTeam: [
-    { userId: "u_owner", role: "owner" as const, invitePending: false },
-    { userId: "u_member", role: "member" as const, invitePending: false },
-    { userId: "u_pending_owner", role: "owner" as const, invitePending: true },
-  ],
-  clientContacts: [
-    { userId: "u_primary", role: "primary" as const, invitePending: false },
-    { userId: "u_collab", role: "collaborator" as const, invitePending: false },
-  ],
-};
+const deliveryOwner = mk({ deliveryRole: "owner" });
+const deliveryAdmin = mk({ deliveryRole: "admin" });
+const deliveryMemberAssigned = mk({ deliveryRole: "member", assignedDelivery: true });
+const deliveryMemberUnassigned = mk({ deliveryRole: "member" });
+const reviewOwner = mk({ reviewRole: "owner" });
+const reviewMemberAssigned = mk({ reviewRole: "member", assignedReview: true });
+const reviewMemberUnassigned = mk({ reviewRole: "member" });
+const outsider = mk({});
 
-describe("role resolution", () => {
-  it("maps an accepted member to their role", () => {
-    expect(vendorRole(owner, project)).toBe("owner");
-    expect(vendorRole(member, project)).toBe("member");
-    expect(clientRole(primary, project)).toBe("primary");
-    expect(clientRole(collab, project)).toBe("collaborator");
+describe("delivery side", () => {
+  it("owner/admin manage the project; members do not", () => {
+    expect(canManageProject(deliveryOwner)).toBe(true);
+    expect(canManageProject(deliveryAdmin)).toBe(true);
+    expect(canManageProject(deliveryMemberAssigned)).toBe(false);
+    expect(canManageProject(reviewOwner)).toBe(false);
   });
 
-  it("returns null for a null user, a stranger, or a still-pending invite", () => {
-    expect(vendorRole(null, project)).toBeNull();
-    expect(vendorRole(stranger, project)).toBeNull();
-    expect(clientRole(stranger, project)).toBeNull();
-    expect(
-      vendorRole({ ...stranger, id: "u_pending_owner" }, project),
-    ).toBeNull(); // invitePending entries do not count
+  it("assigned members (and leads) can act on milestones; unassigned members cannot", () => {
+    expect(canAccessDelivery(deliveryOwner)).toBe(true);
+    expect(canAccessDelivery(deliveryMemberAssigned)).toBe(true);
+    expect(canAccessDelivery(deliveryMemberUnassigned)).toBe(false);
+    expect(deliveryLead(deliveryMemberAssigned)).toBe(false);
   });
 });
 
-describe("action guards", () => {
-  it("milestone edits: any vendor team member, no client", () => {
-    expect(canEditMilestone(owner, project)).toBe(true);
-    expect(canEditMilestone(member, project)).toBe(true);
-    expect(canEditMilestone(primary, project)).toBe(false);
-    expect(canEditMilestone(null, project)).toBe(false);
+describe("review side", () => {
+  it("any assigned receiving-company member (or lead) can rate", () => {
+    expect(canRateMilestone(reviewOwner)).toBe(true);
+    expect(canRateMilestone(reviewMemberAssigned)).toBe(true);
+    expect(canRateMilestone(reviewMemberUnassigned)).toBe(false);
+    expect(canRateMilestone(deliveryOwner)).toBe(false);
   });
 
-  it("project management + completion + capstone request: vendor owner only", () => {
-    for (const guard of [canManageProject, canRequestCompletion, canRequestCapstone]) {
-      expect(guard(owner, project)).toBe(true);
-      expect(guard(member, project)).toBe(false);
-      expect(guard(primary, project)).toBe(false);
-    }
+  it("only receiving-company owner/admin confirm completion / manage review staffing", () => {
+    expect(canManageReview(reviewOwner)).toBe(true);
+    expect(canManageReview(reviewMemberAssigned)).toBe(false);
+    expect(reviewLead(reviewOwner)).toBe(true);
+  });
+});
+
+describe("visibility", () => {
+  it("either side grants view; an outsider gets nothing", () => {
+    expect(canViewProject(deliveryMemberAssigned)).toBe(true);
+    expect(canViewProject(reviewMemberAssigned)).toBe(true);
+    expect(canViewProject(outsider)).toBe(false);
+    expect(canAccessReview(outsider)).toBe(false);
   });
 
-  it("capstone submission + inviting collaborators: primary contact only", () => {
-    for (const guard of [canSubmitCapstone, canInviteCollaborator]) {
-      expect(guard(primary, project)).toBe(true);
-      expect(guard(collab, project)).toBe(false);
-      expect(guard(owner, project)).toBe(false);
-    }
-  });
-
-  it("milestone rating: any client contact, no vendor", () => {
-    expect(canRateMilestone(primary, project)).toBe(true);
-    expect(canRateMilestone(collab, project)).toBe(true);
-    expect(canRateMilestone(owner, project)).toBe(false);
-    expect(canRateMilestone(null, project)).toBe(false);
-  });
-
-  it("exposes the plain predicates too", () => {
-    expect(isVendorOwner(owner, project)).toBe(true);
-    expect(isVendorMember(member, project)).toBe(true);
-    expect(isPrimaryContact(primary, project)).toBe(true);
-    expect(isCollaborator(collab, project)).toBe(true);
+  it("a project with no myAccess denies everything", () => {
+    expect(canViewProject({})).toBe(false);
+    expect(canManageProject({})).toBe(false);
   });
 });

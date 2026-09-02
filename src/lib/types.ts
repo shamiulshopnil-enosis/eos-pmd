@@ -28,42 +28,53 @@ export type ActivityType =
   | "PUBLICATION_REQUESTED"
   | "PROJECT_PUBLISHED";
 
-export type VendorMemberRole = "owner" | "member";
+export type CompanyRole = "owner" | "admin" | "member";
 
-/** An entry in a vendor's reusable people directory (Team Management feature). */
-export interface VendorMember {
-  id: string;
-  ownerUserId: string;
-  email: string;
-  name: string | null;
-  role: VendorMemberRole;
-  userId: string | null;
-  invitePending: boolean; // derived: userId == null (person has not signed in yet)
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/** A named grouping of directory members, owned by one vendor. */
-export interface Team {
-  id: string;
-  ownerUserId: string;
-  name: string;
-  memberIds: string[];
-  members: VendorMember[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/** Global, shared client-company directory searched when creating a project. */
-export interface ClientCompany {
+/** One company (company-unification PR1). Delivering or receiving per project. */
+export interface Company {
   id: string;
   name: string;
-  contactName: string | null;
-  contactEmail: string;
-  designation: string;
+  claimed: boolean;
   createdByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A person in an company. Replaces VendorMember + project clientContacts people. */
+export interface CompanyMember {
+  id: string;
+  companyId: string;
+  email: string;
+  name: string | null;
+  role: CompanyRole;
+  userId: string | null;
+  invitePending: boolean; // derived: userId == null
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Company search result — a public-ish view with the company's primary contact. */
+export interface CompanySummary extends Company {
+  primaryContact: { name: string | null; email: string } | null;
+}
+
+/** A named grouping of company members. */
+export interface Team {
+  id: string;
+  companyId: string;
+  name: string;
+  memberIds: string[];
+  members: CompanyMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The current viewer's derived access to a project (company-unification PR2). */
+export interface ProjectAccess {
+  deliveryRole: CompanyRole | null;
+  reviewRole: CompanyRole | null;
+  assignedDelivery: boolean;
+  assignedReview: boolean;
 }
 
 export interface Project {
@@ -71,6 +82,8 @@ export interface Project {
   name: string;
   clientCompanyName: string;
   clientCompanyId: string | null;
+  deliveringCompanyId: string | null;
+  receivingCompanyId: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -96,10 +109,13 @@ export interface Project {
   reviewedMilestoneCount: number;
   finalScore: number | null;
 
-  vendorTeam: VendorTeamMember[];
-  clientContacts: ClientContact[];
+  vendorTeam: VendorTeamMember[]; // effective delivery people (resolved)
+  clientContacts: ClientContact[]; // effective review people (resolved)
   assignedTeamIds: string[];
   assignedMemberIds: string[];
+  receivingTeamIds: string[];
+  receivingMemberIds: string[];
+  myAccess?: ProjectAccess;
   capstone: CapstoneEndorsement | null;
 
   publicSummary: string | null;

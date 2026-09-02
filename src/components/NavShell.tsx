@@ -1,21 +1,24 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { recentActivities } from "@/lib/data";
-import { ACTIVITY_LABELS, VENDOR_NAME } from "@/lib/constants";
+import { getMyCompany, recentActivities } from "@/lib/data";
+import { ACTIVITY_LABELS } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
 import type { SessionUser } from "@/lib/session";
 import { signOut } from "@/app/login/actions";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Performance Dashboard", icon: "📊" },
+  { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/projects", label: "Projects", icon: "📁" },
   { href: "/milestones", label: "Milestones", icon: "🚀" },
-  { href: "/team", label: "Team Management", icon: "👥" },
-  { href: "/client-companies", label: "Client Companies", icon: "🏢" },
+  { href: "/team", label: "My Company", icon: "👥" },
+  { href: "/companies", label: "Companies", icon: "🏢" },
 ];
 
 export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {
-  const recentActivity = await recentActivities(8, user.id);
+  const [recentActivity, company] = await Promise.all([
+    recentActivities(8),
+    getMyCompany().catch(() => null),
+  ]);
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -66,7 +69,7 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
             EOS Performance Monitoring
           </Link>
           <div className="hidden text-sm text-slate-500 dark:text-slate-400 md:block">
-            {VENDOR_NAME} <span className="mx-1 text-slate-300">·</span> Vendor workspace
+            {company?.name ?? "EOS"} <span className="mx-1 text-slate-300">·</span> Workspace
           </div>
 
           <details className="group relative">

@@ -28,5 +28,5 @@ export async function acceptWithCode(invitationId: string, formData: FormData): 
   const res = await acceptInviteWithCode(invitationId, code);
   if (!res.ok) return { step: "code", error: res.error ?? "That code is invalid or has expired." };
 
-  redirect(res.redirectTo ?? "/my-projects");
+  redirect(res.redirectTo ?? "/dashboard");
 }

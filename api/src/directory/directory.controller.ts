@@ -1,22 +1,32 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { VendorMembersService } from "./vendor-members.service";
+import { CompaniesService } from "./companies.service";
+import { CompanyMembersService } from "./company-members.service";
 import { TeamsService } from "./teams.service";
-import { ClientCompaniesService } from "./client-companies.service";
 import { CurrentUser } from "../common/auth.decorators";
 import type { SessionUser } from "../common/types";
 
-@Controller("vendor-members")
-export class VendorMembersController {
-  constructor(private readonly members: VendorMembersService) {}
+@Controller("companies")
+export class CompaniesController {
+  constructor(
+    private readonly companies: CompaniesService,
+    private readonly members: CompanyMembersService,
+  ) {}
 
   @Get()
-  list(@CurrentUser() user: SessionUser) {
-    return this.members.list(user);
+  list(@CurrentUser() user: SessionUser, @Query("q") q?: string, @Query("scope") scope?: string) {
+    if (scope === "search" || q) return this.companies.search(q);
+    return this.companies.listMine(user);
   }
 
-  @Post()
-  create(@CurrentUser() user: SessionUser, @Body() body: Record<string, unknown>) {
-    return this.members.create(user, body);
+  @Get("me")
+  async me(@CurrentUser() user: SessionUser, @Query("companyId") companyId?: string) {
+    const id = await this.companies.resolveActingCompany(user, companyId);
+    return this.companies.getOrThrow(id);
+  }
+
+  @Get(":id")
+  get(@CurrentUser() _user: SessionUser, @Param("id") id: string) {
+    return this.companies.getOrThrow(id);
   }
 
   @Patch(":id")
@@ -25,12 +35,42 @@ export class VendorMembersController {
     @Param("id") id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.members.update(user, id, body);
+    return this.companies.update(user, id, body);
   }
 
-  @Delete(":id")
-  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    await this.members.remove(user, id);
+  // --- members ---
+
+  @Get(":id/members")
+  listMembers(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    return this.members.list(user, id);
+  }
+
+  @Post(":id/members")
+  addMember(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.members.add(user, id, body);
+  }
+
+  @Patch(":id/members/:membershipId")
+  updateMember(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Param("membershipId") membershipId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.members.update(user, id, membershipId, body);
+  }
+
+  @Delete(":id/members/:membershipId")
+  async removeMember(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Param("membershipId") membershipId: string,
+  ) {
+    await this.members.remove(user, id, membershipId);
     return { ok: true };
   }
 }
@@ -40,8 +80,8 @@ export class TeamsController {
   constructor(private readonly teams: TeamsService) {}
 
   @Get()
-  list(@CurrentUser() user: SessionUser) {
-    return this.teams.list(user);
+  list(@CurrentUser() user: SessionUser, @Query("companyId") companyId?: string) {
+    return this.teams.list(user, companyId);
   }
 
   @Post()
@@ -61,41 +101,6 @@ export class TeamsController {
   @Delete(":id")
   async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     await this.teams.remove(user, id);
-    return { ok: true };
-  }
-}
-
-@Controller("client-companies")
-export class ClientCompaniesController {
-  constructor(private readonly companies: ClientCompaniesService) {}
-
-  @Get()
-  list(@CurrentUser() user: SessionUser, @Query("q") q?: string) {
-    return this.companies.list(user, q);
-  }
-
-  @Get(":id")
-  get(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    return this.companies.get(user, id);
-  }
-
-  @Post()
-  create(@CurrentUser() user: SessionUser, @Body() body: Record<string, unknown>) {
-    return this.companies.create(user, body);
-  }
-
-  @Patch(":id")
-  update(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.companies.update(user, id, body);
-  }
-
-  @Delete(":id")
-  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
-    await this.companies.remove(user, id);
     return { ok: true };
   }
 }

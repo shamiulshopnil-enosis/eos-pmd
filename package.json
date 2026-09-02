@@ -18,7 +18,11 @@
     "migrate:003": "tsx --env-file=.env scripts/migrations/003_project_people.ts",
     "migrate:004": "tsx --env-file=.env scripts/migrations/004_backfill_scores.ts",
     "migrate:005": "tsx --env-file=.env scripts/migrations/005_client_company_directory.ts",
-    "migrate:006": "tsx --env-file=.env scripts/migrations/006_milestone_review_dimensions.ts"
+    "migrate:006": "tsx --env-file=.env scripts/migrations/006_milestone_review_dimensions.ts",
+    "migrate:007": "tsx --env-file=.env scripts/migrations/007_companies.ts",
+    "migrate:008": "tsx --env-file=.env scripts/migrations/008_backfill_project_staffing.ts",
+    "migrate:009": "tsx --env-file=.env scripts/migrations/009_unify_roles.ts",
+    "migrate:010": "tsx --env-file=.env scripts/migrations/010_rename_company_collections.ts"
   },
   "dependencies": {
     "jose": "^6.2.10",

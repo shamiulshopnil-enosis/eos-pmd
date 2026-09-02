@@ -28,39 +28,48 @@ export type ActivityType =
   | "PUBLICATION_REQUESTED"
   | "PROJECT_PUBLISHED";
 
-export type VendorMemberRole = "owner" | "member";
+export type CompanyRole = "owner" | "admin" | "member";
 
-export interface VendorMember {
+export interface Company {
   id: string;
-  ownerUserId: string;
+  name: string;
+  claimed: boolean;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CompanyMember {
+  id: string;
+  companyId: string;
   email: string;
   name: string | null;
-  role: VendorMemberRole;
+  role: CompanyRole;
   userId: string | null;
-  invitePending: boolean;
+  invitePending: boolean; // derived: userId == null
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface Team {
   id: string;
-  ownerUserId: string;
+  companyId: string;
   name: string;
   memberIds: string[];
-  members: VendorMember[];
+  members: CompanyMember[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface ClientCompany {
-  id: string;
-  name: string;
-  contactName: string | null;
-  contactEmail: string;
-  designation: string;
-  createdByUserId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+/**
+ * The requesting user's derived access to a project (company-unification PR2).
+ * Attached to a serialized Project when a user context is available.
+ */
+export interface ProjectAccess {
+  deliveryRole: CompanyRole | null; // user's role in deliveringCompanyId
+  reviewRole: CompanyRole | null; // user's role in receivingCompanyId
+  assignedDelivery: boolean; // on an assigned delivery team / individually assigned
+  assignedReview: boolean; // on an assigned review team / individually assigned
 }
 
 export interface Project {
@@ -68,6 +77,8 @@ export interface Project {
   name: string;
   clientCompanyName: string;
   clientCompanyId: string | null;
+  deliveringCompanyId: string | null;
+  receivingCompanyId: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -93,10 +104,13 @@ export interface Project {
   reviewedMilestoneCount: number;
   finalScore: number | null;
 
-  vendorTeam: VendorTeamMember[];
-  clientContacts: ClientContact[];
+  vendorTeam: VendorTeamMember[]; // effective delivery people (resolved)
+  clientContacts: ClientContact[]; // effective review people (resolved)
   assignedTeamIds: string[];
   assignedMemberIds: string[];
+  receivingTeamIds: string[];
+  receivingMemberIds: string[];
+  myAccess?: ProjectAccess;
   capstone: CapstoneEndorsement | null;
 
   publicSummary: string | null;
@@ -237,7 +251,7 @@ export type MilestoneWithFullProject = Milestone & {
 
 // --- Identity ---
 
-export type UserRole = "buyer" | "vendor" | "admin";
+export type UserRole = "admin" | "member";
 
 export interface SessionUser {
   id: string;
