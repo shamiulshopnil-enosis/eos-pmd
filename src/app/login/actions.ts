@@ -3,11 +3,9 @@
 import { redirect } from "next/navigation";
 import {
   clearSession,
-  createLoginCode,
-  findOrCreateUser,
   homePathForRole,
-  issueSession,
-  verifyLoginCode,
+  requestLoginCode,
+  signInWithLoginCode,
 } from "@/lib/auth";
 
 export interface LoginState {
@@ -31,10 +29,11 @@ export async function requestCode(_prev: LoginState, formData: FormData): Promis
     return { step: "email", error: "Enter a valid email address." };
   }
 
-  const code = await createLoginCode(email);
-  console.log(`[auth] login code for ${email}: ${code}`);
+  const res = await requestLoginCode(email);
+  if (!res.ok) return { step: "email", error: res.error ?? "Could not send a code." };
+  console.log(`[auth] login code for ${email}: ${res.devCode}`);
 
-  return { step: "code", email, devCode: code };
+  return { step: "code", email, devCode: res.devCode };
 }
 
 export async function verifyCode(_prev: LoginState, formData: FormData): Promise<LoginState> {
@@ -45,13 +44,10 @@ export async function verifyCode(_prev: LoginState, formData: FormData): Promise
   if (!EMAIL_RE.test(email)) return { step: "email", error: "Enter a valid email address." };
   if (!/^\d{6}$/.test(code)) return { step: "code", email, error: "Enter the 6-digit code." };
 
-  const ok = await verifyLoginCode(email, code);
-  if (!ok) return { step: "code", email, error: "That code is invalid or has expired." };
+  const res = await signInWithLoginCode(email, code, next);
+  if (!res.ok) return { step: "code", email, error: res.error ?? "That code is invalid or has expired." };
 
-  const user = await findOrCreateUser(email);
-  await issueSession(user);
-
-  redirect(next ?? homePathForRole(user.role));
+  redirect(res.redirectTo ?? homePathForRole("buyer"));
 }
 
 export async function signOut(): Promise<void> {

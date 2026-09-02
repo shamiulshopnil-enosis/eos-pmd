@@ -10,22 +10,48 @@ optional publish to a public project page.
 
 ## Stack
 
-Next.js 16 (App Router) + TypeScript + Mongoose 8 / MongoDB + Tailwind CSS 4. Server Components for reads,
-Server Actions for every mutation — no separate REST/API layer. Sessions are a signed JWT (`jose`) in an
-httpOnly cookie, enforced by [`middleware.ts`](./middleware.ts) and `getCurrentUser()` / `requireUser()` in
-[`src/lib/auth.ts`](./src/lib/auth.ts).
+Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 for the web app, and a **NestJS API**
+([`./api`](./api)) that owns MongoDB (Mongoose 8) and all auth. Server Components and Server Actions
+no longer touch the database — they call the API over HTTP through
+[`src/lib/api-client.ts`](./src/lib/api-client.ts), forwarding the session JWT as a Bearer token.
+Sessions are a signed JWT (`jose`) in an httpOnly cookie, enforced by [`middleware.ts`](./middleware.ts)
+and `getCurrentUser()` / `requireUser()` in [`src/lib/auth.ts`](./src/lib/auth.ts); the API verifies the
+same token with a shared `AUTH_SECRET`.
 
 ## Running it
 
+Start the API first (see [`api/README.md`](./api/README.md)):
+
+```bash
+cd api && npm install && cp .env.example .env   # set MONGODB_URI + AUTH_SECRET
+npm run dev                                     # http://localhost:4000/api
+```
+
+Then the web app, in another terminal:
+
 ```bash
 npm install
-cp .env.example .env   # set MONGODB_URI and AUTH_SECRET
+cp .env.example .env   # set AUTH_SECRET (same value as the API) + API_BASE_URL
 npm run db:seed        # resets the database to the demo dataset below
 npm run dev            # http://localhost:3000
 ```
 
 `npm run build` runs a production build. `npm test` runs the unit tests (pure logic only —
 `scoring`, `permissions`, and the milestone/flag guards).
+
+## Deploy (Render)
+
+[`render.yaml`](./render.yaml) is a Blueprint that stands up both services and links them:
+
+1. Render dashboard → **New → Blueprint** → pick this repo. It creates `eos-pmd-api` and `eos-pmd-web`,
+   generates one shared `AUTH_SECRET`, and injects the API's host into the web service (`API_HOST`,
+   which [`api-client.ts`](./src/lib/api-client.ts) turns into `https://<host>/api`).
+2. Set `MONGODB_URI` on the **`eos-pmd-api`** service (the web service does not need it).
+3. On the Atlas cluster's Network Access, allowlist `0.0.0.0/0` — Render only gives static outbound IPs
+   on paid instance types.
+
+The `free` instance type sleeps after 15 min idle, so the first request pays a cold start plus the Atlas
+handshake; use `starter` for the API if that matters. Node is pinned to 24 via `.node-version`.
 
 ## Authentication
 

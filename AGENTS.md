@@ -13,6 +13,14 @@ This is the `eos-pmd` milestones-feature prototype. Two things that differ from 
 
 Run `npm test` for the pure-logic unit tests; `npm run db:seed` for a demo database.
 
+- **Data + auth now live in a NestJS backend (`./api`).** The app no longer touches
+  MongoDB directly. `src/lib/data.ts` and `src/lib/actions.ts` are thin HTTP clients
+  (`src/lib/api-client.ts`) against the API under `http://localhost:4000/api`;
+  `src/lib/auth.ts` keeps only the `eos_session` cookie and local JWT verification.
+  Start the API (`cd api && npm run dev`) before `npm run dev`. `AUTH_SECRET` must match
+  on both sides; the app forwards the session JWT as a Bearer token. See `api/README.md`.
+  `src/lib/models.ts` / `src/lib/mongoose.ts` remain only for the offline `scripts/`.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

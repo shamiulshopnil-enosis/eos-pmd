@@ -1,0 +1,56 @@
+# Render Blueprint — deploys the NestJS API and the Next.js web app as two
+# linked services. Spec: https://render.com/docs/blueprint-spec
+#
+# First deploy:
+#   1. Render dashboard -> New -> Blueprint -> pick this repo.
+#   2. Render creates both services, generates one shared AUTH_SECRET, and points
+#      the web app at the API automatically (via API_HOST).
+#   3. Set MONGODB_URI on the `eos-pmd-api` service (your Atlas connection string).
+#   4. On the Atlas cluster, allowlist Render's outbound IPs — or use 0.0.0.0/0
+#      (Render only provides static outbound IPs on paid instance types).
+#
+# The `free` instance type sleeps after 15 min idle; the first request then pays
+# a cold start plus the Atlas handshake. Bump `plan` to `starter` for the API if
+# that matters.
+
+services:
+  # ---------------------------------------------------------------- API (NestJS)
+  - type: web
+    name: eos-pmd-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: api
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: AUTH_SECRET
+        generateValue: true # random 256-bit value; the web service reuses this exact value
+      - key: MONGODB_URI
+        sync: false # set in the Render dashboard (Atlas URI, same DB the app already uses)
+
+  # ------------------------------------------------------------- Web (Next.js)
+  - type: web
+    name: eos-pmd-web
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: AUTH_SECRET
+        fromService:
+          type: web
+          name: eos-pmd-api
+          envVarKey: AUTH_SECRET # identical secret so session JWTs verify on both sides
+      - key: API_HOST
+        fromService:
+          type: web
+          name: eos-pmd-api
+          property: host # e.g. eos-pmd-api.onrender.com -> api-client builds https://<host>/api
