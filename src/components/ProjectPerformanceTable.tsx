@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { ClientHealth } from "@/lib/constants";
@@ -25,8 +26,20 @@ export type PerfRow = {
 
 /** The full project-performance record on the dashboard — PrimeReact <DataTable>. */
 export function ProjectPerformanceTable({ rows }: { rows: PerfRow[] }) {
+  const router = useRouter();
   return (
-    <DataTable value={rows} dataKey="id" className="eos-table" tableStyle={{ minWidth: "960px" }} scrollable removableSort>
+    <DataTable
+      value={rows}
+      dataKey="id"
+      className="eos-table eos-rows-clickable"
+      tableStyle={{ minWidth: "960px" }}
+      scrollable
+      removableSort
+      onRowClick={(e) => {
+        if (window.getSelection()?.toString()) return;
+        router.push(`/projects/${(e.data as PerfRow).id}`);
+      }}
+    >
       <Column
         field="name"
         header="Project"

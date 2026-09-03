@@ -3,6 +3,9 @@ import { countMilestones, listMilestonesWithProject } from "@/lib/data";
 import { EmptyState, PageHeader } from "@/components/ui";
 import MilestonesTable from "@/components/MilestonesTable";
 
+// The list reads ?status=…/?flag=… via useSearchParams and always reflects live data.
+export const dynamic = "force-dynamic";
+
 export default async function MilestonesPage() {
   await requireUser();
 

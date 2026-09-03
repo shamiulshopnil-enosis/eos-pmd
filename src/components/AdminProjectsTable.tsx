@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
@@ -25,8 +26,19 @@ export type TimeoutRow = {
 
 /** Admin project list — PrimeReact <DataTable>. */
 export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
+  const router = useRouter();
   return (
-    <DataTable value={rows} dataKey="id" className="eos-table" tableStyle={{ minWidth: "760px" }} scrollable>
+    <DataTable
+      value={rows}
+      dataKey="id"
+      className="eos-table eos-rows-clickable"
+      tableStyle={{ minWidth: "760px" }}
+      scrollable
+      onRowClick={(e) => {
+        if (window.getSelection()?.toString()) return;
+        router.push(`/admin/projects/${(e.data as AdminProjectRow).id}`);
+      }}
+    >
       <Column
         header="Project"
         body={(p: AdminProjectRow) => (

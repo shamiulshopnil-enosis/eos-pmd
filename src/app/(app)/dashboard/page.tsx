@@ -207,7 +207,11 @@ export default async function DashboardPage() {
       <section>
         <SectionHeading>Summary</SectionHeading>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <FigureBlock label="Active projects" value={`${kpis.activeProjects} / ${projects.length}`} />
+          <FigureBlock
+            label="Active projects"
+            value={kpis.activeProjects}
+            hint={`of ${projects.length} total`}
+          />
           <FigureBlock label="Active milestones" value={kpis.activeMilestones} />
           <FigureBlock label="Milestones reviewed" value={kpis.milestonesReviewed} />
           <FigureBlock

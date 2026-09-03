@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { DataTable } from "primereact/datatable";
+import { useRouter, useSearchParams } from "next/navigation";
+import { DataTable, type DataTableSortEvent } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { ProjectWithMilestones } from "@/lib/types";
 import { computeProjectPerformance } from "@/lib/derived";
@@ -24,40 +25,53 @@ import {
   ProjectTypeBadge,
   RagDisc,
 } from "@/components/ui";
-import { FilterBar, FilterDateRange, FilterSelect, FilterText } from "@/components/filters";
+import {
+  FilterDateRange,
+  FilterToolbar,
+  ResultBar,
+  facetCounts,
+  emptySelection,
+  toggleValue,
+  selectionCount,
+  type ExtraChip,
+  type FilterFacet,
+  type Selected,
+  type SortState,
+} from "@/components/filters";
 
-const RATING_BANDS: [string, string][] = [
-  ["any", "Any rating"],
-  ["high", "≥ 4.0"],
-  ["mid", "3.0 – 3.9"],
-  ["low", "< 3.0"],
-  ["none", "Unrated"],
-];
+type SortKey = "name" | "client" | "milestones" | "rating" | "healthRank";
 
 const HEALTH_ORDER: Record<string, number> = { HAPPY: 0, NEEDS_ATTENTION: 1, AT_RISK: 2, NO_DATA: 3 };
 
-const EMPTY = {
-  q: "",
-  status: "",
-  approval: "",
-  execution: "",
-  visibility: "",
-  type: "",
-  health: "",
-  rating: "any",
-  startFrom: "",
-  startTo: "",
-  dueFrom: "",
-  dueTo: "",
-};
+const FACETS: FilterFacet[] = [
+  { key: "status", label: "Status", options: Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "type", label: "Type", options: Object.entries(PROJECT_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "health", label: "Client health", options: Object.entries(CLIENT_HEALTH_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "approval", label: "Approval", options: Object.entries(ADMIN_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "execution", label: "Execution", options: Object.entries(EXECUTION_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "visibility", label: "Visibility", options: [{ value: "PRIVATE", label: "Private" }, { value: "PUBLIC", label: "Public" }] },
+  {
+    key: "rating",
+    label: "Avg. rating",
+    options: [
+      { value: "high", label: "4.0 and up" },
+      { value: "mid", label: "3.0 – 3.9" },
+      { value: "low", label: "Below 3.0" },
+      { value: "none", label: "Unrated" },
+    ],
+  },
+];
 
-function inRange(d: Date | null, from: string, to: string): boolean {
-  if (!from && !to) return true;
-  if (!d) return false;
-  if (from && d < new Date(from)) return false;
-  if (to && d > new Date(`${to}T23:59:59`)) return false;
-  return true;
-}
+const INLINE_KEYS = ["status", "type", "health"];
+
+const SORT_OPTIONS: { label: string; key: SortKey; dir: "asc" | "desc" }[] = [
+  { label: "Name (A–Z)", key: "name", dir: "asc" },
+  { label: "Name (Z–A)", key: "name", dir: "desc" },
+  { label: "Client (A–Z)", key: "client", dir: "asc" },
+  { label: "Milestones (most first)", key: "milestones", dir: "desc" },
+  { label: "Avg. rating (high–low)", key: "rating", dir: "desc" },
+  { label: "Client health (worst first)", key: "healthRank", dir: "desc" },
+];
 
 type Row = {
   id: string;
@@ -68,17 +82,59 @@ type Row = {
   execution: string;
   visibility: string;
   type: string;
+  health: string;
+  ratingBand: string;
   milestones: number;
   rating: number | null;
-  health: string;
   healthRank: number;
-  project: ProjectWithMilestones;
+  startDate: Date | null;
+  dueDate: Date | null;
   perf: ReturnType<typeof computeProjectPerformance>;
 };
 
+function ratingBand(r: number | null): string {
+  if (r == null) return "none";
+  if (r >= 4) return "high";
+  if (r >= 3) return "mid";
+  return "low";
+}
+
+function inRange(d: Date | null, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (!d) return false;
+  if (from && d < new Date(from)) return false;
+  if (to && d > new Date(`${to}T23:59:59`)) return false;
+  return true;
+}
+
+const ACCESS: Record<string, (r: Row) => string> = {
+  status: (r) => r.status,
+  type: (r) => r.type,
+  health: (r) => r.health,
+  approval: (r) => r.approval,
+  execution: (r) => r.execution,
+  visibility: (r) => r.visibility,
+  rating: (r) => r.ratingBand,
+};
+
+type DateModel = { startFrom: string; startTo: string; dueFrom: string; dueTo: string };
+const EMPTY_DATES: DateModel = { startFrom: "", startTo: "", dueFrom: "", dueTo: "" };
+
 export default function ProjectsTable({ projects }: { projects: ProjectWithMilestones[] }) {
-  const [f, setF] = useState({ ...EMPTY });
-  const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Selected>(() => {
+    const base = emptySelection(FACETS);
+    for (const f of FACETS) {
+      const raw = params.get(f.key);
+      if (raw) base[f.key] = raw.split(",").filter((v) => f.options.some((o) => o.value === v));
+    }
+    return base;
+  });
+  const [dates, setDates] = useState<DateModel>({ ...EMPTY_DATES });
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: "name", dir: "asc" });
 
   const rows = useMemo<Row[]>(
     () =>
@@ -93,68 +149,138 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           execution: project.executionStatus,
           visibility: project.visibility,
           type: project.projectType,
+          health: perf.health,
+          ratingBand: ratingBand(perf.avgRating),
           milestones: perf.totalMilestones,
           rating: perf.avgRating,
-          health: perf.health,
           healthRank: HEALTH_ORDER[perf.health] ?? 9,
-          project,
+          startDate: project.startDate,
+          dueDate: project.expectedCompletionDate,
           perf,
         };
       }),
     [projects],
   );
 
-  const filtered = useMemo(() => {
-    const q = f.q.trim().toLowerCase();
-    return rows.filter(({ project, perf }) => {
-      if (q && !`${project.name} ${project.clientCompanyName}`.toLowerCase().includes(q)) return false;
-      if (f.status && project.status !== f.status) return false;
-      if (f.approval && project.adminStatus !== f.approval) return false;
-      if (f.execution && project.executionStatus !== f.execution) return false;
-      if (f.visibility && project.visibility !== f.visibility) return false;
-      if (f.type && project.projectType !== f.type) return false;
-      if (f.health && perf.health !== f.health) return false;
-      if (f.rating !== "any") {
-        const r = perf.avgRating;
-        if (f.rating === "none" && r != null) return false;
-        if (f.rating === "high" && !(r != null && r >= 4)) return false;
-        if (f.rating === "mid" && !(r != null && r >= 3 && r < 4)) return false;
-        if (f.rating === "low" && !(r != null && r < 3)) return false;
-      }
-      if (!inRange(project.startDate, f.startFrom, f.startTo)) return false;
-      if (!inRange(project.expectedCompletionDate, f.dueFrom, f.dueTo)) return false;
-      return true;
+  const passFacets = (r: Row, sel: Selected) =>
+    FACETS.every((f) => {
+      const picked = sel[f.key] ?? [];
+      return picked.length === 0 || picked.includes(ACCESS[f.key](r));
     });
-  }, [rows, f]);
 
-  const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
-  const activeCount = (Object.keys(EMPTY) as (keyof typeof EMPTY)[]).filter((k) => f[k] !== EMPTY[k]).length;
+  const test = (r: Row, sel: Selected) => {
+    const needle = q.trim().toLowerCase();
+    if (needle && !`${r.name} ${r.client}`.toLowerCase().includes(needle)) return false;
+    if (!passFacets(r, sel)) return false;
+    if (!inRange(r.startDate, dates.startFrom, dates.startTo)) return false;
+    if (!inRange(r.dueDate, dates.dueFrom, dates.dueTo)) return false;
+    return true;
+  };
+
+  const counts = useMemo(
+    () => facetCounts(rows, FACETS, selected, test, (r, key) => ACCESS[key](r)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, selected, q, dates],
+  );
+
+  const filtered = useMemo(
+    () => rows.filter((r) => test(r, selected)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, selected, q, dates],
+  );
+
+  const dateActive =
+    (dates.startFrom || dates.startTo ? 1 : 0) + (dates.dueFrom || dates.dueTo ? 1 : 0);
+  const extraChips: ExtraChip[] = [];
+  if (dates.startFrom || dates.startTo)
+    extraChips.push({
+      id: "start",
+      label: `Start: ${dates.startFrom || "…"} – ${dates.startTo || "…"}`,
+      onRemove: () => setDates((d) => ({ ...d, startFrom: "", startTo: "" })),
+    });
+  if (dates.dueFrom || dates.dueTo)
+    extraChips.push({
+      id: "due",
+      label: `Completion: ${dates.dueFrom || "…"} – ${dates.dueTo || "…"}`,
+      onRemove: () => setDates((d) => ({ ...d, dueFrom: "", dueTo: "" })),
+    });
+
+  const clearAll = () => {
+    setQ("");
+    setSelected(emptySelection(FACETS));
+    setDates({ ...EMPTY_DATES });
+  };
+  const anyActive = q.trim() !== "" || selectionCount(selected) > 0 || dateActive > 0;
 
   return (
     <>
-      <FilterBar active={active} count={activeCount} onClear={() => setF({ ...EMPTY })}>
-        <FilterText label="Search" value={f.q} onChange={(v) => set({ q: v })} placeholder="Project or client…" />
-        <FilterSelect label="Status" value={f.status} onChange={(v) => set({ status: v })} options={[["", "Any"], ...Object.entries(PROJECT_STATUS_LABELS)]} />
-        <FilterSelect label="Approval" value={f.approval} onChange={(v) => set({ approval: v })} options={[["", "Any"], ...Object.entries(ADMIN_STATUS_LABELS)]} />
-        <FilterSelect label="Execution" value={f.execution} onChange={(v) => set({ execution: v })} options={[["", "Any"], ...Object.entries(EXECUTION_STATUS_LABELS)]} />
-        <FilterSelect label="Visibility" value={f.visibility} onChange={(v) => set({ visibility: v })} width="w-36" options={[["", "Any"], ["PRIVATE", "Private"], ["PUBLIC", "Public"]]} />
-        <FilterSelect label="Type" value={f.type} onChange={(v) => set({ type: v })} width="w-40" options={[["", "Any"], ...Object.entries(PROJECT_TYPE_LABELS)]} />
-        <FilterSelect label="Client health" value={f.health} onChange={(v) => set({ health: v })} options={[["", "Any"], ...Object.entries(CLIENT_HEALTH_LABELS)]} />
-        <FilterSelect label="Avg rating" value={f.rating} onChange={(v) => set({ rating: v })} width="w-32" options={RATING_BANDS} />
-        <FilterDateRange label="Start date" from={f.startFrom} to={f.startTo} onFrom={(v) => set({ startFrom: v })} onTo={(v) => set({ startTo: v })} />
-        <FilterDateRange label="Expected completion" from={f.dueFrom} to={f.dueTo} onFrom={(v) => set({ dueFrom: v })} onTo={(v) => set({ dueTo: v })} />
-      </FilterBar>
+      <FilterToolbar
+        q={q}
+        onQChange={setQ}
+        searchPlaceholder="Search project or client…"
+        facets={FACETS}
+        inlineKeys={INLINE_KEYS}
+        selected={selected}
+        onToggle={(key, value) => setSelected((s) => toggleValue(s, key, value))}
+        onClearFacet={(key) => setSelected((s) => ({ ...s, [key]: [] }))}
+        onClearAll={clearAll}
+        counts={counts}
+        extraChips={extraChips}
+        extraActiveCount={dateActive}
+        resultCount={filtered.length}
+        totalCount={rows.length}
+        drawerExtra={
+          <>
+            <FilterDateRange
+              label="Start date"
+              from={dates.startFrom}
+              to={dates.startTo}
+              onFrom={(v) => setDates((d) => ({ ...d, startFrom: v }))}
+              onTo={(v) => setDates((d) => ({ ...d, startTo: v }))}
+            />
+            <FilterDateRange
+              label="Expected completion"
+              from={dates.dueFrom}
+              to={dates.dueTo}
+              onFrom={(v) => setDates((d) => ({ ...d, dueFrom: v }))}
+              onTo={(v) => setDates((d) => ({ ...d, dueTo: v }))}
+            />
+          </>
+        }
+      />
+
+      <ResultBar
+        count={filtered.length}
+        total={rows.length}
+        noun="projects"
+        sort={sort}
+        onSort={setSort}
+        sortOptions={SORT_OPTIONS}
+      />
 
       {filtered.length === 0 ? (
-        <EmptyState icon="filter_alt_off" title="No projects match your filters" description="Adjust or clear the filters above." />
+        <EmptyState
+          icon="filter_alt_off"
+          title={anyActive ? "No projects match your filters" : "No projects yet"}
+          description={anyActive ? "Adjust or clear the filters above." : "Create your first project to get started."}
+        />
       ) : (
         <DataTable
           value={filtered}
           dataKey="id"
           removableSort
-          className="eos-table"
+          sortField={sort.key}
+          sortOrder={sort.dir === "asc" ? 1 : -1}
+          onSort={(e: DataTableSortEvent) =>
+            setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
+          }
+          className="eos-table eos-rows-clickable"
           tableStyle={{ minWidth: "1040px" }}
           scrollable
+          onRowClick={(e) => {
+            if (window.getSelection()?.toString()) return;
+            router.push(`/projects/${(e.data as Row).id}`);
+          }}
         >
           <Column
             field="name"
@@ -199,9 +325,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           <Column field="healthRank" header="Client health" sortable body={(r: Row) => <HealthBadge health={r.perf.health} />} />
         </DataTable>
       )}
-      <p className="mt-2 font-mono text-xs text-ink-muted">
-        {filtered.length} of {rows.length} shown
-      </p>
     </>
   );
 }

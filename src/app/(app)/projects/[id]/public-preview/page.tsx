@@ -103,7 +103,7 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
             </div>
           ) : project.publicPerformanceConsent ? (
             <div className="rounded-ledger border border-rule bg-band p-4">
-              <div className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-ink-muted">
+              <div className="mb-1 text-xs font-semibold text-ink-muted">
                 Delivery in progress
               </div>
               <p className="text-sm text-ink-muted">
@@ -116,7 +116,7 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
 
           {project.capstone?.submitted ? (
             <div className="rounded-ledger border border-rule bg-band p-4">
-              <div className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-ink-muted">
+              <div className="mb-2 text-xs font-semibold text-ink-muted">
                 Client endorsement
               </div>
               {project.capstone.attributes.length > 0 ? (
@@ -153,7 +153,7 @@ function Info({
 }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-[0.07em] text-ink-muted">{label}</dt>
+      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
       <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
     </div>
   );

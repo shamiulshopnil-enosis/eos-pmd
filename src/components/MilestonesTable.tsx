@@ -2,46 +2,81 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { DataTable } from "primereact/datatable";
+import { useRouter, useSearchParams } from "next/navigation";
+import { DataTable, type DataTableSortEvent } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { MilestoneWithProject } from "@/lib/types";
 import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { MILESTONE_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { EmptyState, FlagBadge, MilestoneStatusBadge, StarRating } from "@/components/ui";
-import { FilterBar, FilterDateRange, FilterSelect, FilterText } from "@/components/filters";
+import {
+  FilterDateRange,
+  FilterToolbar,
+  ResultBar,
+  facetCounts,
+  emptySelection,
+  toggleValue,
+  selectionCount,
+  type ExtraChip,
+  type FilterFacet,
+  type Selected,
+  type SortState,
+} from "@/components/filters";
 
-const FLAGS: [string, string][] = [
-  ["", "Any flag"],
-  ["OVERDUE", "Overdue"],
-  ["DUE_SOON", "Due soon"],
-  ["AWAITING_REVIEW", "Awaiting review"],
+type SortKey = "title" | "project" | "client" | "start" | "due" | "reviewed" | "status" | "rating";
+
+const FLAG_OPTIONS = [
+  { value: "OVERDUE", label: "Overdue" },
+  { value: "DUE_SOON", label: "Due soon" },
+  { value: "AWAITING_REVIEW", label: "Awaiting review" },
 ];
 
-const RATINGS: [string, string][] = [
-  ["any", "Any rating"],
-  ["5", "5.0"],
-  ["4", "4.0 – 4.9"],
-  ["3", "3.0 – 3.9"],
-  ["2", "2.0 – 2.9"],
-  ["1", "Below 2.0"],
-  ["none", "Unrated"],
+const RATING_OPTIONS = [
+  { value: "5", label: "5.0" },
+  { value: "4", label: "4.0 – 4.9" },
+  { value: "3", label: "3.0 – 3.9" },
+  { value: "2", label: "2.0 – 2.9" },
+  { value: "1", label: "Below 2.0" },
+  { value: "none", label: "Unrated" },
 ];
 
-const EMPTY = {
-  q: "",
-  status: "",
-  flag: "",
-  project: "",
-  client: "",
-  rating: "any",
-  startFrom: "",
-  startTo: "",
-  dueFrom: "",
-  dueTo: "",
-  reviewedFrom: "",
-  reviewedTo: "",
+const INLINE_KEYS = ["status", "flag", "rating"];
+
+const SORT_OPTIONS: { label: string; key: SortKey; dir: "asc" | "desc" }[] = [
+  { label: "Due date (soonest)", key: "due", dir: "asc" },
+  { label: "Due date (latest)", key: "due", dir: "desc" },
+  { label: "Milestone (A–Z)", key: "title", dir: "asc" },
+  { label: "Project (A–Z)", key: "project", dir: "asc" },
+  { label: "Reviewed (newest)", key: "reviewed", dir: "desc" },
+  { label: "Rating (high–low)", key: "rating", dir: "desc" },
+];
+
+type Row = {
+  id: string;
+  title: string;
+  project: string;
+  projectId: string;
+  client: string;
+  status: string;
+  flag: string;
+  ratingBand: string;
+  start: number | null;
+  due: number | null;
+  reviewed: number | null;
+  rating: number | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  reviewedAt: Date | null;
+  m: MilestoneWithProject;
 };
+
+function ratingBand(r: number | null): string {
+  if (r == null) return "none";
+  if (r >= 5) return "5";
+  const lo = Math.floor(r);
+  return String(Math.min(4, Math.max(1, lo)));
+}
 
 function inRange(d: Date | null, from: string, to: string): boolean {
   if (!from && !to) return true;
@@ -51,44 +86,62 @@ function inRange(d: Date | null, from: string, to: string): boolean {
   return true;
 }
 
-function ratingMatches(band: string, r: number | null): boolean {
-  if (band === "any") return true;
-  if (band === "none") return r == null;
-  if (r == null) return false;
-  if (band === "5") return r >= 5;
-  const lo = Number(band);
-  return r >= lo && r < lo + 1;
-}
+const ACCESS: Record<string, (r: Row) => string> = {
+  status: (r) => r.status,
+  flag: (r) => r.flag,
+  rating: (r) => r.ratingBand,
+  project: (r) => r.projectId,
+  client: (r) => r.client,
+};
 
-type Row = {
-  id: string;
-  title: string;
-  project: string;
-  projectId: string;
-  client: string;
-  start: number | null;
-  due: number | null;
-  reviewed: number | null;
-  status: string;
-  rating: number | null;
-  m: MilestoneWithProject;
+type DateModel = {
+  startFrom: string;
+  startTo: string;
+  dueFrom: string;
+  dueTo: string;
+  reviewedFrom: string;
+  reviewedTo: string;
+};
+const EMPTY_DATES: DateModel = {
+  startFrom: "",
+  startTo: "",
+  dueFrom: "",
+  dueTo: "",
+  reviewedFrom: "",
+  reviewedTo: "",
 };
 
 export default function MilestonesTable({ milestones }: { milestones: MilestoneWithProject[] }) {
-  const [f, setF] = useState({ ...EMPTY });
-  const set = (patch: Partial<typeof EMPTY>) => setF((prev) => ({ ...prev, ...patch }));
+  const router = useRouter();
+  const params = useSearchParams();
 
-  const projectOptions = useMemo<[string, string][]>(() => {
-    const m = new Map<string, string>();
-    for (const x of milestones) m.set(x.project.id, x.project.name);
-    return [["", "Any project"], ...[...m].sort((a, b) => a[1].localeCompare(b[1]))];
+  const facets = useMemo<FilterFacet[]>(() => {
+    const projectOpts = [...new Map(milestones.map((m) => [m.project.id, m.project.name])).entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    const clientOpts = [...new Set(milestones.map((m) => m.project.clientCompanyName))]
+      .sort()
+      .map((c) => ({ value: c, label: c }));
+    return [
+      { key: "status", label: "Status", options: Object.entries(MILESTONE_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+      { key: "flag", label: "Flag", options: FLAG_OPTIONS },
+      { key: "rating", label: "Rating", options: RATING_OPTIONS },
+      { key: "project", label: "Project", options: projectOpts, searchable: true },
+      { key: "client", label: "Client", options: clientOpts, searchable: true },
+    ];
   }, [milestones]);
 
-  const clientOptions = useMemo<[string, string][]>(() => {
-    const s = new Set<string>();
-    for (const x of milestones) s.add(x.project.clientCompanyName);
-    return [["", "Any client"], ...[...s].sort().map((c) => [c, c] as [string, string])];
-  }, [milestones]);
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Selected>(() => {
+    const base = emptySelection(facets);
+    for (const f of facets) {
+      const raw = params.get(f.key);
+      if (raw) base[f.key] = raw.split(",").filter((v) => f.options.some((o) => o.value === v));
+    }
+    return base;
+  });
+  const [dates, setDates] = useState<DateModel>({ ...EMPTY_DATES });
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: "due", dir: "asc" });
 
   const rows = useMemo<Row[]>(
     () =>
@@ -98,53 +151,134 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
         project: m.project.name,
         projectId: m.project.id,
         client: m.project.clientCompanyName,
+        status: m.status,
+        flag: getMilestoneFlag(m) ?? "",
+        ratingBand: ratingBand(m.rating),
         start: m.startDate ? new Date(m.startDate).getTime() : null,
         due: m.dueDate ? new Date(m.dueDate).getTime() : null,
         reviewed: m.reviewedAt ? new Date(m.reviewedAt).getTime() : null,
-        status: m.status,
         rating: m.rating,
+        startDate: m.startDate,
+        dueDate: m.dueDate,
+        reviewedAt: m.reviewedAt,
         m,
       })),
     [milestones],
   );
 
-  const filtered = useMemo(() => {
-    const q = f.q.trim().toLowerCase();
-    return rows.filter(({ m }) => {
-      if (q && !`${m.title} ${m.project.name} ${m.project.clientCompanyName}`.toLowerCase().includes(q)) return false;
-      if (f.status && m.status !== f.status) return false;
-      if (f.flag && getMilestoneFlag(m) !== f.flag) return false;
-      if (f.project && m.project.id !== f.project) return false;
-      if (f.client && m.project.clientCompanyName !== f.client) return false;
-      if (!ratingMatches(f.rating, m.rating)) return false;
-      if (!inRange(m.startDate, f.startFrom, f.startTo)) return false;
-      if (!inRange(m.dueDate, f.dueFrom, f.dueTo)) return false;
-      if (!inRange(m.reviewedAt, f.reviewedFrom, f.reviewedTo)) return false;
-      return true;
+  const passFacets = (r: Row, sel: Selected) =>
+    facets.every((f) => {
+      const picked = sel[f.key] ?? [];
+      return picked.length === 0 || picked.includes(ACCESS[f.key](r));
     });
-  }, [rows, f]);
 
-  const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
-  const activeCount = (Object.keys(EMPTY) as (keyof typeof EMPTY)[]).filter((k) => f[k] !== EMPTY[k]).length;
+  const test = (r: Row, sel: Selected) => {
+    const needle = q.trim().toLowerCase();
+    if (needle && !`${r.title} ${r.project} ${r.client}`.toLowerCase().includes(needle)) return false;
+    if (!passFacets(r, sel)) return false;
+    if (!inRange(r.startDate, dates.startFrom, dates.startTo)) return false;
+    if (!inRange(r.dueDate, dates.dueFrom, dates.dueTo)) return false;
+    if (!inRange(r.reviewedAt, dates.reviewedFrom, dates.reviewedTo)) return false;
+    return true;
+  };
+
+  const counts = useMemo(
+    () => facetCounts(rows, facets, selected, test, (r, key) => ACCESS[key](r)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, facets, selected, q, dates],
+  );
+
+  const filtered = useMemo(
+    () => rows.filter((r) => test(r, selected)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, selected, q, dates],
+  );
+
+  const dateGroups: [string, string, string, string][] = [
+    ["start", "Start date", dates.startFrom, dates.startTo],
+    ["due", "Due date", dates.dueFrom, dates.dueTo],
+    ["reviewed", "Reviewed", dates.reviewedFrom, dates.reviewedTo],
+  ];
+  const dateActive = dateGroups.filter(([, , a, b]) => a || b).length;
+  const extraChips: ExtraChip[] = dateGroups
+    .filter(([, , a, b]) => a || b)
+    .map(([key, label, a, b]) => ({
+      id: key,
+      label: `${label}: ${a || "…"} – ${b || "…"}`,
+      onRemove: () =>
+        setDates((d) => ({ ...d, [`${key}From`]: "", [`${key}To`]: "" }) as DateModel),
+    }));
+
+  const clearAll = () => {
+    setQ("");
+    setSelected(emptySelection(facets));
+    setDates({ ...EMPTY_DATES });
+  };
+  const anyActive = q.trim() !== "" || selectionCount(selected) > 0 || dateActive > 0;
 
   return (
     <>
-      <FilterBar active={active} count={activeCount} onClear={() => setF({ ...EMPTY })}>
-        <FilterText label="Search" value={f.q} onChange={(v) => set({ q: v })} placeholder="Milestone, project, client…" />
-        <FilterSelect label="Status" value={f.status} onChange={(v) => set({ status: v })} width="w-40" options={[["", "Any"], ...Object.entries(MILESTONE_STATUS_LABELS)]} />
-        <FilterSelect label="Flag" value={f.flag} onChange={(v) => set({ flag: v })} width="w-40" options={FLAGS} />
-        <FilterSelect label="Project" value={f.project} onChange={(v) => set({ project: v })} width="w-52" options={projectOptions} />
-        <FilterSelect label="Client" value={f.client} onChange={(v) => set({ client: v })} width="w-44" options={clientOptions} />
-        <FilterSelect label="Rating" value={f.rating} onChange={(v) => set({ rating: v })} width="w-36" options={RATINGS} />
-        <FilterDateRange label="Start date" from={f.startFrom} to={f.startTo} onFrom={(v) => set({ startFrom: v })} onTo={(v) => set({ startTo: v })} />
-        <FilterDateRange label="Due date" from={f.dueFrom} to={f.dueTo} onFrom={(v) => set({ dueFrom: v })} onTo={(v) => set({ dueTo: v })} />
-        <FilterDateRange label="Reviewed" from={f.reviewedFrom} to={f.reviewedTo} onFrom={(v) => set({ reviewedFrom: v })} onTo={(v) => set({ reviewedTo: v })} />
-      </FilterBar>
+      <FilterToolbar
+        q={q}
+        onQChange={setQ}
+        searchPlaceholder="Search milestone, project, client…"
+        facets={facets}
+        inlineKeys={INLINE_KEYS}
+        selected={selected}
+        onToggle={(key, value) => setSelected((s) => toggleValue(s, key, value))}
+        onClearFacet={(key) => setSelected((s) => ({ ...s, [key]: [] }))}
+        onClearAll={clearAll}
+        counts={counts}
+        extraChips={extraChips}
+        extraActiveCount={dateActive}
+        resultCount={filtered.length}
+        totalCount={rows.length}
+        drawerExtra={dateGroups.map(([key, label, from, to]) => (
+          <FilterDateRange
+            key={key}
+            label={label}
+            from={from}
+            to={to}
+            onFrom={(v) => setDates((d) => ({ ...d, [`${key}From`]: v }) as DateModel)}
+            onTo={(v) => setDates((d) => ({ ...d, [`${key}To`]: v }) as DateModel)}
+          />
+        ))}
+      />
+
+      <ResultBar
+        count={filtered.length}
+        total={rows.length}
+        noun="milestones"
+        sort={sort}
+        onSort={setSort}
+        sortOptions={SORT_OPTIONS}
+      />
 
       {filtered.length === 0 ? (
-        <EmptyState icon="filter_alt_off" title="No milestones match your filters" description="Adjust or clear the filters above." />
+        <EmptyState
+          icon="filter_alt_off"
+          title={anyActive ? "No milestones match your filters" : "No milestones yet"}
+          description={anyActive ? "Adjust or clear the filters above." : "Milestones appear here once a project adds them."}
+        />
       ) : (
-        <DataTable value={filtered} dataKey="id" removableSort className="eos-table" tableStyle={{ minWidth: "960px" }} scrollable>
+        <DataTable
+          value={filtered}
+          dataKey="id"
+          removableSort
+          sortField={sort.key}
+          sortOrder={sort.dir === "asc" ? 1 : -1}
+          onSort={(e: DataTableSortEvent) =>
+            setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
+          }
+          className="eos-table eos-rows-clickable"
+          tableStyle={{ minWidth: "960px" }}
+          scrollable
+          onRowClick={(e) => {
+            if (window.getSelection()?.toString()) return;
+            const r = e.data as Row;
+            router.push(`/projects/${r.projectId}/milestones/${r.id}`);
+          }}
+        >
           <Column
             field="title"
             header="Milestone"
@@ -189,9 +323,6 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
           />
         </DataTable>
       )}
-      <p className="mt-2 font-mono text-xs text-ink-muted">
-        {filtered.length} of {milestones.length} shown
-      </p>
     </>
   );
 }

@@ -6,6 +6,9 @@ import { EmptyState, InkLink, PageHeader, SectionHeading } from "@/components/ui
 import { ExecutionStatusBadge } from "@/components/ui";
 import ProjectsTable from "@/components/ProjectsTable";
 
+// The table reads its filters from the URL via useSearchParams and always reflects live data.
+export const dynamic = "force-dynamic";
+
 export default async function ProjectsPage() {
   await requireUser();
 
