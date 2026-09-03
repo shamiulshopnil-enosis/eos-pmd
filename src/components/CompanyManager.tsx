@@ -1,22 +1,76 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
-import {
-  addCompanyMember,
-  removeCompanyMember,
-  renameCompany,
-  updateCompanyMember,
-} from "@/lib/actions";
+import { Dropdown } from "primereact/dropdown";
+import { addCompanyMember, removeCompanyMember, updateCompanyMember } from "@/lib/actions";
 import type { Company, CompanyMember } from "@/lib/types";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { Field, Select, TextInput } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
+import { toastError, toastSuccess } from "@/components/toast";
 
 const ROLE_OPTIONS: [string, string][] = [
   ["member", "Member"],
   ["admin", "Admin"],
   ["owner", "Owner"],
 ];
+
+const ROLE_DROPDOWN_OPTIONS = ROLE_OPTIONS.map(([value, label]) => ({ value, label }));
+
+/**
+ * Role picker that persists the moment it changes — no Save button. Optimistic:
+ * the new role shows immediately, reverting only if the server rejects it.
+ */
+function RoleAutoSave({
+  companyId,
+  memberId,
+  role,
+}: {
+  companyId: string;
+  memberId: string;
+  role: string;
+}) {
+  const [value, setValue] = useState(role);
+  const [pending, setPending] = useState(false);
+  const lastSaved = useRef(role);
+
+  useEffect(() => {
+    if (value === lastSaved.current) return;
+    let cancelled = false;
+    setPending(true);
+    const data = new FormData();
+    data.set("role", value);
+    updateCompanyMember(companyId, memberId, data)
+      .then(() => {
+        if (cancelled) return;
+        lastSaved.current = value;
+        toastSuccess("Role updated.");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toastError("Couldn't update the role. Please try again.");
+        setValue(lastSaved.current);
+      })
+      .finally(() => {
+        if (!cancelled) setPending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value, companyId, memberId]);
+
+  return (
+    <Dropdown
+      value={value}
+      onChange={(e) => e.value && setValue(e.value)}
+      options={ROLE_DROPDOWN_OPTIONS}
+      disabled={pending}
+      className="w-32"
+      aria-label="Member role"
+    />
+  );
+}
 
 /**
  * People management for one company — the company's directory of members.
@@ -31,20 +85,6 @@ export default function CompanyManager({
 }) {
   return (
     <>
-      <Card className="mb-6">
-        <SectionHeading>Company</SectionHeading>
-        <ActionForm
-          action={renameCompany.bind(null, company.id)}
-          success="Company name saved."
-          className="flex flex-wrap items-end gap-3"
-        >
-          <Field label="Name" required width="md">
-            <TextInput name="name" required defaultValue={company.name} />
-          </Field>
-          <Button type="submit" outlined severity="secondary" label="Save" />
-        </ActionForm>
-      </Card>
-
       <Card>
         <SectionHeading>People</SectionHeading>
         {members.length === 0 ? (
@@ -67,16 +107,7 @@ export default function CompanyManager({
                   </span>
                 </span>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <ActionForm
-                    action={updateCompanyMember.bind(null, company.id, m.id)}
-                    success="Role updated."
-                    className="flex items-center gap-2"
-                  >
-                    <div className="w-32">
-                      <Select name="role" defaultValue={m.role} options={ROLE_OPTIONS} />
-                    </div>
-                    <Button type="submit" text size="small" label="Save" />
-                  </ActionForm>
+                  <RoleAutoSave companyId={company.id} memberId={m.id} role={m.role} />
                   <ActionForm
                     action={removeCompanyMember.bind(null, company.id, m.id)}
                     success="Person removed."

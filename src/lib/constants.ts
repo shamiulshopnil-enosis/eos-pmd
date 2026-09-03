@@ -5,11 +5,15 @@
  *  `Project.vendorTeam` (Milestones plan, Phase 3); this is cosmetic only. */
 export const VENDOR_NAME = "Waverley Software";
 
-/** PRD §13 — Client Satisfaction Classification thresholds. */
+/**
+ * PRD §13 — Client Satisfaction Classification thresholds.
+ *  - rating ≥ 4.0            → Happy
+ *  - 3.0 < rating < 4.0      → Needs Attention
+ *  - rating ≤ 3.0            → At Risk
+ */
 export const SATISFACTION_THRESHOLDS = {
   happyAtOrAbove: 4.0,
-  needsAttentionAtOrAbove: 3.0,
-  // below needsAttentionAtOrAbove => At Risk
+  needsAttentionAbove: 3.0,
 };
 
 /** PRD §25 — "Client Satisfaction Rate" counts evaluations at or above this. */

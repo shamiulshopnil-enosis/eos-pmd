@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Chart } from "primereact/chart";
 import type { Chart as ChartJS, Plugin } from "chart.js";
 import { AT_RISK_RATING_THRESHOLD, SATISFIED_RATING_THRESHOLD } from "@/lib/constants";
-import type { RatingTrendPoint } from "@/lib/derived";
+import {
+  computeRatingTrend,
+  type RatingSample,
+  type RatingTrendPoint,
+  type TrendPeriod,
+} from "@/lib/derived";
 
 type Tokens = {
   ink: string;
@@ -53,6 +58,13 @@ function readTokens(): Tokens {
 const fmt = (n: number | null | undefined) => (n == null ? "—" : n.toFixed(1));
 const MONO = "var(--font-roboto-mono), ui-monospace, monospace";
 
+const PERIODS: { key: TrendPeriod; label: string; unit: string }[] = [
+  { key: "daily", label: "Daily", unit: "d" },
+  { key: "weekly", label: "Weekly", unit: "wk" },
+  { key: "monthly", label: "Monthly", unit: "mo" },
+  { key: "yearly", label: "Yearly", unit: "yr" },
+];
+
 /**
  * Milestone rating over time. Reads as an answer, not a squiggle:
  *  - headline running-average with its move over the window,
@@ -63,13 +75,18 @@ const MONO = "var(--font-roboto-mono), ui-monospace, monospace";
  *  - review volume per month as faint bars, so a one-review spike can't be
  *    mistaken for a trend.
  */
-export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
+export function TrendChart({ samples }: { samples: RatingSample[] }) {
   const [t, setT] = useState<Tokens>(() => readTokens());
+  const [period, setPeriod] = useState<TrendPeriod>("monthly");
   useEffect(() => {
     const obs = new MutationObserver(() => setT(readTokens()));
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
     return () => obs.disconnect();
   }, []);
+
+  const points = useMemo(() => computeRatingTrend(samples, period), [samples, period]);
+  const periodMeta = PERIODS.find((p) => p.key === period) ?? PERIODS[2];
+  const periodUnit = periodMeta.unit;
 
   const populated = points.filter((p) => p.avgRating != null);
   const totalReviews = points.reduce((sum, p) => sum + p.count, 0);
@@ -211,6 +228,9 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
       afterDatasetsDraw(chart) {
         const meta = chart.getDatasetMeta(0);
         if (!meta || meta.hidden) return;
+        // Too many buckets (daily / weekly) — the per-point labels collide; the
+        // tooltip carries the exact figure instead.
+        if (points.length > 14) return;
         const { ctx } = chart;
         ctx.save();
         ctx.font = `700 11px ${MONO}`;
@@ -246,12 +266,14 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
           itemSort: (a: { datasetIndex: number }, b: { datasetIndex: number }) =>
             a.datasetIndex - b.datasetIndex,
           callbacks: {
-            title: (items: { dataIndex: number }[]) => points[items[0].dataIndex]?.monthLabel ?? "",
+            title: (items: { dataIndex: number }[]) => points[items[0].dataIndex]?.fullLabel ?? "",
             label: (item: { datasetIndex: number; dataIndex: number }) => {
               const p = points[item.dataIndex];
               if (!p) return "";
               if (item.datasetIndex === 0)
-                return p.avgRating == null ? "No reviews this month" : `Monthly avg ${p.avgRating.toFixed(1)}`;
+                return p.avgRating == null
+                  ? "No reviews in this period"
+                  : `${periodMeta.label} avg ${p.avgRating.toFixed(1)}`;
               if (item.datasetIndex === 1)
                 return p.cumulativeAvg == null ? "" : `Running avg ${p.cumulativeAvg.toFixed(1)}`;
               return `${p.count} review${p.count === 1 ? "" : "s"}`;
@@ -280,13 +302,41 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
         },
       },
     }),
-    [points, t, maxCount],
+    [points, t, maxCount, periodMeta],
+  );
+
+  const periodToggle = (
+    <div className="inline-flex overflow-hidden rounded-[6px] border border-rule">
+      {PERIODS.map((p, i) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => setPeriod(p.key)}
+          className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+            i > 0 ? "border-l border-rule" : ""
+          } ${
+            period === p.key
+              ? "bg-link text-white"
+              : "bg-panel text-ink-muted hover:bg-band hover:text-ink"
+          }`}
+          aria-pressed={period === p.key}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
   );
 
   if (populated.length === 0) {
     return (
-      <div className="flex h-44 items-center justify-center px-4 text-center text-sm text-ink-muted">
-        No reviewed milestones yet — the trend appears once clients start rating.
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
+          <span className="text-xs text-ink-muted">Client rating over time</span>
+          {periodToggle}
+        </div>
+        <div className="flex h-44 items-center justify-center px-4 text-center text-sm text-ink-muted">
+          No milestones reviewed in this window — try a wider period, or wait for clients to rate.
+        </div>
       </div>
     );
   }
@@ -326,11 +376,15 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
             Running client rating{firstPop && delta != null ? ` · since ${firstPop.label}` : ""}
           </div>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-sm font-semibold tabular-nums text-ink">{totalReviews}</div>
-          <div className="text-xs text-ink-muted">
-            review{totalReviews === 1 ? "" : "s"} · {points.length} mo
-            {busiest && busiest.count > 0 ? ` · peak ${busiest.count} in ${busiest.label}` : ""}
+        <div className="flex flex-col items-end gap-1.5">
+          {periodToggle}
+          <div className="text-right">
+            <span className="font-mono text-sm font-semibold tabular-nums text-ink">{totalReviews}</span>
+            <span className="text-xs text-ink-muted">
+              {" "}
+              review{totalReviews === 1 ? "" : "s"} · {points.length} {periodUnit}
+              {busiest && busiest.count > 0 ? ` · peak ${busiest.count} in ${busiest.label}` : ""}
+            </span>
           </div>
         </div>
       </div>
@@ -345,7 +399,7 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-[11px] text-ink-muted">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded" style={{ background: "var(--link)" }} /> Monthly avg
+          <span className="h-0.5 w-4 rounded" style={{ background: "var(--link)" }} /> {periodMeta.label} avg
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-0 w-4 border-t-2 border-dashed border-ink-muted" /> Running avg
@@ -355,7 +409,7 @@ export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
             className="inline-block h-2.5 w-2.5 rounded-[2px]"
             style={{ background: "color-mix(in srgb, var(--link) 16%, transparent)" }}
           />
-          Reviews/mo
+          Reviews/{periodUnit}
         </span>
         <span className="ml-auto inline-flex items-center gap-2">
           <span className="inline-flex items-center gap-1">

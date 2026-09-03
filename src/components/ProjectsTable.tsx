@@ -8,7 +8,6 @@ import { Column } from "primereact/column";
 import type { ProjectWithMilestones } from "@/lib/types";
 import { computeProjectPerformance } from "@/lib/derived";
 import {
-  PROJECT_STATUS_LABELS,
   PROJECT_TYPE_LABELS,
   ADMIN_STATUS_LABELS,
   EXECUTION_STATUS_LABELS,
@@ -22,7 +21,6 @@ import {
   ExecutionStatusBadge,
   HealthBadge,
   ListCard,
-  ProjectStatusBadge,
   ProjectTypeBadge,
   RagDisc,
 } from "@/components/ui";
@@ -46,10 +44,9 @@ type SortKey = "name" | "client" | "milestones" | "rating" | "healthRank";
 const HEALTH_ORDER: Record<string, number> = { HAPPY: 0, NEEDS_ATTENTION: 1, AT_RISK: 2, NO_DATA: 3 };
 
 const FACETS: FilterFacet[] = [
-  { key: "status", label: "Status", options: Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "type", label: "Type", options: Object.entries(PROJECT_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "health", label: "Client health", options: Object.entries(CLIENT_HEALTH_LABELS).map(([value, label]) => ({ value, label })) },
-  { key: "approval", label: "Approval", options: Object.entries(ADMIN_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+  { key: "approval", label: "EOS approval", options: Object.entries(ADMIN_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "execution", label: "Execution", options: Object.entries(EXECUTION_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "visibility", label: "Visibility", options: [{ value: "PRIVATE", label: "Private" }, { value: "PUBLIC", label: "Public" }] },
   {
@@ -64,7 +61,7 @@ const FACETS: FilterFacet[] = [
   },
 ];
 
-const INLINE_KEYS = ["status", "type", "health"];
+const INLINE_KEYS = ["type", "health"];
 
 const SORT_OPTIONS: { label: string; key: SortKey; dir: "asc" | "desc" }[] = [
   { label: "Name (A–Z)", key: "name", dir: "asc" },
@@ -79,7 +76,6 @@ type Row = {
   id: string;
   name: string;
   client: string;
-  status: string;
   approval: string;
   execution: string;
   visibility: string;
@@ -110,7 +106,6 @@ function inRange(d: Date | null, from: string, to: string): boolean {
 }
 
 const ACCESS: Record<string, (r: Row) => string> = {
-  status: (r) => r.status,
   type: (r) => r.type,
   health: (r) => r.health,
   approval: (r) => r.approval,
@@ -146,7 +141,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           id: project.id,
           name: project.name,
           client: project.clientCompanyName,
-          status: project.status,
           approval: project.adminStatus,
           execution: project.executionStatus,
           visibility: project.visibility,
@@ -286,7 +280,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
                   </div>
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <ProjectStatusBadge status={r.status} />
                   <ExecutionStatusBadge status={r.execution} />
                   <HealthBadge health={r.perf.health} />
                 </div>
@@ -330,8 +323,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
             )}
           />
           <Column field="client" header="Client" sortable body={(r: Row) => <span className="text-ink-muted">{r.client}</span>} />
-          <Column field="status" header="Status" sortable body={(r: Row) => <ProjectStatusBadge status={r.status} />} />
-          <Column field="approval" header="Approval" sortable body={(r: Row) => <AdminStatusBadge status={r.approval} />} />
           <Column field="execution" header="Execution" sortable body={(r: Row) => <ExecutionStatusBadge status={r.execution} />} />
           <Column
             field="visibility"
@@ -357,6 +348,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
             body={(r: Row) => <span className="font-mono tabular-nums text-ink">{formatRating(r.rating)}</span>}
           />
           <Column field="healthRank" header="Client health" sortable body={(r: Row) => <HealthBadge health={r.perf.health} />} />
+          <Column field="approval" header="EOS approval" sortable body={(r: Row) => <AdminStatusBadge status={r.approval} />} />
         </DataTable>
         </>
       )}

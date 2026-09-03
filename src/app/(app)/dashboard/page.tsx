@@ -2,10 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listProjectsWithMilestones, listReviewProjects } from "@/lib/data";
 import {
+  average,
+  collectRatingSamples,
   computeAlerts,
   computeDashboardKpis,
   computeProjectPerformance,
-  computeRatingTrend,
   getMilestoneFlag,
 } from "@/lib/derived";
 import { reviewRoleLabel } from "@/lib/permissions";
@@ -21,8 +22,7 @@ import {
 import { Icon } from "@/components/icon";
 import { TrendChart } from "@/components/TrendChart";
 import { DashboardBreakdowns } from "@/components/DashboardBreakdowns";
-import { DashboardLedger, type LedgerRow } from "@/components/DashboardLedger";
-import { ProjectPerformanceTable, type PerfRow } from "@/components/ProjectPerformanceTable";
+import { DashboardLedger, type ClientGroup, type LedgerRow } from "@/components/DashboardLedger";
 
 // Live metrics — always render against the current database, never a build snapshot.
 export const dynamic = "force-dynamic";
@@ -125,7 +125,7 @@ export default async function DashboardPage() {
 
   const kpis = computeDashboardKpis(projects, null);
   const alerts = computeAlerts(projects);
-  const trend = computeRatingTrend(projects);
+  const ratingSamples = collectRatingSamples(projects);
 
   const allMilestones = projects.flatMap((p) => p.milestones);
   const overdueCount = allMilestones.filter((m) => getMilestoneFlag(m) === "OVERDUE").length;
@@ -153,7 +153,11 @@ export default async function DashboardPage() {
       return b.lastActivity - a.lastActivity;
     });
 
-  const rows: LedgerRow[] = sorted.map(({ project: p, perf, spark }) => ({
+  const projectRow = ({
+    project: p,
+    perf,
+    spark,
+  }: (typeof sorted)[number]): LedgerRow => ({
     id: p.id,
     name: p.name,
     client: p.clientCompanyName,
@@ -173,28 +177,64 @@ export default async function DashboardPage() {
       ratingText: m.status === "reviewed" && m.rating != null ? formatRating(m.rating) : null,
       due: m.dueDate ? formatDate(m.dueDate) : "—",
     })),
-  }));
+  });
 
-  const needingAttention = rows.filter(
-    (r) => r.health === "AT_RISK" || r.health === "NEEDS_ATTENTION" || r.declining,
-  ).length;
+  // The ledger is keyed by client company: one line per client, its projects and
+  // their milestones tucked into the expansion. `sorted` is already health-first,
+  // so the client's worst project decides where the group lands.
+  const groupOrder: string[] = [];
+  const grouped = new Map<string, (typeof sorted)[number][]>();
+  for (const entry of sorted) {
+    const key = entry.project.clientCompanyId ?? entry.project.clientCompanyName;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+      groupOrder.push(key);
+    }
+    grouped.get(key)!.push(entry);
+  }
 
-  const perfRows: PerfRow[] = sorted.map(({ project: p, perf, lastActivity }) => ({
-    id: p.id,
-    name: p.name,
-    client: p.clientCompanyName,
-    status: p.status,
-    visibility: p.visibility,
-    health: perf.health,
-    active: perf.activeMilestones,
-    total: perf.totalMilestones,
-    reviewed: perf.milestonesReviewed,
-    responseText: formatPercent(perf.responseRate),
-    avgText: formatRating(perf.avgRating),
-    latestText: formatRating(perf.latestRating),
-    declined: perf.satisfactionDeclined,
-    lastActivityText: formatDate(new Date(lastActivity)),
-  }));
+  const clientGroups: ClientGroup[] = groupOrder.map((key) => {
+    const entries = grouped.get(key)!;
+    const ratings = entries.flatMap((e) =>
+      e.project.milestones
+        .filter((m) => m.status === "reviewed" && m.rating != null)
+        .map((m) => m.rating as number),
+    );
+    const latest = entries
+      .flatMap((e) =>
+        e.project.milestones.filter(
+          (m) => m.status === "reviewed" && m.rating != null && m.reviewedAt,
+        ),
+      )
+      .sort((a, b) => (b.reviewedAt!.getTime() ?? 0) - (a.reviewedAt!.getTime() ?? 0))[0];
+    const totalMilestones = entries.reduce((n, e) => n + e.project.milestones.length, 0);
+    const reviewedCount = entries.reduce(
+      (n, e) => n + e.project.milestones.filter((m) => m.status === "reviewed").length,
+      0,
+    );
+    const worstHealth = entries.reduce<ClientHealth>(
+      (worst, e) => (HEALTH_RANK[e.perf.health] < HEALTH_RANK[worst] ? e.perf.health : worst),
+      "HAPPY",
+    );
+    return {
+      id: key,
+      client: entries[0].project.clientCompanyName,
+      health: worstHealth,
+      latestText: formatRating(latest?.rating ?? null),
+      avgText: formatRating(average(ratings)),
+      reviewedText: `${reviewedCount} / ${totalMilestones}`,
+      projectCount: entries.length,
+      needsAttention: entries.some(
+        (e) =>
+          e.perf.health === "AT_RISK" ||
+          e.perf.health === "NEEDS_ATTENTION" ||
+          e.perf.satisfactionDeclined,
+      ),
+      projects: entries.map(projectRow),
+    };
+  });
+
+  const needingAttention = clientGroups.filter((g) => g.needsAttention).length;
 
   return (
     <div>
@@ -265,46 +305,55 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Attention + trend */}
-      <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <section>
-          <SectionHeading>Attention</SectionHeading>
-          {alerts.length === 0 ? (
-            <p className="flex items-center gap-1.5 text-sm text-ink-muted">
-              <Icon name="check_circle" className="text-[15px] text-rag-good" fill />
-              Nothing needs attention.
-            </p>
-          ) : (
-            <ul className="divide-y divide-rule rounded-ledger border border-rule bg-panel">
-              {alerts.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    href={a.href}
-                    className="flex items-start gap-2 px-3 py-2.5 text-sm text-ink hover:bg-band hover:text-link"
-                  >
-                    <Icon
-                      name={a.severity === "critical" ? "warning" : "error"}
-                      className={`mt-0.5 shrink-0 text-[15px] ${
-                        a.severity === "critical" ? "text-rag-bad" : "text-rag-warn"
-                      }`}
-                      fill
-                    />
-                    <span className="flex-1">{a.message}</span>
-                    <Icon name="chevron_right" className="mt-0.5 shrink-0 text-[16px] text-ink-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {/* Attention — its own full-width row, tinted so the eye lands here first */}
+      <section className="mt-10">
+        <SectionHeading
+          action={
+            alerts.length > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--rag-warn-bg,rgba(127,95,1,0.12))] px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-rag-warn">
+                {alerts.length} open
+              </span>
+            ) : null
+          }
+        >
+          Attention
+        </SectionHeading>
+        {alerts.length === 0 ? (
+          <p className="flex items-center gap-1.5 rounded-ledger border border-rule bg-panel px-3 py-2.5 text-sm text-ink-muted">
+            <Icon name="check_circle" className="text-[15px] text-rag-good" fill />
+            Nothing needs attention.
+          </p>
+        ) : (
+          <ul className="divide-y divide-rule overflow-hidden rounded-ledger border border-l-[3px] border-rag-warn-fill bg-[var(--rag-warn-bg,rgba(127,95,1,0.12))]">
+            {alerts.map((a) => (
+              <li key={a.id}>
+                <Link
+                  href={a.href}
+                  className="flex items-start gap-2 px-3 py-2.5 text-sm text-ink hover:bg-black/[0.03] hover:text-link dark:hover:bg-white/[0.04]"
+                >
+                  <Icon
+                    name={a.severity === "critical" ? "warning" : "error"}
+                    className={`mt-0.5 shrink-0 text-[15px] ${
+                      a.severity === "critical" ? "text-rag-bad" : "text-rag-warn"
+                    }`}
+                    fill
+                  />
+                  <span className="flex-1">{a.message}</span>
+                  <Icon name="chevron_right" className="mt-0.5 shrink-0 text-[16px] text-ink-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-        <section>
-          <SectionHeading>Rating trend</SectionHeading>
-          <div className="rounded-ledger border border-rule bg-panel px-3 pb-2 pt-3">
-            <TrendChart points={trend} />
-          </div>
-        </section>
-      </div>
+      {/* Rating trend — full-width row beneath */}
+      <section className="mt-10">
+        <SectionHeading>Rating trend</SectionHeading>
+        <div className="rounded-ledger border border-rule bg-panel px-3 pb-2 pt-3">
+          <TrendChart samples={ratingSamples} />
+        </div>
+      </section>
 
       {/* Breakdowns — Jira-style summary cards */}
       <section className="mt-10">
@@ -322,14 +371,14 @@ export default async function DashboardPage() {
               </span>
             ) : (
               <span className="font-mono text-xs tabular-nums text-ink-muted">
-                {rows.length} nominal
+                {clientGroups.length} nominal
               </span>
             )
           }
         >
           Client ledger
         </SectionHeading>
-        <DashboardLedger rows={rows} />
+        <DashboardLedger groups={clientGroups} />
         <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
           {(["AT_RISK", "NEEDS_ATTENTION", "HAPPY", "NO_DATA"] as ClientHealth[]).map((h) => (
             <span key={h} className="inline-flex items-center gap-1.5">
@@ -338,20 +387,6 @@ export default async function DashboardPage() {
             </span>
           ))}
         </p>
-      </section>
-
-      {/* Full performance record */}
-      <section className="mt-10">
-        <SectionHeading
-          action={
-            <Link href="/projects" className="text-sm text-link hover:text-link-strong">
-              Open projects
-            </Link>
-          }
-        >
-          Project performance
-        </SectionHeading>
-        <ProjectPerformanceTable rows={perfRows} />
       </section>
 
       {reviewProjects.length > 0 ? <ReviewSection reviewProjects={reviewProjects} /> : null}

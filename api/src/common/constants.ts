@@ -5,7 +5,8 @@ export const VENDOR_NAME = "Waverley Software";
 
 export const SATISFACTION_THRESHOLDS = {
   happyAtOrAbove: 4.0,
-  needsAttentionAtOrAbove: 3.0,
+  // 3.0 < rating < 4.0 → Needs Attention; rating ≤ 3.0 → At Risk
+  needsAttentionAbove: 3.0,
 };
 
 export const SATISFIED_RATING_THRESHOLD = 4.0;
