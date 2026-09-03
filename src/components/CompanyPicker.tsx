@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { InputText } from "primereact/inputtext";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
 import { Button } from "primereact/button";
 import { Field, TextInput } from "@/components/form";
 import type { CompanySummary } from "@/lib/types";
@@ -18,11 +20,12 @@ export default function CompanyPicker({ companies }: { companies: PickerOrg[] })
   const [selected, setSelected] = useState<PickerOrg | null>(null);
   const [adding, setAdding] = useState(false);
 
+  const trimmed = query.trim();
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return companies.slice(0, 8);
+    const q = trimmed.toLowerCase();
+    if (!q) return [];
     return companies.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [companies, query]);
+  }, [companies, trimmed]);
 
   const exactMatch = companies.some((o) => o.name.trim().toLowerCase() === query.trim().toLowerCase());
 
@@ -85,52 +88,57 @@ export default function CompanyPicker({ companies }: { companies: PickerOrg[] })
 
   return (
     <div className="space-y-2">
-      <InputText
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search companies…"
-        autoComplete="off"
-        className="w-full"
-      />
-      <div className="rounded-ledger border border-rule">
-        {matches.length > 0 ? (
-          <ul className="max-h-56 divide-y divide-rule overflow-y-auto text-sm">
-            {matches.map((o) => (
-              <li key={o.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelected(o)}
-                  className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-band"
-                >
-                  <span className="font-medium text-ink">{o.name}</span>
-                  {o.primaryContact ? (
-                    <span className="text-xs text-ink-muted">
-                      {o.primaryContact.name ? `${o.primaryContact.name} · ` : ""}
-                      {o.primaryContact.email}
-                    </span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="px-3 py-2 text-sm text-ink-muted">
-            {query.trim() ? "No matching company." : "Start typing to search."}
-          </div>
-        )}
-        {query.trim() && !exactMatch ? (
-          <div className="border-t border-rule p-1.5">
-            <Button
-              type="button"
-              text
-              size="small"
-              icon="pi pi-plus"
-              label={`Add “${query.trim()}” as a new company`}
-              onClick={() => setAdding(true)}
-            />
-          </div>
-        ) : null}
-      </div>
+      <IconField iconPosition="left" className="block">
+        <InputIcon className="pi pi-search" />
+        <InputText
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search companies by name…"
+          autoComplete="off"
+          className="w-full"
+        />
+      </IconField>
+
+      {trimmed ? (
+        <div className="rounded-ledger border border-rule">
+          {matches.length > 0 ? (
+            <ul className="max-h-56 divide-y divide-rule overflow-y-auto text-sm">
+              {matches.map((o) => (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(o)}
+                    className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-band"
+                  >
+                    <span className="font-medium text-ink">{o.name}</span>
+                    {o.primaryContact ? (
+                      <span className="text-xs text-ink-muted">
+                        {o.primaryContact.name ? `${o.primaryContact.name} · ` : ""}
+                        {o.primaryContact.email}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="px-3 py-2 text-sm text-ink-muted">No matching company.</div>
+          )}
+          {!exactMatch ? (
+            <div className="border-t border-rule p-1.5">
+              <Button
+                type="button"
+                text
+                size="small"
+                icon="pi pi-plus"
+                label={`Add “${trimmed}” as a new company`}
+                onClick={() => setAdding(true)}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <p className="text-xs text-ink-muted">
         Pick an existing company or add a new one — a project needs a client company.
       </p>

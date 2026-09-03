@@ -275,7 +275,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
             setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
           }
           className="eos-table eos-rows-clickable"
-          tableStyle={{ minWidth: "1040px" }}
+          tableStyle={{ minWidth: "1180px" }}
           scrollable
           onRowClick={(e) => {
             if (window.getSelection()?.toString()) return;
@@ -286,6 +286,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
             field="name"
             header="Project"
             sortable
+            style={{ minWidth: "14rem" }}
             body={(r: Row) => (
               <span className="flex items-center gap-2">
                 <RagDisc health={r.perf.health} />
