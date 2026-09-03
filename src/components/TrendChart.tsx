@@ -64,9 +64,8 @@ const MONO = "var(--font-roboto-mono), ui-monospace, monospace";
  *    mistaken for a trend.
  */
 export function TrendChart({ points }: { points: RatingTrendPoint[] }) {
-  const [t, setT] = useState<Tokens>(FALLBACK);
+  const [t, setT] = useState<Tokens>(() => readTokens());
   useEffect(() => {
-    setT(readTokens());
     const obs = new MutationObserver(() => setT(readTokens()));
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
     return () => obs.disconnect();
