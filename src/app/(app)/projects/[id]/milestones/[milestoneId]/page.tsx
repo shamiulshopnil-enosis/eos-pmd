@@ -145,6 +145,35 @@ export default async function MilestoneDetailPage({
                 </GhostButton>
               </ActionForm>
             </div>
+          ) : milestone.status === "rejected" ? (
+            <div className="space-y-3 text-sm">
+              <p className="font-medium text-rag-bad">
+                Rejected by {milestone.rejectedByName ?? milestone.rejectedByEmail ?? "the client"}
+                {milestone.rejectedAt ? ` on ${formatDateTime(milestone.rejectedAt)}` : ""}.
+              </p>
+              {milestone.rejectionReason ? (
+                <blockquote className="rounded-ledger border border-rule bg-band p-3 italic text-ink-muted">
+                  &ldquo;{milestone.rejectionReason}&rdquo;
+                </blockquote>
+              ) : null}
+              <p className="text-ink-muted">
+                Use <span className="font-medium">Edit milestone</span> above to revise it, then send it back.
+              </p>
+              {siblingSent ? (
+                <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-xs text-rag-warn">
+                  &ldquo;{siblingSent.title}&rdquo; is with the client right now — only one milestone can be under
+                  review at a time.
+                </p>
+              ) : null}
+              <ActionForm
+                action={sendMilestoneForReview.bind(null, id, milestoneId)}
+                success="Milestone sent to the client for review."
+              >
+                <InkButton type="submit" icon="send" disabled={!!siblingSent}>
+                  Send for review again
+                </InkButton>
+              </ActionForm>
+            </div>
           ) : (
             <div className="space-y-3">
               <MilestoneReviewSummary milestone={milestone} />

@@ -111,6 +111,15 @@ export class MilestonesController {
     return this.milestones.requestRatingReconsideration(user, id);
   }
 
+  @Post(":id/reject")
+  reject(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.milestones.rejectMilestone(user, id, body);
+  }
+
   // --- attachments ---
 
   @Post(":id/attachments")

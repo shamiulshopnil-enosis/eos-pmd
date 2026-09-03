@@ -8,7 +8,7 @@ export type ProjectVisibility = "PRIVATE" | "PUBLIC";
 export type ProjectType = "whole" | "milestone";
 export type AdminStatus = "draft" | "pending_approval" | "published" | "rejected" | "edited" | "trashed";
 export type ExecutionStatus = "ongoing" | "awaiting_completion" | "completed";
-export type MilestoneStatus = "draft" | "sent" | "reviewed";
+export type MilestoneStatus = "draft" | "sent" | "reviewed" | "rejected";
 export type CapstoneTier = "promoter" | "neutral" | "detractor";
 export type VendorTeamRole = "owner" | "member";
 export type ClientContactRole = "primary" | "collaborator";
@@ -26,7 +26,9 @@ export type ActivityType =
   | "FEEDBACK_RECEIVED"
   | "PROJECT_COMPLETED"
   | "PUBLICATION_REQUESTED"
-  | "PROJECT_PUBLISHED";
+  | "PROJECT_PUBLISHED"
+  | "MILESTONE_REJECTED"
+  | "MILESTONE_REJECTION_EMAILED";
 
 export type CompanyRole = "owner" | "admin" | "member";
 
@@ -165,6 +167,11 @@ export interface Milestone {
   reviewedByName: string | null;
   reviewedByEmail: string | null;
   sentAt: Date | null;
+  rejectedAt: Date | null;
+  rejectedByUserId: string | null;
+  rejectedByName: string | null;
+  rejectedByEmail: string | null;
+  rejectionReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

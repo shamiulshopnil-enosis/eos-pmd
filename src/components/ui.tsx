@@ -74,7 +74,7 @@ export function ProjectStatusBadge({ status }: { status: string }) {
   return <Badge tone={projectStatusTone[status] ?? "slate"}>{PROJECT_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const milestoneStatusTone: Record<string, Tone> = { draft: "slate", sent: "amber", reviewed: "green" };
+const milestoneStatusTone: Record<string, Tone> = { draft: "slate", sent: "amber", reviewed: "green", rejected: "red" };
 export function MilestoneStatusBadge({ status }: { status: string }) {
   return <Badge tone={milestoneStatusTone[status] ?? "slate"}>{MILESTONE_STATUS_LABELS[status] ?? status}</Badge>;
 }

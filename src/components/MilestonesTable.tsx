@@ -24,7 +24,7 @@ import {
   type SortState,
 } from "@/components/filters";
 
-type SortKey = "title" | "project" | "client" | "start" | "due" | "reviewed" | "status" | "rating";
+type SortKey = "title" | "project" | "client" | "assignees" | "start" | "due" | "reviewed" | "status" | "rating";
 
 const FLAG_OPTIONS = [
   { value: "OVERDUE", label: "Overdue" },
@@ -58,6 +58,7 @@ type Row = {
   project: string;
   projectId: string;
   client: string;
+  assignees: string;
   status: string;
   flag: string;
   ratingBand: string;
@@ -151,6 +152,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
         project: m.project.name,
         projectId: m.project.id,
         client: m.project.clientCompanyName,
+        assignees: m.assignees.map((a) => a.name ?? a.email).join(", "),
         status: m.status,
         flag: getMilestoneFlag(m) ?? "",
         ratingBand: ratingBand(m.rating),
@@ -271,7 +273,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
             setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
           }
           className="eos-table eos-rows-clickable"
-          tableStyle={{ minWidth: "960px" }}
+          tableStyle={{ minWidth: "1200px" }}
           scrollable
           onRowClick={(e) => {
             if (window.getSelection()?.toString()) return;
@@ -283,6 +285,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
             field="title"
             header="Milestone"
             sortable
+            style={{ minWidth: "14rem" }}
             body={(r: Row) => (
               <Link href={`/projects/${r.projectId}/milestones/${r.id}`} className="font-medium text-ink hover:text-link hover:underline">
                 {r.title}
@@ -300,6 +303,19 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
             )}
           />
           <Column field="client" header="Client" sortable body={(r: Row) => <span className="text-ink-muted">{r.client}</span>} />
+          <Column
+            field="assignees"
+            header="Assigned to"
+            sortable
+            style={{ minWidth: "11rem" }}
+            body={(r: Row) =>
+              r.assignees ? (
+                <span className="text-ink-muted">{r.assignees}</span>
+              ) : (
+                <span className="text-ink-subtle">—</span>
+              )
+            }
+          />
           <Column field="start" header="Start" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.startDate)}</span>} />
           <Column field="due" header="Due" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.dueDate)}</span>} />
           <Column field="reviewed" header="Reviewed" sortable body={(r: Row) => <span className="font-mono text-xs text-ink-muted">{formatDate(r.m.reviewedAt)}</span>} />

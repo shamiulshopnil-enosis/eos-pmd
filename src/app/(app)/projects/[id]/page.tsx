@@ -18,6 +18,7 @@ import {
 import {
   confirmCompletion,
   editOwnMilestoneRating,
+  rejectMilestone,
   requestCapstone,
   requestCompletion,
   setProjectStatus,
@@ -48,6 +49,7 @@ import { MoreActions, type MoreAction } from "@/components/MoreActions";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 import MilestoneReviewForm from "@/components/MilestoneReviewForm";
+import MilestoneRejectForm from "@/components/MilestoneRejectForm";
 import ActivityLogModal from "@/components/ActivityLogModal";
 import ProjectMilestoneTable from "@/components/ProjectMilestoneTable";
 
@@ -326,11 +328,34 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   ) : null}
 
                   {m.status === "sent" ? (
-                    <MilestoneReviewForm
-                      action={submitMilestoneRating.bind(null, id, m.id)}
-                      submitLabel="Submit review"
-                      intro="Please rate this milestone on each of the following."
-                    />
+                    <>
+                      <MilestoneReviewForm
+                        action={submitMilestoneRating.bind(null, id, m.id)}
+                        submitLabel="Submit review"
+                        intro="Please rate this milestone on each of the following."
+                      />
+                      <MilestoneRejectForm
+                        action={rejectMilestone.bind(null, id, m.id)}
+                        assignees={m.assignees}
+                      />
+                    </>
+                  ) : null}
+
+                  {m.status === "rejected" ? (
+                    <div className="mt-3 border-t border-rule pt-3">
+                      <p className="text-sm font-medium text-rag-bad">
+                        You rejected this milestone
+                        {m.rejectedAt ? ` on ${formatDateTime(m.rejectedAt)}` : ""}.
+                      </p>
+                      {m.rejectionReason ? (
+                        <blockquote className="mt-2 rounded-ledger border border-rule bg-band p-3 text-sm italic text-ink-muted">
+                          &ldquo;{m.rejectionReason}&rdquo;
+                        </blockquote>
+                      ) : null}
+                      <p className="mt-2 text-xs text-ink-muted">
+                        The delivery team can revise it and send it back for review.
+                      </p>
+                    </div>
                   ) : null}
 
                   {canEdit ? (

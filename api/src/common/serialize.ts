@@ -210,6 +210,11 @@ export function serializeMilestone(m: Raw): Milestone {
     reviewedByName: str(m.reviewedByName),
     reviewedByEmail: str(m.reviewedByEmail),
     sentAt: date(m.sentAt),
+    rejectedAt: date(m.rejectedAt),
+    rejectedByUserId: m.rejectedByUserId == null ? null : String(m.rejectedByUserId),
+    rejectedByName: str(m.rejectedByName),
+    rejectedByEmail: str(m.rejectedByEmail),
+    rejectionReason: str(m.rejectionReason),
     createdAt: date(m.createdAt) ?? new Date(0),
     updatedAt: date(m.updatedAt) ?? new Date(0),
   };
