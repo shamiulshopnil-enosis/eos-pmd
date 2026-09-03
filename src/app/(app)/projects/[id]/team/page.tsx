@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getMyCompany, getProject, listCompanyMembers } from "@/lib/data";
 import { canManageDeliveryStaffing, canManageReview } from "@/lib/permissions";
-import { setProjectStaffing, setReviewStaffing } from "@/lib/actions";
+import { addCompanyPerson, setProjectStaffing, setReviewStaffing } from "@/lib/actions";
 import type { CompanyMember } from "@/lib/types";
 import { Badge, Card, PageHeader, SectionHeading } from "@/components/ui";
 import { SubmitButton } from "@/components/form";
@@ -30,58 +30,66 @@ export default async function ProjectPeoplePage({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title={`People — ${project.name}`}
-        description="Assign your company's people to this project. People are managed under My Company; adding someone here lets them see and work on this project."
-        back={{ href: `/projects/${id}`, label: "Back to Project" }}
+        description="Search your company's directory to add people to this project. Only the people you add here are listed as the project team; your company's owners and admins can always see it."
+        back={{ href: `/projects/${id}`, label: "Back to project" }}
       />
 
-      {showDeliveryForm ? (
+      {showDeliveryForm && myCompany ? (
         <StaffingCard
-          title="Delivery people"
+          title="Delivery team"
+          companyId={myCompany.id}
           members={members}
           selectedMemberIds={project.assignedMemberIds}
           action={setProjectStaffing.bind(null, id)}
         />
-      ) : null}
+      ) : (
+        <Card className="mb-6">
+          <SectionHeading>Delivery team</SectionHeading>
+          {project.vendorTeam.length === 0 ? (
+            <p className="text-sm text-ink-muted">No delivery people assigned yet.</p>
+          ) : (
+            <PeopleList people={project.vendorTeam} leadTone="owner" />
+          )}
+        </Card>
+      )}
 
-      {showReviewForm ? (
+      {showReviewForm && myCompany ? (
         <StaffingCard
-          title="Review people"
+          title="Client contacts"
+          companyId={myCompany.id}
           members={members}
           selectedMemberIds={project.receivingMemberIds}
           action={setReviewStaffing.bind(null, id)}
         />
-      ) : null}
-
-      <Card className="mb-6 p-5">
-        <SectionHeading>Delivery Team (effective)</SectionHeading>
-        <PeopleList people={project.vendorTeam} leadTone="owner" />
-      </Card>
-
-      <Card className="p-5">
-        <SectionHeading>Client Contacts (effective)</SectionHeading>
-        {project.clientContacts.length === 0 ? (
-          <p className="text-sm text-ink-muted">The client company has not staffed this project yet.</p>
-        ) : (
-          <PeopleList people={project.clientContacts} leadTone="primary" />
-        )}
-      </Card>
+      ) : (
+        <Card>
+          <SectionHeading>Client contacts</SectionHeading>
+          {project.clientContacts.length === 0 ? (
+            <p className="text-sm text-ink-muted">The client company has not staffed this project yet.</p>
+          ) : (
+            <PeopleList people={project.clientContacts} leadTone="primary" />
+          )}
+        </Card>
+      )}
     </div>
   );
 }
 
 function StaffingCard({
   title,
+  companyId,
   members,
   selectedMemberIds,
   action,
 }: {
   title: string;
+  companyId: string;
   members: CompanyMember[];
   selectedMemberIds: string[];
   action: (formData: FormData) => void;
 }) {
   return (
-    <Card className="mb-6 p-5">
+    <Card className="mb-6">
       <SectionHeading>{title}</SectionHeading>
       {members.length === 0 ? (
         <p className="text-sm text-ink-muted">
@@ -93,7 +101,17 @@ function StaffingCard({
         </p>
       ) : (
         <ActionForm action={action} success="People updated." className="space-y-3">
-          <PeoplePicker members={members} name="memberIds" defaultSelectedIds={selectedMemberIds} />
+          <PeoplePicker
+            directory={members}
+            name="memberIds"
+            emit="id"
+            selectedLayout="rows"
+            defaultSelected={selectedMemberIds}
+            placeholder="Search your company by name or email…"
+            addPerson={addCompanyPerson.bind(null, companyId)}
+            addContextLabel="your company"
+            emptyHint="No one on this project yet — search above to add people from your company."
+          />
           <SubmitButton>Save</SubmitButton>
         </ActionForm>
       )}
@@ -111,7 +129,7 @@ function PeopleList({
   return (
     <ul className="divide-y divide-rule text-sm">
       {people.map((p) => (
-        <li key={p.email} className="flex items-center justify-between py-2">
+        <li key={p.email} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
           <span className="text-ink">
             {p.name ? `${p.name} · ` : ""}
             {p.email}

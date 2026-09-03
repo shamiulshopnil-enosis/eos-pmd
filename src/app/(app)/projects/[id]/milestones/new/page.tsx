@@ -2,12 +2,12 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getProject } from "@/lib/data";
 import { canAccessDelivery } from "@/lib/permissions";
-import { createMilestone } from "@/lib/actions";
+import { addProjectDeliveryPerson, createMilestone } from "@/lib/actions";
 import { Field, FileInput, FormActions, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
-import AssigneeCheckboxes from "@/components/AssigneeCheckboxes";
+import PeoplePicker from "@/components/PeoplePicker";
 
 export default async function NewMilestonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -57,7 +57,19 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
             <legend className="mb-1 text-xs font-semibold text-ink">
               Assign to <span className="font-normal text-ink-muted">(optional)</span>
             </legend>
-            <AssigneeCheckboxes people={project.vendorTeam} />
+            <PeoplePicker
+              directory={project.vendorTeam.map((m) => ({
+                email: m.email,
+                name: m.name,
+                invitePending: m.invitePending,
+              }))}
+              name="assigneeEmails"
+              emit="email"
+              placeholder="Search people on this project…"
+              addPerson={addProjectDeliveryPerson.bind(null, project.id)}
+              addContextLabel="this project"
+              emptyHint="No one assigned — search above to add people from this project."
+            />
           </fieldset>
 
           <Field label="Files" optional hint="Up to 10 files, 15 MB each.">

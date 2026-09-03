@@ -203,7 +203,11 @@ export class ProjectsService {
         seen.add(key);
         people.push(this.companyMemberToTeamMember(m));
       };
-      for (const m of companyId ? membersByCompany.get(companyId) ?? [] : []) push(m);
+      // Effective people are the individuals explicitly assigned to *this*
+      // project (plus grandfathered embedded rows, merged by the caller).
+      // Company owners/admins keep their see-everything access via
+      // `myRole` / `projectIdsForUser`, but are not listed as project team
+      // unless they were hand-picked.
       for (const mid of wanted) {
         const m = memberById.get(mid);
         if (m) push(m);
