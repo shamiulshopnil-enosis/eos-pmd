@@ -52,18 +52,21 @@ export default function CompanyManager({
         ) : (
           <ul className="mb-4 divide-y divide-rule text-sm">
             {members.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+              <li
+                key={m.id}
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3"
+              >
                 <span className="text-ink">
                   {m.name ? `${m.name} · ` : ""}
                   {m.email}
-                  <span className="ml-2 inline-flex gap-1">
+                  <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                     <Badge tone={m.role === "owner" ? "blue" : m.role === "admin" ? "purple" : "slate"}>{m.role}</Badge>
                     <Badge tone={m.invitePending ? "amber" : "green"}>
                       {m.invitePending ? "Not signed in" : "Active"}
                     </Badge>
                   </span>
                 </span>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <ActionForm
                     action={updateCompanyMember.bind(null, company.id, m.id)}
                     success="Role updated."

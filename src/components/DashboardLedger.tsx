@@ -8,6 +8,7 @@ import type { ClientHealth } from "@/lib/constants";
 import { Icon } from "@/components/icon";
 import {
   ExecutionStatusBadge,
+  ListCard,
   MilestoneStatusBadge,
   RagDisc,
   Sparkline,
@@ -40,10 +41,34 @@ export function DashboardLedger({ rows }: { rows: LedgerRow[] }) {
   const [expanded, setExpanded] = useState<DataTableExpandedRows>({});
 
   return (
+    <>
+    <ul className="space-y-2 sm:hidden">
+      {rows.map((r) => (
+        <li key={r.id}>
+          <ListCard href={r.href}>
+            <div className="flex items-start gap-2">
+              <RagDisc health={r.health} className="mt-1" />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-ink">{r.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+                  <span>{r.client}</span>
+                  <ExecutionStatusBadge status={r.execStatus} />
+                </div>
+              </div>
+            </div>
+            <div className="mt-2.5 flex items-center gap-4 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
+              <span>Latest <span className="text-ink">{r.latestText}</span></span>
+              <span>Avg <span className="text-ink">{r.avgText}</span></span>
+              <span>Reviewed <span className="text-ink">{r.reviewedText}</span></span>
+            </div>
+          </ListCard>
+        </li>
+      ))}
+    </ul>
     <DataTable
       value={rows}
       dataKey="id"
-      className="eos-table eos-ledger"
+      className="eos-table eos-ledger hidden sm:block"
       expandedRows={expanded}
       onRowToggle={(e) => setExpanded(e.data as DataTableExpandedRows)}
       onRowClick={(e) => {
@@ -158,5 +183,6 @@ export function DashboardLedger({ rows }: { rows: LedgerRow[] }) {
         )}
       />
     </DataTable>
+    </>
   );
 }

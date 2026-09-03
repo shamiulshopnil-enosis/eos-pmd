@@ -267,3 +267,142 @@ export function computeRatingTrend(
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard breakdowns (Jira-style summary cards)
+// ---------------------------------------------------------------------------
+
+const RATING_BANDS = ["5", "4", "3", "2", "1"] as const;
+export type RatingBand = (typeof RATING_BANDS)[number];
+
+/** Which 1–5 band a milestone's average rating falls in (5 is exact-5-only). */
+export function ratingBand(r: number): RatingBand {
+  if (r >= 5) return "5";
+  return String(Math.min(4, Math.max(1, Math.floor(r)))) as RatingBand;
+}
+
+export type RatingDistributionBar = {
+  band: RatingBand;
+  label: string;
+  count: number;
+  tone: "good" | "warn" | "bad";
+};
+
+/** Count of reviewed milestones per rating band, highest band first. */
+export function computeRatingDistribution(projects: ProjectWithMilestones[]): RatingDistributionBar[] {
+  const counts: Record<RatingBand, number> = { "5": 0, "4": 0, "3": 0, "2": 0, "1": 0 };
+  for (const project of projects) {
+    for (const m of reviewedMilestones(project)) {
+      if (m.rating != null) counts[ratingBand(m.rating)] += 1;
+    }
+  }
+  const label: Record<RatingBand, string> = {
+    "5": "5.0",
+    "4": "4.0–4.9",
+    "3": "3.0–3.9",
+    "2": "2.0–2.9",
+    "1": "< 2.0",
+  };
+  const tone = (b: RatingBand): "good" | "warn" | "bad" =>
+    b === "5" || b === "4" ? "good" : b === "3" ? "warn" : "bad";
+  return RATING_BANDS.map((b) => ({ band: b, label: label[b], count: counts[b], tone: tone(b) }));
+}
+
+export type StatusBreakdownRow = {
+  status: Milestone["status"];
+  label: string;
+  count: number;
+  pct: number;
+  tone: "good" | "warn" | "bad" | "slate";
+};
+
+/** Share of every milestone by status, most common first. */
+export function computeMilestoneStatusBreakdown(
+  projects: ProjectWithMilestones[],
+): StatusBreakdownRow[] {
+  const all = projects.flatMap((p) => p.milestones);
+  const total = all.length;
+  const meta: { status: Milestone["status"]; label: string; tone: StatusBreakdownRow["tone"] }[] = [
+    { status: "reviewed", label: "Reviewed", tone: "good" },
+    { status: "sent", label: "With client", tone: "warn" },
+    { status: "draft", label: "Draft", tone: "slate" },
+    { status: "rejected", label: "Rejected", tone: "bad" },
+  ];
+  return meta
+    .map((m) => {
+      const count = all.filter((x) => x.status === m.status).length;
+      return { ...m, count, pct: total > 0 ? (count / total) * 100 : 0 };
+    })
+    .sort((a, b) => b.count - a.count);
+}
+
+export type ProjectProgressRow = {
+  id: string;
+  name: string;
+  total: number;
+  reviewed: number;
+  sent: number;
+  remaining: number;
+  pct: number;
+};
+
+/** Per-project milestone progress (reviewed / with-client / remaining), most
+ *  complete first. Projects with no milestones are dropped. */
+export function computeProjectProgress(projects: ProjectWithMilestones[]): ProjectProgressRow[] {
+  return projects
+    .map((p) => {
+      const total = p.milestones.length;
+      const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
+      const sent = p.milestones.filter((m) => m.status === "sent").length;
+      return {
+        id: p.id,
+        name: p.name,
+        total,
+        reviewed,
+        sent,
+        remaining: Math.max(0, total - reviewed - sent),
+        pct: total > 0 ? (reviewed / total) * 100 : 0,
+      };
+    })
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.pct - a.pct || b.total - a.total);
+}
+
+export type WorkloadRow = {
+  key: string;
+  name: string;
+  open: number;
+  done: number;
+  total: number;
+};
+
+/** Milestones grouped by assignee (email), open (draft/sent/rejected) vs done
+ *  (reviewed), busiest first. Milestones with no assignee roll up to
+ *  "Unassigned", which is always sorted last. */
+export function computeDeliveryWorkload(projects: ProjectWithMilestones[]): WorkloadRow[] {
+  const byKey = new Map<string, WorkloadRow>();
+  const bump = (key: string, name: string, done: boolean) => {
+    const row = byKey.get(key) ?? { key, name, open: 0, done: 0, total: 0 };
+    if (done) row.done += 1;
+    else row.open += 1;
+    row.total += 1;
+    byKey.set(key, row);
+  };
+  for (const project of projects) {
+    for (const m of project.milestones) {
+      const done = m.status === "reviewed";
+      if (m.assignees.length === 0) {
+        bump("__unassigned__", "Unassigned", done);
+        continue;
+      }
+      for (const a of m.assignees) {
+        bump(a.email.toLowerCase(), a.name ?? a.email, done);
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => {
+    if (a.key === "__unassigned__") return 1;
+    if (b.key === "__unassigned__") return -1;
+    return b.total - a.total || b.open - a.open;
+  });
+}

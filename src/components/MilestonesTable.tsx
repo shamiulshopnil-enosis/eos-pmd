@@ -9,11 +9,12 @@ import type { MilestoneWithProject } from "@/lib/types";
 import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { MILESTONE_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import { EmptyState, FlagBadge, MilestoneStatusBadge, StarRating } from "@/components/ui";
+import { EmptyState, FlagBadge, ListCard, MilestoneStatusBadge, StarRating } from "@/components/ui";
 import {
   FilterDateRange,
   FilterToolbar,
   ResultBar,
+  cmp,
   facetCounts,
   emptySelection,
   toggleValue,
@@ -196,6 +197,12 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
     [rows, selected, q, dates],
   );
 
+  // Pre-sorted so the mobile card list matches the DataTable's own sort.
+  const sorted = useMemo(() => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => cmp(a[sort.key], b[sort.key]) * dir);
+  }, [filtered, sort]);
+
   const dateGroups: [string, string, string, string][] = [
     ["start", "Start date", dates.startFrom, dates.startTo],
     ["due", "Due date", dates.dueFrom, dates.dueTo],
@@ -263,8 +270,32 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
           description={anyActive ? "Adjust or clear the filters above." : "Milestones appear here once a project adds them."}
         />
       ) : (
+        <>
+        <ul className="space-y-2 sm:hidden">
+          {sorted.map((r) => (
+            <li key={r.id}>
+              <ListCard href={`/projects/${r.projectId}/milestones/${r.id}`}>
+                <div className="font-medium text-ink">{r.title}</div>
+                <div className="mt-0.5 text-xs text-ink-muted">
+                  {r.project} · {r.client}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <MilestoneStatusBadge status={r.status} />
+                  <FlagBadge flag={getMilestoneFlag(r.m)} />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
+                  <span>Due {formatDate(r.m.dueDate)}</span>
+                  {isMilestoneReviewed(r.m) ? <StarRating value={r.rating} /> : <span>Not reviewed</span>}
+                </div>
+                {r.assignees ? (
+                  <div className="mt-1.5 text-xs text-ink-subtle">{r.assignees}</div>
+                ) : null}
+              </ListCard>
+            </li>
+          ))}
+        </ul>
         <DataTable
-          value={filtered}
+          value={sorted}
           dataKey="id"
           removableSort
           sortField={sort.key}
@@ -272,7 +303,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
           onSort={(e: DataTableSortEvent) =>
             setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
           }
-          className="eos-table eos-rows-clickable"
+          className="eos-table eos-rows-clickable hidden sm:block"
           tableStyle={{ minWidth: "1200px" }}
           scrollable
           onRowClick={(e) => {
@@ -338,6 +369,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
             body={(r: Row) => (isMilestoneReviewed(r.m) ? <StarRating value={r.rating} /> : <span className="text-ink-muted">—</span>)}
           />
         </DataTable>
+        </>
       )}
     </>
   );

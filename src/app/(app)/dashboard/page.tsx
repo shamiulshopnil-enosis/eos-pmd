@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { TrendChart } from "@/components/TrendChart";
+import { DashboardBreakdowns } from "@/components/DashboardBreakdowns";
 import { DashboardLedger, type LedgerRow } from "@/components/DashboardLedger";
 import { ProjectPerformanceTable, type PerfRow } from "@/components/ProjectPerformanceTable";
 
@@ -293,6 +294,12 @@ export default async function DashboardPage() {
           </div>
         </section>
       </div>
+
+      {/* Breakdowns — Jira-style summary cards */}
+      <section className="mt-10">
+        <SectionHeading>Breakdowns</SectionHeading>
+        <DashboardBreakdowns projects={projects} />
+      </section>
 
       {/* Client ledger */}
       <section className="mt-10">

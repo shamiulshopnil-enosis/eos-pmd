@@ -7,7 +7,7 @@ import { Column } from "primereact/column";
 import type { Milestone } from "@/lib/types";
 import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { FlagBadge, MilestoneStatusBadge, StarRating } from "@/components/ui";
+import { FlagBadge, ListCard, MilestoneStatusBadge, StarRating } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 
@@ -24,10 +24,33 @@ export default function ProjectMilestoneTable({
   const [expanded, setExpanded] = useState<DataTableExpandedRows>({});
 
   return (
+    <>
+    <ul className="space-y-2 sm:hidden">
+      {milestones.map((m) => (
+        <li key={m.id}>
+          <ListCard href={`/projects/${projectId}/milestones/${m.id}`}>
+            <div className="font-medium text-ink">{m.title}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <MilestoneStatusBadge status={m.status} />
+              <FlagBadge flag={getMilestoneFlag(m)} />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
+              <span>Due {formatDate(m.dueDate)}</span>
+              {isMilestoneReviewed(m) ? <StarRating value={m.rating} /> : <span>Not reviewed</span>}
+            </div>
+            {m.assignees.length > 0 ? (
+              <div className="mt-1.5 text-xs text-ink-subtle">
+                {m.assignees.map((a) => a.name ?? a.email).join(", ")}
+              </div>
+            ) : null}
+          </ListCard>
+        </li>
+      ))}
+    </ul>
     <DataTable
       value={milestones}
       dataKey="id"
-      className="eos-table"
+      className="eos-table hidden sm:block"
       expandedRows={expanded}
       onRowToggle={(e) => setExpanded(e.data as DataTableExpandedRows)}
       rowExpansionTemplate={(m: Milestone) => {
@@ -128,5 +151,6 @@ export default function ProjectMilestoneTable({
         }
       />
     </DataTable>
+    </>
   );
 }

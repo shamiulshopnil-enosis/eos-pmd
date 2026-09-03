@@ -21,6 +21,7 @@ import {
   EmptyState,
   ExecutionStatusBadge,
   HealthBadge,
+  ListCard,
   ProjectStatusBadge,
   ProjectTypeBadge,
   RagDisc,
@@ -29,6 +30,7 @@ import {
   FilterDateRange,
   FilterToolbar,
   ResultBar,
+  cmp,
   facetCounts,
   emptySelection,
   toggleValue,
@@ -189,6 +191,12 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
     [rows, selected, q, dates],
   );
 
+  // Pre-sorted so the mobile card list matches the DataTable's own sort.
+  const sorted = useMemo(() => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => cmp(a[sort.key], b[sort.key]) * dir);
+  }, [filtered, sort]);
+
   const dateActive =
     (dates.startFrom || dates.startTo ? 1 : 0) + (dates.dueFrom || dates.dueTo ? 1 : 0);
   const extraChips: ExtraChip[] = [];
@@ -265,8 +273,33 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           description={anyActive ? "Adjust or clear the filters above." : "Create your first project to get started."}
         />
       ) : (
+        <>
+        <ul className="space-y-2 sm:hidden">
+          {sorted.map((r) => (
+            <li key={r.id}>
+              <ListCard href={`/projects/${r.id}`}>
+                <div className="flex items-start gap-2">
+                  <RagDisc health={r.perf.health} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-ink">{r.name}</div>
+                    <div className="mt-0.5 text-xs text-ink-muted">{r.client}</div>
+                  </div>
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <ProjectStatusBadge status={r.status} />
+                  <ExecutionStatusBadge status={r.execution} />
+                  <HealthBadge health={r.perf.health} />
+                </div>
+                <div className="mt-2.5 flex items-center gap-4 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
+                  <span>{r.milestones} milestone{r.milestones === 1 ? "" : "s"}</span>
+                  <span>Avg {formatRating(r.rating)}</span>
+                </div>
+              </ListCard>
+            </li>
+          ))}
+        </ul>
         <DataTable
-          value={filtered}
+          value={sorted}
           dataKey="id"
           removableSort
           sortField={sort.key}
@@ -274,7 +307,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           onSort={(e: DataTableSortEvent) =>
             setSort({ key: e.sortField as SortKey, dir: e.sortOrder === 1 ? "asc" : "desc" })
           }
-          className="eos-table eos-rows-clickable"
+          className="eos-table eos-rows-clickable hidden sm:block"
           tableStyle={{ minWidth: "1180px" }}
           scrollable
           onRowClick={(e) => {
@@ -325,6 +358,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           />
           <Column field="healthRank" header="Client health" sortable body={(r: Row) => <HealthBadge health={r.perf.health} />} />
         </DataTable>
+        </>
       )}
     </>
   );

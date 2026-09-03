@@ -19,11 +19,12 @@ import { Button } from "primereact/button";
  * FormData; controlled widgets mirror their value into a hidden input.
  * ------------------------------------------------------------------ */
 
+// Constrained widths apply from `sm` up; on a phone every field fills its row.
 const FIELD_WIDTH: Record<string, string> = {
-  xs: "max-w-[7rem]",
-  sm: "max-w-[12rem]",
-  md: "max-w-[20rem]",
-  lg: "max-w-[28rem]",
+  xs: "w-full sm:w-auto sm:max-w-[7rem]",
+  sm: "w-full sm:w-auto sm:max-w-[12rem]",
+  md: "w-full sm:w-auto sm:max-w-[20rem]",
+  lg: "w-full sm:w-auto sm:max-w-[28rem]",
   full: "",
 };
 
