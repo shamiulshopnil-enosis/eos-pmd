@@ -48,7 +48,7 @@ export function isMilestoneReviewed(m: Milestone | null): m is Milestone & { rat
 export function classifyHealth(rating: number | null): ClientHealth {
   if (rating == null) return "NO_DATA";
   if (rating >= SATISFACTION_THRESHOLDS.happyAtOrAbove) return "HAPPY";
-  if (rating >= SATISFACTION_THRESHOLDS.needsAttentionAtOrAbove) return "NEEDS_ATTENTION";
+  if (rating > SATISFACTION_THRESHOLDS.needsAttentionAbove) return "NEEDS_ATTENTION";
   return "AT_RISK";
 }
 
@@ -211,48 +211,118 @@ export function computeAlerts(projects: ProjectWithMilestones[], now: Date = new
 }
 
 export type RatingTrendPoint = {
-  /** Short axis label, e.g. "Jul 26". */
+  /** Short axis label, e.g. "Jul 26" (monthly) or "Sep 3" (daily). */
   label: string;
-  /** Full label for tooltips, e.g. "July 2026". */
-  monthLabel: string;
-  /** Mean of the milestone ratings reviewed in this month, or null if none. */
+  /** Full label for tooltips, e.g. "July 2026" or "Wed, September 3, 2026". */
+  fullLabel: string;
+  /** Mean of the milestone ratings reviewed in this bucket, or null if none. */
   avgRating: number | null;
-  /** How many milestones were reviewed in this month. */
+  /** How many milestones were reviewed in this bucket. */
   count: number;
   /** Running mean of every rating reviewed from the window start through this
-   *  month — the stable line the noisy monthly average moves around. */
+   *  bucket — the stable line the noisy per-bucket average moves around. */
   cumulativeAvg: number | null;
 };
 
+/** Granularity the rating trend can be bucketed at. */
+export type TrendPeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+/** How many buckets each period shows — the visible window. */
+export const TREND_PERIOD_BUCKETS: Record<TrendPeriod, number> = {
+  daily: 30,
+  weekly: 12,
+  monthly: 12,
+  yearly: 5,
+};
+
+/** A single reviewed rating, serialisation-safe across the server→client boundary. */
+export type RatingSample = { rating: number; reviewedAt: string };
+
+/** Every reviewed milestone rating across the given projects, oldest first. */
+export function collectRatingSamples(projects: ProjectWithMilestones[]): RatingSample[] {
+  const out: RatingSample[] = [];
+  for (const project of projects) {
+    for (const m of project.milestones) {
+      if (!isMilestoneReviewed(m) || m.rating == null || !m.reviewedAt) continue;
+      out.push({ rating: m.rating, reviewedAt: new Date(m.reviewedAt).toISOString() });
+    }
+  }
+  return out.sort((a, b) => a.reviewedAt.localeCompare(b.reviewedAt));
+}
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const startOfWeek = (d: Date) => {
+  const s = startOfDay(d);
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); // Monday = 0
+  return s;
+};
+
 /**
- * Milestone rating over time, bucketed by the month it was reviewed. Returns the
- * monthly mean, the review count behind it, and a running (cumulative) mean so
- * the chart can show signal (the trend) next to noise (one volatile month).
+ * Reviewed milestone ratings bucketed by calendar period. Returns the per-bucket
+ * mean, the review count behind it, and a running (cumulative) mean so the chart
+ * can show signal (the trend) next to noise (one volatile bucket). `now` is
+ * injectable for tests.
  */
 export function computeRatingTrend(
-  projects: ProjectWithMilestones[],
-  months = 6,
+  samples: RatingSample[],
+  period: TrendPeriod = "monthly",
+  now: Date = new Date(),
 ): RatingTrendPoint[] {
-  const now = new Date();
-  const buckets: { label: string; monthLabel: string; year: number; month: number; ratings: number[] }[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    buckets.push({
-      label: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
-      monthLabel: d.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      ratings: [],
-    });
+  const n = TREND_PERIOD_BUCKETS[period];
+  const buckets: {
+    start: number;
+    end: number;
+    label: string;
+    fullLabel: string;
+    ratings: number[];
+  }[] = [];
+
+  for (let i = n - 1; i >= 0; i--) {
+    let start: Date;
+    let end: Date;
+    let label: string;
+    let fullLabel: string;
+    if (period === "daily") {
+      start = startOfDay(now);
+      start.setDate(start.getDate() - i);
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      label = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      fullLabel = start.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    } else if (period === "weekly") {
+      start = startOfWeek(now);
+      start.setDate(start.getDate() - i * 7);
+      end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      label = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      fullLabel = `Week of ${start.toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })}`;
+    } else if (period === "monthly") {
+      start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      label = start.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+      fullLabel = start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    } else {
+      start = new Date(now.getFullYear() - i, 0, 1);
+      end = new Date(now.getFullYear() - i + 1, 0, 1);
+      label = String(start.getFullYear());
+      fullLabel = label;
+    }
+    buckets.push({ start: start.getTime(), end: end.getTime(), label, fullLabel, ratings: [] });
   }
 
-  for (const project of projects) {
-    for (const milestone of reviewedMilestones(project)) {
-      const reviewed = milestone.reviewedAt;
-      if (!reviewed) continue;
-      const bucket = buckets.find((b) => b.year === reviewed.getFullYear() && b.month === reviewed.getMonth());
-      if (bucket) bucket.ratings.push(milestone.rating as number);
-    }
+  for (const s of samples) {
+    const t = new Date(s.reviewedAt).getTime();
+    const bucket = buckets.find((b) => t >= b.start && t < b.end);
+    if (bucket) bucket.ratings.push(s.rating);
   }
 
   const seen: number[] = [];
@@ -260,7 +330,7 @@ export function computeRatingTrend(
     seen.push(...b.ratings);
     return {
       label: b.label,
-      monthLabel: b.monthLabel,
+      fullLabel: b.fullLabel,
       avgRating: average(b.ratings),
       count: b.ratings.length,
       cumulativeAvg: seen.length > 0 ? average(seen) : null,

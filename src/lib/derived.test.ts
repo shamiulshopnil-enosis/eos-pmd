@@ -69,8 +69,11 @@ describe("isMilestoneReviewed", () => {
 describe("classifyHealth", () => {
   it("buckets the rating", () => {
     expect(classifyHealth(null)).toBe("NO_DATA");
+    expect(classifyHealth(5)).toBe("HAPPY");
     expect(classifyHealth(4)).toBe("HAPPY");
-    expect(classifyHealth(3)).toBe("NEEDS_ATTENTION");
+    expect(classifyHealth(3.5)).toBe("NEEDS_ATTENTION");
+    expect(classifyHealth(3.01)).toBe("NEEDS_ATTENTION");
+    expect(classifyHealth(3)).toBe("AT_RISK");
     expect(classifyHealth(2.5)).toBe("AT_RISK");
   });
 });

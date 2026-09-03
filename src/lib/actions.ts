@@ -291,12 +291,6 @@ export async function removeCompanyMember(companyId: string, membershipId: strin
   revalidatePath("/team");
 }
 
-export async function renameCompany(companyId: string, formData: FormData) {
-  await patch(`/companies/${companyId}`, formToObject(formData));
-  revalidatePath("/team");
-  revalidatePath("/companies");
-}
-
 /** Replace the delivering-company people assigned to a project. */
 export async function setProjectStaffing(projectId: string, formData: FormData) {
   await post(`/projects/${projectId}/delivery-staffing`, formToObject(formData));

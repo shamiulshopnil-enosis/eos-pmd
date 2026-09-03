@@ -1,12 +1,7 @@
 "use client";
 
 import { Button } from "primereact/button";
-import {
-  addCompanyMember,
-  removeCompanyMember,
-  renameCompany,
-  updateCompanyMember,
-} from "@/lib/actions";
+import { addCompanyMember, removeCompanyMember, updateCompanyMember } from "@/lib/actions";
 import type { Company, CompanyMember } from "@/lib/types";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { Field, Select, TextInput } from "@/components/form";
@@ -31,20 +26,6 @@ export default function CompanyManager({
 }) {
   return (
     <>
-      <Card className="mb-6">
-        <SectionHeading>Company</SectionHeading>
-        <ActionForm
-          action={renameCompany.bind(null, company.id)}
-          success="Company name saved."
-          className="flex flex-wrap items-end gap-3"
-        >
-          <Field label="Name" required width="md">
-            <TextInput name="name" required defaultValue={company.name} />
-          </Field>
-          <Button type="submit" outlined severity="secondary" label="Save" />
-        </ActionForm>
-      </Card>
-
       <Card>
         <SectionHeading>People</SectionHeading>
         {members.length === 0 ? (
