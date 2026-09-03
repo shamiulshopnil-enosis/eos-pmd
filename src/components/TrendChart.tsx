@@ -59,10 +59,10 @@ const fmt = (n: number | null | undefined) => (n == null ? "—" : n.toFixed(1))
 const MONO = "var(--font-roboto-mono), ui-monospace, monospace";
 
 const PERIODS: { key: TrendPeriod; label: string; unit: string }[] = [
-  { key: "daily", label: "Daily", unit: "d" },
-  { key: "weekly", label: "Weekly", unit: "wk" },
-  { key: "monthly", label: "Monthly", unit: "mo" },
-  { key: "yearly", label: "Yearly", unit: "yr" },
+  { key: "week", label: "Last week", unit: "d" },
+  { key: "month", label: "Last month", unit: "d" },
+  { key: "quarter", label: "Last quarter", unit: "wk" },
+  { key: "year", label: "Last year", unit: "mo" },
 ];
 
 /**
@@ -77,7 +77,7 @@ const PERIODS: { key: TrendPeriod; label: string; unit: string }[] = [
  */
 export function TrendChart({ samples }: { samples: RatingSample[] }) {
   const [t, setT] = useState<Tokens>(() => readTokens());
-  const [period, setPeriod] = useState<TrendPeriod>("monthly");
+  const [period, setPeriod] = useState<TrendPeriod>("quarter");
   useEffect(() => {
     const obs = new MutationObserver(() => setT(readTokens()));
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
@@ -252,7 +252,9 @@ export function TrendChart({ samples }: { samples: RatingSample[] }) {
   const options = useMemo(
     () => ({
       maintainAspectRatio: false,
-      layout: { padding: { top: 18, right: 6 } },
+      // Headroom for the per-point value labels drawn above the top gridline —
+      // without it the "5.0" labels clip against the canvas edge.
+      layout: { padding: { top: 34, right: 6 } },
       interaction: { mode: "index" as const, intersect: false },
       plugins: {
         legend: { display: false },
@@ -394,7 +396,7 @@ export function TrendChart({ samples }: { samples: RatingSample[] }) {
         data={data}
         options={options}
         plugins={[zonesPlugin, valueLabelsPlugin]}
-        className="h-52 w-full"
+        className="h-60 w-full"
       />
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-[11px] text-ink-muted">

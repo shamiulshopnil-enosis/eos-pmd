@@ -12,7 +12,6 @@ import {
   MILESTONE_STATUS_LABELS,
   type ClientHealth,
   CLIENT_HEALTH_LABELS,
-  PROJECT_TYPE_LABELS,
   ADMIN_STATUS_LABELS,
   EXECUTION_STATUS_LABELS,
 } from "@/lib/constants";
@@ -103,10 +102,6 @@ export function ProjectStatusBadge({ status }: { status: string }) {
 const milestoneStatusTone: Record<string, Tone> = { draft: "slate", sent: "amber", reviewed: "green", rejected: "red" };
 export function MilestoneStatusBadge({ status }: { status: string }) {
   return <Badge tone={milestoneStatusTone[status] ?? "slate"}>{MILESTONE_STATUS_LABELS[status] ?? status}</Badge>;
-}
-
-export function ProjectTypeBadge({ type }: { type: string }) {
-  return <Badge tone="slate">{PROJECT_TYPE_LABELS[type] ?? type}</Badge>;
 }
 
 const adminStatusTone: Record<string, Tone> = {

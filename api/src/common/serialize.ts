@@ -103,6 +103,8 @@ export function serializeProject(p: Raw): Project {
     clientCompanyId: p.clientCompanyId == null ? null : String(p.clientCompanyId),
     deliveringCompanyId: p.deliveringCompanyId == null ? null : String(p.deliveringCompanyId),
     receivingCompanyId: p.receivingCompanyId == null ? null : String(p.receivingCompanyId),
+    deliveringCompanyName: str(p.deliveringCompanyName),
+    receivingCompanyName: str(p.receivingCompanyName),
     clientContactName: str(p.clientContactName),
     clientEmail: p.clientEmail as string,
     services: str(p.services),
@@ -116,7 +118,6 @@ export function serializeProject(p: Raw): Project {
     internalRef: str(p.internalRef),
     projectUrl: str(p.projectUrl),
     visibility: (p.visibility as Project["visibility"]) ?? "PRIVATE",
-    projectType: (p.projectType as Project["projectType"]) ?? "whole",
     adminStatus: (p.adminStatus as Project["adminStatus"]) ?? "draft",
     executionStatus: (p.executionStatus as Project["executionStatus"]) ?? "ongoing",
     minReviewThreshold: Number(p.minReviewThreshold ?? 0),
@@ -184,6 +185,17 @@ function serializeMilestoneReview(r: Raw | null | undefined): Milestone["ratings
   };
 }
 
+function serializeMilestoneReviewNotes(r: Raw | null | undefined): Milestone["ratingNotes"] {
+  if (!r) return null;
+  return {
+    deliverables: str(r.deliverables),
+    timeliness: str(r.timeliness),
+    understanding: str(r.understanding),
+    planning: str(r.planning),
+    communication: str(r.communication),
+  };
+}
+
 export function serializeMilestone(m: Raw): Milestone {
   return {
     id: String(m._id),
@@ -201,6 +213,7 @@ export function serializeMilestone(m: Raw): Milestone {
       ? (m.attachments as Raw[]).map(serializeMilestoneAttachment)
       : [],
     ratings: serializeMilestoneReview(m.ratings as Raw | null | undefined),
+    ratingNotes: serializeMilestoneReviewNotes(m.ratingNotes as Raw | null | undefined),
     rating: num(m.rating),
     comment: str(m.comment),
     editRequestedByVendor: Boolean(m.editRequestedByVendor),

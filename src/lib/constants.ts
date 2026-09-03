@@ -125,13 +125,6 @@ export const PROJECT_STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "Archived",
 };
 
-// --- Milestones plan, Phase 1 ---
-
-export const PROJECT_TYPE_LABELS: Record<string, string> = {
-  whole: "Whole Project",
-  milestone: "Milestone Project",
-};
-
 export const ADMIN_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   pending_approval: "Pending Approval",

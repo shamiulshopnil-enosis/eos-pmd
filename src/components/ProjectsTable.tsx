@@ -8,7 +8,6 @@ import { Column } from "primereact/column";
 import type { ProjectWithMilestones } from "@/lib/types";
 import { computeProjectPerformance } from "@/lib/derived";
 import {
-  PROJECT_TYPE_LABELS,
   ADMIN_STATUS_LABELS,
   EXECUTION_STATUS_LABELS,
   CLIENT_HEALTH_LABELS,
@@ -21,7 +20,6 @@ import {
   ExecutionStatusBadge,
   HealthBadge,
   ListCard,
-  ProjectTypeBadge,
   RagDisc,
 } from "@/components/ui";
 import {
@@ -44,7 +42,6 @@ type SortKey = "name" | "client" | "milestones" | "rating" | "healthRank";
 const HEALTH_ORDER: Record<string, number> = { HAPPY: 0, NEEDS_ATTENTION: 1, AT_RISK: 2, NO_DATA: 3 };
 
 const FACETS: FilterFacet[] = [
-  { key: "type", label: "Type", options: Object.entries(PROJECT_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "health", label: "Client health", options: Object.entries(CLIENT_HEALTH_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "approval", label: "EOS approval", options: Object.entries(ADMIN_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
   { key: "execution", label: "Execution", options: Object.entries(EXECUTION_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
@@ -61,7 +58,7 @@ const FACETS: FilterFacet[] = [
   },
 ];
 
-const INLINE_KEYS = ["type", "health"];
+const INLINE_KEYS = ["health"];
 
 const SORT_OPTIONS: { label: string; key: SortKey; dir: "asc" | "desc" }[] = [
   { label: "Name (A–Z)", key: "name", dir: "asc" },
@@ -79,7 +76,6 @@ type Row = {
   approval: string;
   execution: string;
   visibility: string;
-  type: string;
   health: string;
   ratingBand: string;
   milestones: number;
@@ -106,7 +102,6 @@ function inRange(d: Date | null, from: string, to: string): boolean {
 }
 
 const ACCESS: Record<string, (r: Row) => string> = {
-  type: (r) => r.type,
   health: (r) => r.health,
   approval: (r) => r.approval,
   execution: (r) => r.execution,
@@ -144,7 +139,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           approval: project.adminStatus,
           execution: project.executionStatus,
           visibility: project.visibility,
-          type: project.projectType,
           health: perf.health,
           ratingBand: ratingBand(perf.avgRating),
           milestones: perf.totalMilestones,
@@ -332,7 +326,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
               <Badge tone={r.visibility === "PUBLIC" ? "blue" : "slate"}>{r.visibility === "PUBLIC" ? "Public" : "Private"}</Badge>
             )}
           />
-          <Column field="type" header="Type" sortable body={(r: Row) => <ProjectTypeBadge type={r.type} />} />
           <Column
             field="milestones"
             header="Milestones"

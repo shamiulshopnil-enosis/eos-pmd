@@ -55,12 +55,18 @@ const toDate = (v: unknown): Date | null => {
 
 /**
  * Milestones added inline on the new-project form. The client serialises them
- * into a `milestonesJson` field: `[{title, startDate?, dueDate?, description?}]`.
- * Only rows with a title survive.
+ * into a `milestonesJson` field:
+ * `[{title, startDate?, dueDate?, description?, assigneeEmails: string[]}]`.
+ * Only rows with a title survive. Every milestone must name at least one
+ * assignee, so a project can never be created with an unassigned milestone.
  */
-function parseInlineMilestones(
-  body: Record<string, unknown>,
-): { title: string; description: string; startDate: Date | null; dueDate: Date | null }[] {
+function parseInlineMilestones(body: Record<string, unknown>): {
+  title: string;
+  description: string;
+  startDate: Date | null;
+  dueDate: Date | null;
+  assigneeEmails: string[];
+}[] {
   const raw = body["milestonesJson"];
   if (typeof raw !== "string" || raw.trim() === "") return [];
   let parsed: unknown;
@@ -73,11 +79,17 @@ function parseInlineMilestones(
   return parsed
     .map((r) => {
       const row = (r ?? {}) as Record<string, unknown>;
+      const emails = Array.isArray(row.assigneeEmails)
+        ? (row.assigneeEmails as unknown[])
+            .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
+            .filter((e) => e !== "")
+        : [];
       return {
         title: typeof row.title === "string" ? row.title.trim() : "",
         description: typeof row.description === "string" ? row.description : "",
         startDate: toDate(row.startDate),
         dueDate: toDate(row.dueDate),
+        assigneeEmails: [...new Set(emails)],
       };
     })
     .filter((m) => m.title !== "");
@@ -105,6 +117,7 @@ export class ProjectsService {
     @InjectModel(MODEL.Activity) private readonly activities: Model<any>,
     @InjectModel(MODEL.Invitation) private readonly invitations: Model<any>,
     @InjectModel(MODEL.CompanyMember) private readonly companyMembers: Model<any>,
+    @InjectModel(MODEL.Company) private readonly companiesModel: Model<any>,
     private readonly activity: ActivityService,
     private readonly users: UsersService,
     private readonly companies: CompaniesService,
@@ -182,6 +195,17 @@ export class ProjectsService {
           .lean()) as Record<string, any>[]),
       );
     }
+
+    // Company display names — so a read can show "delivered by <vendor>" /
+    // "for <client>" without the caller joining the companies collection.
+    const companyNameById = new Map<string, string>();
+    if (companyIds.size) {
+      const companyDocs = (await this.companiesModel
+        .find({ _id: { $in: toObjectIds([...companyIds]) } })
+        .select({ name: 1 })
+        .lean()) as Record<string, any>[];
+      for (const c of companyDocs) companyNameById.set(String(c._id), String(c.name ?? ""));
+    }
     const memberById = new Map<string, Record<string, any>>();
     const membersByCompany = new Map<string, Record<string, any>[]>();
     for (const m of membershipDocs) {
@@ -232,6 +256,12 @@ export class ProjectsService {
 
       const out: T = {
         ...p,
+        deliveringCompanyName: p.deliveringCompanyId
+          ? companyNameById.get(p.deliveringCompanyId) ?? p.deliveringCompanyName ?? null
+          : p.deliveringCompanyName ?? null,
+        receivingCompanyName: p.receivingCompanyId
+          ? companyNameById.get(p.receivingCompanyId) ?? p.receivingCompanyName ?? p.clientCompanyName ?? null
+          : p.receivingCompanyName ?? p.clientCompanyName ?? null,
         vendorTeam: mergeVendorTeam(p.vendorTeam, delivery.people),
         clientContacts: mergeClientContacts(
           p.clientContacts,
@@ -529,6 +559,67 @@ export class ProjectsService {
       strList(body, "memberIds"),
     );
 
+    // Every project is a milestone project now: it must ship with at least one
+    // milestone, and every milestone must name at least one assignee. Validate
+    // before the project row is written so a rejected form leaves nothing behind.
+    const inlineMilestones = parseInlineMilestones(body);
+    if (inlineMilestones.length === 0) {
+      throw new BadRequestException("Add at least one milestone — every project needs one.");
+    }
+    const wantedAssigneeEmails = [
+      ...new Set(inlineMilestones.flatMap((m) => m.assigneeEmails)),
+    ];
+    const assigneeMemberDocs = wantedAssigneeEmails.length
+      ? ((await this.companyMembers
+          .find({
+            companyId: new Types.ObjectId(deliveringCompanyId),
+            email: { $in: wantedAssigneeEmails },
+          })
+          .lean()) as Record<string, any>[])
+      : [];
+    const assigneeByEmail = new Map(
+      assigneeMemberDocs.map((m) => [String(m.email).toLowerCase(), m]),
+    );
+    const snapshotAssignees = (emails: string[]) => {
+      const out: { userId: Types.ObjectId | null; email: string; name: string | null }[] = [];
+      const seen = new Set<string>();
+      for (const raw of emails) {
+        const email = raw.trim().toLowerCase();
+        if (!email || seen.has(email)) continue;
+        if (email === user.email.toLowerCase()) {
+          seen.add(email);
+          out.push({ userId: new Types.ObjectId(user.id), email, name: user.name ?? null });
+          continue;
+        }
+        const m = assigneeByEmail.get(email);
+        if (!m) continue;
+        seen.add(email);
+        out.push({
+          userId: m.userId ? new Types.ObjectId(String(m.userId)) : null,
+          email,
+          name: (m.name as string) ?? null,
+        });
+      }
+      return out;
+    };
+    const preparedMilestones = inlineMilestones.map((m) => {
+      const assignees = snapshotAssignees(m.assigneeEmails);
+      if (assignees.length === 0) {
+        throw new BadRequestException(
+          `Assign at least one teammate to the milestone "${m.title}".`,
+        );
+      }
+      return { ...m, assignees };
+    });
+
+    // Anyone assigned to a milestone must also be able to see the project.
+    const milestoneAssigneeMemberIds = assigneeMemberDocs.map((m) => m._id as Types.ObjectId);
+    const allAssignedMemberIds = [
+      ...new Map(
+        [...assignedMemberIds, ...milestoneAssigneeMemberIds].map((id) => [String(id), id]),
+      ).values(),
+    ];
+
     const project = await this.projects.create({
       name: str(body, "name"),
       clientCompanyName: company.name,
@@ -544,8 +635,7 @@ export class ProjectsService {
       engagementModel: optStr(body, "engagementModel"),
       internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
-      projectType: str(body, "projectType") === "whole" ? "whole" : "milestone",
-      assignedMemberIds,
+      assignedMemberIds: allAssignedMemberIds,
       vendorTeam: [
         { userId: user.id, email: user.email, name: user.name, role: "owner", invitePending: false },
       ],
@@ -590,31 +680,21 @@ export class ProjectsService {
 
     await project.save();
 
-    if (project.projectType === "whole") {
+    for (const m of preparedMilestones) {
       await this.milestones.create({
         projectId,
-        title: "Project delivery",
-        description: "",
-        dueDate: optDate(body, "expectedCompletionDate"),
+        title: m.title,
+        description: sanitizeMilestoneHtml(m.description),
+        startDate: m.startDate,
+        dueDate: m.dueDate,
+        assignees: m.assignees,
         status: "draft",
       });
-    } else {
-      const inline = parseInlineMilestones(body);
-      for (const m of inline) {
-        await this.milestones.create({
-          projectId,
-          title: m.title,
-          description: sanitizeMilestoneHtml(m.description),
-          startDate: m.startDate,
-          dueDate: m.dueDate,
-          status: "draft",
-        });
-        await this.activity.log({
-          projectId,
-          type: "RELEASE_CREATED",
-          message: `Milestone "${m.title}" created`,
-        });
-      }
+      await this.activity.log({
+        projectId,
+        type: "RELEASE_CREATED",
+        message: `Milestone "${m.title}" created`,
+      });
     }
     await this.recomputeProjectScore(projectId);
 
@@ -629,16 +709,6 @@ export class ProjectsService {
 
   async updateProject(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
     await this.requirePermission(projectId, user, canManageProject, "Only a project owner can edit the project.");
-
-    const current = await this.projects.findById(projectId).select("projectType");
-    if (current?.projectType === "whole") {
-      const sent = await this.milestones.exists({ projectId, status: "sent" });
-      if (sent) {
-        throw new BadRequestException(
-          "This project is locked for editing while its milestone is with the client for review.",
-        );
-      }
-    }
 
     await this.projects.findByIdAndUpdate(projectId, {
       name: str(body, "name"),

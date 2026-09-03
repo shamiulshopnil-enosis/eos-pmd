@@ -36,7 +36,7 @@ export default async function MilestoneDetailPage({
 
   const flag = getMilestoneFlag(milestone);
   const siblingSent = project.milestones.find((m) => m.id !== milestoneId && m.status === "sent");
-  const isWhole = project.projectType === "whole";
+  const canDeleteMilestone = project.milestones.length > 1;
 
   return (
     <div>
@@ -205,7 +205,7 @@ export default async function MilestoneDetailPage({
             </div>
           )}
 
-          {milestone.status !== "sent" && !isWhole ? (
+          {milestone.status !== "sent" && canDeleteMilestone ? (
             <form
               action={deleteMilestone.bind(null, id, milestoneId)}
               className="mt-5 border-t border-rule pt-4"

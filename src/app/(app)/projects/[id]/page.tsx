@@ -39,7 +39,6 @@ import {
   MilestoneStatusBadge,
   PageHeader,
   ProjectStatusBadge,
-  ProjectTypeBadge,
   SectionHeading,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -75,7 +74,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!del && !rev && user.role !== "admin") notFound();
 
   const perf = computeProjectPerformance(project);
-  const isWhole = project.projectType === "whole";
 
   // People management (delivery team) — the "+" popover on the People cell.
   const myCompany = await getMyCompany().catch(() => null);
@@ -122,7 +120,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         description={
           del
             ? `${project.clientCompanyName}${project.clientContactName ? ` · ${project.clientContactName}` : ""}`
-            : `Your role: ${reviewRoleLabel(project)}`
+            : `Delivered by ${project.deliveringCompanyName ?? "the delivery team"} · Your role: ${reviewRoleLabel(project)}`
         }
         back={{ href: "/projects", label: "All projects" }}
         action={
@@ -132,7 +130,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 Edit
               </GhostLink>
             ) : null}
-            {del && !isWhole ? (
+            {del ? (
               <GhostLink href={`/projects/${project.id}/milestones/new`} icon="add">
                 Add milestone
               </GhostLink>
@@ -147,7 +145,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-1.5">
-        <ProjectTypeBadge type={project.projectType} />
         <ProjectStatusBadge status={project.status} />
         <AdminStatusBadge status={project.adminStatus} />
         <ExecutionStatusBadge status={project.executionStatus} />
@@ -196,7 +193,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div>
           <SectionHeading>Project overview</SectionHeading>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm sm:grid-cols-3">
-            <Info label="Client" value={project.clientCompanyName} />
+            {del ? (
+              <Info label="Client" value={project.clientCompanyName} />
+            ) : (
+              <Info label="Delivered by" value={project.deliveringCompanyName ?? "—"} />
+            )}
             {del ? <Info label="Client email" value={project.clientEmail} mono /> : null}
             <Info label="Services" value={project.services} />
             <Info label="Start date" value={formatDate(project.startDate)} mono />
@@ -287,8 +288,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 ? "Add the first milestone to start tracking this project's delivery performance."
                 : "Milestones will appear here once the delivery team adds them."
             }
-            actionHref={del && !isWhole ? `/projects/${project.id}/milestones/new` : undefined}
-            actionLabel={del && !isWhole ? "Add milestone" : undefined}
+            actionHref={del ? `/projects/${project.id}/milestones/new` : undefined}
+            actionLabel={del ? "Add milestone" : undefined}
           />
         ) : del ? (
           <ProjectMilestoneTable projectId={project.id} milestones={project.milestones} />
@@ -395,6 +396,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                         action={editOwnMilestoneRating.bind(null, id, m.id)}
                         submitLabel="Update review"
                         defaultReview={m.ratings}
+                        defaultNotes={m.ratingNotes}
                         defaultComment={m.comment ?? ""}
                       />
                     </div>

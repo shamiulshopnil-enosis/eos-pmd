@@ -24,7 +24,8 @@
     "migrate:009": "tsx --env-file=.env scripts/migrations/009_unify_roles.ts",
     "migrate:010": "tsx --env-file=.env scripts/migrations/010_rename_company_collections.ts",
     "migrate:011": "tsx --env-file=.env scripts/migrations/011_drop_teams.ts",
-    "migrate:012": "tsx --env-file=.env scripts/migrations/012_milestone_due_date.ts"
+    "migrate:012": "tsx --env-file=.env scripts/migrations/012_milestone_due_date.ts",
+    "migrate:013": "tsx --env-file=.env scripts/migrations/013_drop_whole_projects.ts"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

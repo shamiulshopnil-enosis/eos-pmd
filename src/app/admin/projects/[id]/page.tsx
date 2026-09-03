@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getProject } from "@/lib/data";
 import { approveProject, rejectProject } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
-import { AdminStatusBadge, Card, PageHeader, ProjectTypeBadge } from "@/components/ui";
+import { AdminStatusBadge, Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
 
@@ -17,7 +17,6 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
         title={
           <span className="flex flex-wrap items-center gap-2">
             {project.name}
-            <ProjectTypeBadge type={project.projectType} />
             <AdminStatusBadge status={project.adminStatus} />
           </span>
         }
