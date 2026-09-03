@@ -9,14 +9,14 @@ export default async function CompaniesPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Companies"
-        description="Every company in the directory. New client companies are added while creating a project; a contact claims theirs the first time they sign in."
+        title="Clients"
+        description="Every client company in the directory. New ones are added while creating a project; a contact claims theirs the first time they sign in."
       />
 
       <Card className="p-5">
         <SectionHeading>Directory ({all.length})</SectionHeading>
         {all.length === 0 ? (
-          <p className="text-sm text-ink-muted">No companies yet.</p>
+          <p className="text-sm text-ink-muted">No client companies yet.</p>
         ) : (
           <ul className="divide-y divide-rule text-sm">
             {all.map((o) => (
