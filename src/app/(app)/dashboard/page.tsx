@@ -212,26 +212,35 @@ export default async function DashboardPage() {
             label="Active projects"
             value={kpis.activeProjects}
             hint={`of ${projects.length} total`}
+            href="/projects?status=ACTIVE"
           />
-          <FigureBlock label="Active milestones" value={kpis.activeMilestones} />
-          <FigureBlock label="Milestones reviewed" value={kpis.milestonesReviewed} />
+          <FigureBlock
+            label="Active milestones"
+            value={kpis.activeMilestones}
+            href="/milestones?status=draft"
+          />
+          <FigureBlock
+            label="Milestones reviewed"
+            value={kpis.milestonesReviewed}
+            href="/milestones?status=reviewed"
+          />
           <FigureBlock
             label="Awaiting client review"
             value={kpis.awaitingReview}
             tone={kpis.awaitingReview > 0 ? "warn" : undefined}
-            href={kpis.awaitingReview > 0 ? "/milestones?status=sent" : undefined}
+            href="/milestones?status=sent"
           />
           <FigureBlock
             label="Overdue milestones"
             value={overdueCount}
             tone={overdueCount > 0 ? "bad" : undefined}
-            href={overdueCount > 0 ? "/milestones?flag=OVERDUE" : undefined}
+            href="/milestones?flag=OVERDUE"
           />
           <FigureBlock
             label="Due soon"
             value={dueSoonCount}
             tone={dueSoonCount > 0 ? "warn" : undefined}
-            href={dueSoonCount > 0 ? "/milestones?flag=DUE_SOON" : undefined}
+            href="/milestones?flag=DUE_SOON"
           />
           <FigureBlock
             label="Avg. milestone rating"
@@ -245,11 +254,13 @@ export default async function DashboardPage() {
           <FigureBlock
             label="Client satisfaction rate"
             value={formatPercent(kpis.clientSatisfactionRate)}
+            href="/milestones?status=reviewed"
           />
           <FigureBlock
             label="At-risk projects"
             value={kpis.atRiskProjects}
             tone={kpis.atRiskProjects > 0 ? "bad" : undefined}
+            href="/projects?health=AT_RISK"
           />
         </div>
       </section>

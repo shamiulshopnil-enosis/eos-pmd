@@ -8,7 +8,7 @@ const SECTIONS: { match: RegExp; label: string; href: string }[] = [
   { match: /^\/projects/, label: "Projects", href: "/projects" },
   { match: /^\/milestones/, label: "Milestones", href: "/milestones" },
   { match: /^\/team/, label: "My Company", href: "/team" },
-  { match: /^\/companies/, label: "Companies", href: "/companies" },
+  { match: /^\/companies/, label: "Clients", href: "/companies" },
 ];
 
 /** Company / Section breadcrumb in the app header. Section links back to its
