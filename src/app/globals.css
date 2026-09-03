@@ -334,7 +334,7 @@
 .p-button.p-button-sm,
 .p-button.p-button-small {
   min-height: 1.875rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 /* primary — bold blue */
 .p-button:not(.p-button-outlined):not(.p-button-text):not(.p-button-link):not(.p-button-secondary) {
