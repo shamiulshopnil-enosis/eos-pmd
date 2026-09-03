@@ -147,6 +147,7 @@ export const MILESTONE_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   sent: "With Client",
   reviewed: "Reviewed",
+  rejected: "Rejected",
 };
 
 // --- Milestones plan, Phase 7 ---
@@ -180,4 +181,6 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   PROJECT_COMPLETED: "Project completed",
   PUBLICATION_REQUESTED: "Publication requested",
   PROJECT_PUBLISHED: "Project published",
+  MILESTONE_REJECTED: "Milestone rejected by client",
+  MILESTONE_REJECTION_EMAILED: "Rejection emailed to the delivery team",
 };

@@ -20,10 +20,12 @@ import {
   canEditMilestone,
   canManageProject,
   canRateMilestone,
+  canRejectMilestone,
   canSendMilestone,
   reviewLead,
 } from "../common/permissions";
-import { optDate, optStr, str, strList } from "../common/input";
+import { bool, optDate, optStr, str, strList } from "../common/input";
+import { MailerService, type OutboundEmail } from "../common/mailer.service";
 import type {
   Milestone,
   MilestoneWithFullProject,
@@ -52,6 +54,7 @@ export class MilestonesService {
     @InjectConnection() private readonly connection: Connection,
     private readonly activity: ActivityService,
     private readonly projectsService: ProjectsService,
+    private readonly mailer: MailerService,
   ) {}
 
   private bucket(): mongoose.mongo.GridFSBucket {
@@ -273,8 +276,8 @@ export class MilestonesService {
     );
     this.projectsService.assertActiveProject(project);
 
-    if (milestone.status !== "draft") {
-      throw new BadRequestException("Only a draft milestone can be sent for review.");
+    if (milestone.status !== "draft" && milestone.status !== "rejected") {
+      throw new BadRequestException("Only a draft or rejected milestone can be sent for review.");
     }
     const sibling = await this.milestones.exists({
       projectId,
@@ -286,14 +289,22 @@ export class MilestonesService {
         "Another milestone is already with the client. Wait for it to be reviewed first.",
       );
     }
+    const wasRejected = milestone.status === "rejected";
     milestone.status = "sent";
     milestone.sentAt = new Date();
+    // A fresh review request clears the previous rejection stamp; the rejection
+    // stays on the record in the activity log.
+    milestone.rejectedAt = null;
+    milestone.rejectedByUserId = null;
+    milestone.rejectedByName = null;
+    milestone.rejectedByEmail = null;
+    milestone.rejectionReason = null;
     await milestone.save();
     await this.activity.log({
       projectId,
       milestoneId,
       type: "FEEDBACK_REQUESTED",
-      message: `Sent "${milestone.title}" for client review`,
+      message: `${wasRejected ? "Re-sent" : "Sent"} "${milestone.title}" for client review`,
     });
     return { projectId };
   }
@@ -316,14 +327,22 @@ export class MilestonesService {
     }
     if (milestone.status === "draft") return { projectId };
 
+    const wasRejected = milestone.status === "rejected";
     milestone.status = "draft";
     milestone.sentAt = null;
+    milestone.rejectedAt = null;
+    milestone.rejectedByUserId = null;
+    milestone.rejectedByName = null;
+    milestone.rejectedByEmail = null;
+    milestone.rejectionReason = null;
     await milestone.save();
     await this.activity.log({
       projectId,
       milestoneId,
       type: "RELEASE_UPDATED",
-      message: `Recalled "${milestone.title}" from client review`,
+      message: wasRejected
+        ? `Moved rejected milestone "${milestone.title}" back to draft`
+        : `Recalled "${milestone.title}" from client review`,
     });
     return { projectId };
   }
@@ -392,6 +411,93 @@ export class MilestonesService {
       message: `Client reviewed "${milestone.title}" (${overall.toFixed(1)}/5 overall)`,
     });
     return { projectId };
+  }
+
+  /**
+   * Client rejects a milestone that is with them for review. Requires a reason;
+   * the milestone moves to "rejected" (no rating, not scored) so the delivery
+   * team can revise and re-send it. Optionally emails the milestone assignees
+   * (plus the delivery lead) a rejection notice — see MailerService.
+   */
+  async rejectMilestone(
+    user: SessionUser,
+    milestoneId: string,
+    body: Record<string, unknown>,
+  ): Promise<{ projectId: string; email: OutboundEmail | null }> {
+    const milestone = await this.milestones.findById(milestoneId);
+    if (!milestone) throw new NotFoundException("Milestone not found.");
+    const projectId = String(milestone.projectId);
+
+    const project = await this.projectsService.requirePermission(
+      projectId,
+      user,
+      canRejectMilestone,
+      "Only a client contact on this project can reject milestones.",
+    );
+    this.projectsService.assertActiveProject(project);
+
+    if (milestone.status !== "sent") {
+      throw new BadRequestException("This milestone is not awaiting your review.");
+    }
+
+    const reason = str(body, "reason");
+    if (reason.length < 10) {
+      throw new BadRequestException(
+        "Add a short reason for the rejection (at least 10 characters).",
+      );
+    }
+
+    const now = new Date();
+    milestone.status = "rejected";
+    milestone.rejectedAt = now;
+    milestone.rejectedByUserId = new Types.ObjectId(user.id);
+    milestone.rejectedByName = user.name ?? null;
+    milestone.rejectedByEmail = user.email;
+    milestone.rejectionReason = reason;
+    await milestone.save();
+    await this.projectsService.recomputeProjectScore(projectId);
+    await this.activity.log({
+      projectId,
+      milestoneId,
+      type: "MILESTONE_REJECTED",
+      message: `Client rejected "${milestone.title}" — ${reason}`,
+    });
+
+    let email: OutboundEmail | null = null;
+    if (bool(body, "notifyAssignees")) {
+      const assigneeEmails: string[] = (milestone.assignees ?? [])
+        .map((a: { email?: string }) => (a.email ?? "").toLowerCase())
+        .filter(Boolean);
+      const leadEmails = project.vendorTeam
+        .filter((v) => v.role === "owner")
+        .map((v) => v.email.toLowerCase());
+      const to = [...new Set([...assigneeEmails, ...leadEmails])];
+      if (to.length > 0) {
+        const note = optStr(body, "message");
+        const who = user.name ? `${user.name} (${user.email})` : user.email;
+        const lines = [
+          `${who} has rejected the milestone "${milestone.title}" on project "${project.name}".`,
+          "",
+          "Reason given:",
+          reason,
+        ];
+        if (note) lines.push("", "Note from the client:", note);
+        lines.push("", "Please revise the milestone and send it back for review.");
+        email = await this.mailer.send({
+          to,
+          subject: `Milestone "${milestone.title}" was rejected — action needed`,
+          body: lines.join("\n"),
+        });
+        await this.activity.log({
+          projectId,
+          milestoneId,
+          type: "MILESTONE_REJECTION_EMAILED",
+          message: `Rejection notice emailed to ${to.join(", ")}`,
+        });
+      }
+    }
+
+    return { projectId, email };
   }
 
   async editOwnMilestoneRating(

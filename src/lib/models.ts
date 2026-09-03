@@ -10,7 +10,7 @@ const PROJECT_VISIBILITY = ["PRIVATE", "PUBLIC"] as const;
 const PROJECT_TYPE = ["whole", "milestone"] as const;
 const ADMIN_STATUS = ["draft", "pending_approval", "published", "rejected", "edited", "trashed"] as const;
 const EXECUTION_STATUS = ["ongoing", "awaiting_completion", "completed"] as const;
-const MILESTONE_STATUS = ["draft", "sent", "reviewed"] as const;
+const MILESTONE_STATUS = ["draft", "sent", "reviewed", "rejected"] as const;
 // Milestones plan, Phase 7.
 const CAPSTONE_TIER = ["promoter", "neutral", "detractor"] as const;
 // Milestones plan, Phase 3.
@@ -31,6 +31,8 @@ const ACTIVITY_TYPE = [
   "PROJECT_COMPLETED",
   "PUBLICATION_REQUESTED",
   "PROJECT_PUBLISHED",
+  "MILESTONE_REJECTED",
+  "MILESTONE_REJECTION_EMAILED",
 ] as const;
 
 // Milestones plan, Phase 3 — per-project people, embedded on Project.
@@ -255,6 +257,11 @@ const milestoneSchema = new Schema(
     reviewedByName: { type: String, default: null },
     reviewedByEmail: { type: String, default: null },
     sentAt: { type: Date, default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectedByUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    rejectedByName: { type: String, default: null },
+    rejectedByEmail: { type: String, default: null },
+    rejectionReason: { type: String, default: null },
   },
   { timestamps: true },
 );

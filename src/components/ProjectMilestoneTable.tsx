@@ -58,7 +58,18 @@ export default function ProjectMilestoneTable({
               </div>
             ) : null}
 
-            {reviewed ? (
+            {m.status === "rejected" ? (
+              <div className="rounded-ledger border border-rule bg-panel p-3">
+                <div className="text-sm font-medium text-rag-bad">
+                  Rejected by {m.rejectedByName ?? m.rejectedByEmail ?? "the client"}
+                  {m.rejectedAt ? ` · ${formatDateTime(m.rejectedAt)}` : ""}
+                </div>
+                {m.rejectionReason ? (
+                  <p className="mt-1 text-sm italic text-ink-muted">&ldquo;{m.rejectionReason}&rdquo;</p>
+                ) : null}
+                <p className="mt-1 text-xs text-ink-muted">Revise the milestone and send it back for review.</p>
+              </div>
+            ) : reviewed ? (
               <div className="rounded-ledger border border-rule bg-panel p-3">
                 <MilestoneReviewSummary milestone={m} />
                 {m.comment ? <p className="mt-2 text-sm italic text-ink-muted">&ldquo;{m.comment}&rdquo;</p> : null}
@@ -86,6 +97,17 @@ export default function ProjectMilestoneTable({
             {m.title}
           </Link>
         )}
+      />
+      <Column
+        header="Assigned to"
+        style={{ minWidth: "10rem" }}
+        body={(m: Milestone) =>
+          m.assignees.length > 0 ? (
+            <span className="text-ink-muted">{m.assignees.map((a) => a.name ?? a.email).join(", ")}</span>
+          ) : (
+            <span className="text-ink-subtle">—</span>
+          )
+        }
       />
       <Column
         header="Status"

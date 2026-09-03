@@ -41,6 +41,8 @@ export const canManageDeliveryStaffing = (a: ProjectAccess) => deliveryLead(a);
 
 /** Any receiving-company member with access may submit the one milestone rating. */
 export const canRateMilestone = (a: ProjectAccess) => reviewMember(a);
+/** …and the same people may reject a milestone that was sent to them. */
+export const canRejectMilestone = (a: ProjectAccess) => reviewMember(a);
 export const canConfirmCompletion = (a: ProjectAccess) => reviewLead(a);
 export const canSubmitCapstone = (a: ProjectAccess) => reviewLead(a);
 export const canManageReviewStaffing = (a: ProjectAccess) => reviewLead(a);

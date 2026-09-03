@@ -194,6 +194,15 @@ export async function requestRatingReconsideration(projectId: string, milestoneI
   revalidateReview(projectId, milestoneId);
 }
 
+/**
+ * Client rejects a milestone that is with them for review. Needs `reason`;
+ * `notifyAssignees` + `message` optionally email the milestone assignees.
+ */
+export async function rejectMilestone(projectId: string, milestoneId: string, formData: FormData) {
+  await post(`/milestones/${milestoneId}/reject`, formToObject(formData));
+  revalidateReview(projectId, milestoneId);
+}
+
 // ---------------------------------------------------------------------------
 // Completion (Milestones plan, Phase 6 — spec §5.2, §6.8)
 // ---------------------------------------------------------------------------

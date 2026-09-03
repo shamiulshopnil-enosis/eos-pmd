@@ -45,12 +45,12 @@
   --subtle-btn: rgba(9, 30, 66, 0.06);
   --subtle-btn-hover: rgba(9, 30, 66, 0.12);
 
-  /* form controls — a white "well" with a clearly visible border */
+  /* form controls — a white "well" with a soft, legible border */
   --input-bg: #ffffff;
   --input-bg-hover: #ffffff;
   --input-bg-focus: #ffffff;
-  --input-border: #7a8699;
-  --input-border-hover: #5e6c84;
+  --input-border: rgba(23, 43, 77, 0.22);
+  --input-border-hover: rgba(23, 43, 77, 0.38);
   --input-ring: rgba(34, 72, 143, 0.28);
   --control-h: 2.25rem; /* 36px — one height for every control */
   --radius-control: 6px;
@@ -97,8 +97,8 @@
   --input-bg: #282e33;
   --input-bg-hover: #2c333a;
   --input-bg-focus: #2c333a;
-  --input-border: #5c6b7a;
-  --input-border-hover: #7a8b9c;
+  --input-border: rgba(255, 255, 255, 0.16);
+  --input-border-hover: rgba(255, 255, 255, 0.3);
   --input-ring: rgba(125, 176, 255, 0.3);
 
   --shadow-raised: 0 1px 1px rgba(3, 4, 4, 0.5), 0 0 1px rgba(3, 4, 4, 0.6);
@@ -510,25 +510,36 @@ a.eos-linkbtn.p-button-secondary:hover {
 .eos-file {
   padding: 0.4375rem 0.625rem;
 }
-/* IconField — leading search glyph, aligned and out of the text's way */
+/* IconField — leading search glyph, vertically centred and clear of the text.
+   PrimeReact 10.9 renders `.p-icon-field` / `.p-input-icon`; older builds use
+   `.p-iconfield` / `.p-inputicon`. Match both so the glyph never drifts low. */
+.p-icon-field,
 .p-iconfield {
   position: relative;
   display: block;
 }
+.p-icon-field > .p-inputtext,
 .p-iconfield > .p-inputtext {
   width: 100%;
 }
+.p-icon-field .p-input-icon,
+.p-icon-field .p-inputicon,
 .p-iconfield .p-input-icon,
 .p-iconfield .p-inputicon {
   position: absolute;
   top: 50%;
   left: 0.625rem;
+  margin: 0;
   transform: translateY(-50%);
+  line-height: 1;
   color: var(--ink-subtle);
   font-size: 0.875rem;
   pointer-events: none;
 }
-.p-iconfield.p-iconfield-left > .p-inputtext,
+.p-icon-field-left > .p-inputtext,
+.p-icon-field:has(.p-input-icon) > .p-inputtext,
+.p-icon-field:has(.p-inputicon) > .p-inputtext,
+.p-iconfield-left > .p-inputtext,
 .p-iconfield:has(.p-input-icon) > .p-inputtext,
 .p-iconfield:has(.p-inputicon) > .p-inputtext {
   padding-left: 2rem;
@@ -822,7 +833,8 @@ a.eos-linkbtn.p-button-secondary:hover {
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
-  padding: 0.625rem 0.75rem;
+  padding: 0.6875rem 0.875rem;
+  white-space: nowrap;
 }
 .eos-table.p-datatable .p-datatable-tbody > tr {
   background: var(--panel);
@@ -831,7 +843,7 @@ a.eos-linkbtn.p-button-secondary:hover {
 .eos-table.p-datatable .p-datatable-tbody > tr > td {
   border-color: var(--rule);
   border-width: 0 0 1px 0;
-  padding: 0.5625rem 0.75rem;
+  padding: 0.8125rem 0.875rem;
   font-size: 0.875rem;
 }
 .eos-table.p-datatable .p-datatable-tbody > tr:last-child > td {
