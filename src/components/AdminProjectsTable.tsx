@@ -75,7 +75,22 @@ export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
 /** Completion-timeout list with a force-complete action per row. */
 export function AdminTimeoutTable({ rows }: { rows: TimeoutRow[] }) {
   return (
-    <DataTable value={rows} dataKey="id" className="eos-table" tableStyle={{ minWidth: "640px" }} scrollable>
+    <>
+    <ul className="space-y-2 sm:hidden">
+      {rows.map((p) => (
+        <li key={p.id} className="rounded-ledger border border-rule bg-panel p-3.5 text-sm">
+          <Link href={`/admin/projects/${p.id}`} className="font-medium text-link hover:underline">
+            {p.name}
+          </Link>
+          <div className="mt-0.5 text-xs text-ink-muted">{p.clientCompanyName}</div>
+          <div className="mt-1 text-xs text-ink-subtle">Requested {p.completionRequestedAt}</div>
+          <form action={forceCompleteProject.bind(null, p.id)} className="mt-2.5">
+            <Button type="submit" outlined severity="danger" size="small" label="Force-complete" />
+          </form>
+        </li>
+      ))}
+    </ul>
+    <DataTable value={rows} dataKey="id" className="eos-table hidden sm:block" tableStyle={{ minWidth: "640px" }} scrollable>
       <Column
         header="Project"
         body={(p: TimeoutRow) => (
@@ -95,5 +110,6 @@ export function AdminTimeoutTable({ rows }: { rows: TimeoutRow[] }) {
         )}
       />
     </DataTable>
+    </>
   );
 }

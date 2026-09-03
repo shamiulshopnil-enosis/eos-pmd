@@ -243,8 +243,11 @@ export default function PeoplePicker({
       ) : selectedLayout === "rows" ? (
         <ul className="mt-2 divide-y divide-rule overflow-hidden rounded-control border border-rule">
           {selected.map((p) => (
-            <li key={key(p)} className="flex items-center justify-between gap-3 py-2.5 pl-3 pr-2 text-sm">
-              <span className="min-w-0 truncate text-ink">{personLabel(p)}</span>
+            <li
+              key={key(p)}
+              className="flex flex-col items-start gap-1.5 py-2.5 pl-3 pr-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+            >
+              <span className="min-w-0 max-w-full truncate text-ink">{personLabel(p)}</span>
               <span className="flex shrink-0 items-center gap-1.5">
                 {p.role ? <Badge tone={p.role === leadRole ? "blue" : "slate"}>{p.role}</Badge> : null}
                 {p.invitePending ? <Badge tone="amber">Not signed in</Badge> : null}
