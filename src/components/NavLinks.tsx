@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/projects", label: "Projects", icon: "pi-folder-open" },
   { href: "/milestones", label: "Milestones", icon: "pi-flag" },
   { href: "/team", label: "My Company", icon: "pi-users" },
-  { href: "/companies", label: "Companies", icon: "pi-building" },
+  { href: "/companies", label: "Clients", icon: "pi-building" },
 ];
 
 export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
