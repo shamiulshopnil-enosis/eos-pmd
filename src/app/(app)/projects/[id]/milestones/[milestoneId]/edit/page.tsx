@@ -10,6 +10,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
 import PeoplePicker from "@/components/PeoplePicker";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function EditMilestonePage({
   params,
@@ -22,10 +23,19 @@ export default async function EditMilestonePage({
   if (!milestone || milestone.projectId !== id || !project || !canAccessDelivery(project)) notFound();
 
   const backHref = `/projects/${id}/milestones/${milestoneId}`;
+  const crumbs = (
+    <SetBreadcrumb
+      entries={{
+        [`/projects/${id}`]: project.name,
+        [`/projects/${id}/milestones/${milestoneId}`]: milestone.title,
+      }}
+    />
+  );
 
   if (milestone.status === "sent") {
     return (
       <div className="mx-auto max-w-3xl">
+        {crumbs}
         <PageHeader title={`Edit Milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
         <Card className="p-6 text-sm text-ink-muted">
           This milestone is locked for editing while it is with the client for review.{" "}
@@ -42,6 +52,7 @@ export default async function EditMilestonePage({
 
   return (
     <div className="mx-auto max-w-3xl">
+      {crumbs}
       <PageHeader title={`Edit milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to milestone" }} />
 
       <Card className="p-6">

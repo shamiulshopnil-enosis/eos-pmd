@@ -8,6 +8,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
 import PeoplePicker from "@/components/PeoplePicker";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function NewMilestonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +20,7 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title="New milestone"
         description={`Under project — ${project.name}`}

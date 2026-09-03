@@ -9,6 +9,7 @@ import { Card, PageHeader, SectionHeading } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { Field, SubmitButton, TextArea } from "@/components/form";
 import { CheckboxGroup, SingleCheckbox } from "@/components/CheckboxField";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function CapstonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +26,7 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
 
   return (
     <div>
+      <SetBreadcrumb entries={{ [`/projects/${id}`]: project.name }} />
       <PageHeader
         title={`Capstone Endorsement — ${project.name}`}
         description="A short qualitative wrap-up of the whole engagement. No star rating here."

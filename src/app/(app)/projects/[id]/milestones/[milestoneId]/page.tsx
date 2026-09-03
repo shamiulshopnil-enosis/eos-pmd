@@ -19,6 +19,7 @@ import { SubmitButton } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function MilestoneDetailPage({
   params,
@@ -40,6 +41,12 @@ export default async function MilestoneDetailPage({
 
   return (
     <div>
+      <SetBreadcrumb
+        entries={{
+          [`/projects/${id}`]: project.name,
+          [`/projects/${id}/milestones/${milestoneId}`]: milestone.title,
+        }}
+      />
       <PageHeader
         title={milestone.title}
         description={`Project — ${project.name}`}

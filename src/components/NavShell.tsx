@@ -52,12 +52,12 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-rule bg-panel px-4 py-2.5 md:px-6">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <MobileMenu email={user.email} signOut={signOut} />
-            <Link href="/dashboard" className="text-sm font-bold text-ink md:hidden">
+            <Link href="/dashboard" className="shrink-0 text-sm font-bold text-ink md:hidden">
               EOS
             </Link>
-            <div className="hidden min-w-0 sm:block">
+            <div className="min-w-0 flex-1">
               <Breadcrumbs company={company?.name ?? "EOS"} />
             </div>
           </div>

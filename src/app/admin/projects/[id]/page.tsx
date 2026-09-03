@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/format";
 import { AdminStatusBadge, Card, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function AdminProjectReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +14,7 @@ export default async function AdminProjectReviewPage({ params }: { params: Promi
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/admin/projects/${id}`]: project.name }} />
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-2">

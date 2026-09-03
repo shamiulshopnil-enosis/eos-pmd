@@ -44,6 +44,7 @@ import {
 import { Icon } from "@/components/icon";
 import { Select } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 import {
   ProjectActionsMenu,
   type ApprovalState,
@@ -115,6 +116,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title={project.name}
         description={
