@@ -329,7 +329,7 @@ export function FilterToolbar({
                   <i className="pi pi-chevron-down text-[11px] transition-transform" />
                 </span>
               </summary>
-              <div className="pb-3 pt-1">
+              <div className="pb-2.5">
                 <CheckboxList
                   facet={f}
                   selected={selected[f.key] ?? []}
@@ -422,24 +422,24 @@ export function FilterDateRange({
 }) {
   return (
     <div>
-      <div className="mb-1 text-xs font-semibold text-ink">{label}</div>
-      <div className="flex items-center gap-1.5">
+      <div className="mb-1.5 text-xs font-semibold text-ink">{label}</div>
+      <div className="flex items-center gap-2">
         <Calendar
           value={from ? new Date(from) : null}
           onChange={(e) => onFrom(iso(e.value as Date | null))}
           dateFormat="yy-mm-dd"
           showButtonBar
-          placeholder="from"
-          className="flex-1"
+          placeholder="From"
+          className="min-w-0 flex-1"
         />
-        <span className="text-ink-muted">–</span>
+        <span className="shrink-0 text-ink-subtle">–</span>
         <Calendar
           value={to ? new Date(to) : null}
           onChange={(e) => onTo(iso(e.value as Date | null))}
           dateFormat="yy-mm-dd"
           showButtonBar
-          placeholder="to"
-          className="flex-1"
+          placeholder="To"
+          className="min-w-0 flex-1"
         />
       </div>
     </div>

@@ -296,7 +296,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Breakdowns — Jira-style summary cards */}
-      <section className="mt-8">
+      <section className="mt-10">
         <SectionHeading>Breakdowns</SectionHeading>
         <DashboardBreakdowns projects={projects} />
       </section>

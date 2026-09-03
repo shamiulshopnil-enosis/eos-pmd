@@ -40,6 +40,32 @@ export function SectionHeading({ children, action }: { children: ReactNode; acti
   );
 }
 
+/**
+ * The phone-width stand-in for a wide data-table row. Wide `<DataTable>`s are
+ * kept in a `hidden sm:block` wrapper; below `sm` a list of these renders the
+ * same rows as tap-friendly cards. Compose the body yourself.
+ */
+export function ListCard({ href, children }: { href?: string; children: ReactNode }) {
+  const cls = "block rounded-ledger border border-rule bg-panel p-3.5 text-sm";
+  return href ? (
+    <Link href={href} className={`${cls} transition-colors active:border-link hover:border-link`}>
+      {children}
+    </Link>
+  ) : (
+    <div className={cls}>{children}</div>
+  );
+}
+
+/** A label/value line for use inside <ListCard>. */
+export function CardStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-ink-muted">{label}</span>
+      <span className="text-right text-sm text-ink">{children}</span>
+    </div>
+  );
+}
+
 /* --- Tags (PrimeReact <Tag>) --------------------------------------- */
 
 type Tone = "slate" | "blue" | "green" | "amber" | "red" | "purple";

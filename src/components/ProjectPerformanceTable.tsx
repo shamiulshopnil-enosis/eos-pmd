@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { ClientHealth } from "@/lib/constants";
-import { Badge, HealthBadge, ProjectStatusBadge, RagDisc } from "@/components/ui";
+import { Badge, HealthBadge, ListCard, ProjectStatusBadge, RagDisc } from "@/components/ui";
 
 export type PerfRow = {
   id: string;
@@ -28,10 +28,36 @@ export type PerfRow = {
 export function ProjectPerformanceTable({ rows }: { rows: PerfRow[] }) {
   const router = useRouter();
   return (
+    <>
+    <ul className="space-y-2 sm:hidden">
+      {rows.map((r) => (
+        <li key={r.id}>
+          <ListCard href={`/projects/${r.id}`}>
+            <div className="flex items-start gap-2">
+              <RagDisc health={r.health} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-ink">{r.name}</div>
+                <div className="mt-0.5 text-xs text-ink-muted">{r.client}</div>
+              </div>
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <ProjectStatusBadge status={r.status} />
+              <HealthBadge health={r.health} />
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
+              <span>{r.reviewed}/{r.total} reviewed</span>
+              <span>Avg <span className="text-ink">{r.avgText}</span></span>
+              <span className={r.declined ? "text-rag-warn" : ""}>Latest {r.latestText}</span>
+              <span>Resp {r.responseText}</span>
+            </div>
+          </ListCard>
+        </li>
+      ))}
+    </ul>
     <DataTable
       value={rows}
       dataKey="id"
-      className="eos-table eos-rows-clickable"
+      className="eos-table eos-rows-clickable hidden sm:block"
       tableStyle={{ minWidth: "960px" }}
       scrollable
       removableSort
@@ -71,5 +97,6 @@ export function ProjectPerformanceTable({ rows }: { rows: PerfRow[] }) {
       <Column header="Client health" body={(r: PerfRow) => <HealthBadge health={r.health} />} />
       <Column header="Last activity" body={(r: PerfRow) => <span className="font-mono text-xs text-ink-muted">{r.lastActivityText}</span>} />
     </DataTable>
+    </>
   );
 }

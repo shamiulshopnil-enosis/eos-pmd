@@ -6,7 +6,7 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { forceCompleteProject } from "@/lib/actions";
-import { AdminStatusBadge, ProjectTypeBadge } from "@/components/ui";
+import { AdminStatusBadge, ListCard, ProjectTypeBadge } from "@/components/ui";
 
 export type AdminProjectRow = {
   id: string;
@@ -28,10 +28,26 @@ export type TimeoutRow = {
 export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
   const router = useRouter();
   return (
+    <>
+    <ul className="space-y-2 sm:hidden">
+      {rows.map((p) => (
+        <li key={p.id}>
+          <ListCard href={`/admin/projects/${p.id}`}>
+            <div className="font-medium text-ink">{p.name}</div>
+            <div className="mt-0.5 text-xs text-ink-muted">{p.clientCompanyName}</div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <ProjectTypeBadge type={p.projectType} />
+              <AdminStatusBadge status={p.adminStatus} />
+            </div>
+            <div className="mt-2 text-xs text-ink-subtle">Updated {p.updatedAt}</div>
+          </ListCard>
+        </li>
+      ))}
+    </ul>
     <DataTable
       value={rows}
       dataKey="id"
-      className="eos-table eos-rows-clickable"
+      className="eos-table eos-rows-clickable hidden sm:block"
       tableStyle={{ minWidth: "760px" }}
       scrollable
       onRowClick={(e) => {
@@ -52,6 +68,7 @@ export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
       <Column header="Approval" body={(p: AdminProjectRow) => <AdminStatusBadge status={p.adminStatus} />} />
       <Column header="Last updated" body={(p: AdminProjectRow) => <span className="text-ink-muted">{p.updatedAt}</span>} />
     </DataTable>
+    </>
   );
 }
 
