@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getMilestone, getProject } from "@/lib/data";
 import { canAccessDelivery } from "@/lib/permissions";
-import { updateMilestone } from "@/lib/actions";
+import { addProjectDeliveryPerson, updateMilestone } from "@/lib/actions";
 import { toDateInputValue } from "@/lib/format";
 import { Field, FormActions, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
-import AssigneeCheckboxes from "@/components/AssigneeCheckboxes";
+import PeoplePicker from "@/components/PeoplePicker";
 
 export default async function EditMilestonePage({
   params,
@@ -74,9 +74,24 @@ export default async function EditMilestonePage({
             <legend className="mb-1 text-xs font-semibold text-ink">
               Assign to <span className="font-normal text-ink-muted">(optional)</span>
             </legend>
-            <AssigneeCheckboxes
-              people={project.vendorTeam}
-              defaultSelectedEmails={milestone.assignees.map((a) => a.email)}
+            <PeoplePicker
+              directory={[
+                ...project.vendorTeam.map((m) => ({
+                  email: m.email,
+                  name: m.name,
+                  invitePending: m.invitePending,
+                })),
+                ...milestone.assignees
+                  .filter((a) => !project.vendorTeam.some((v) => v.email.toLowerCase() === a.email.toLowerCase()))
+                  .map((a) => ({ email: a.email, name: a.name, invitePending: true })),
+              ]}
+              name="assigneeEmails"
+              emit="email"
+              defaultSelected={milestone.assignees.map((a) => a.email)}
+              placeholder="Search people on this project…"
+              addPerson={addProjectDeliveryPerson.bind(null, id)}
+              addContextLabel="this project"
+              emptyHint="No one assigned — search above to add people from this project."
             />
           </fieldset>
 

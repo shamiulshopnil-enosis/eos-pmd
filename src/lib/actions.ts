@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiUpload } from "./api-client";
 import { acceptInvitationSignedIn } from "./auth";
+import { getProject } from "./data";
+
+type NewPerson = { id: string; email: string; name: string | null };
 
 // Mutations. The permission checks, validation and database writes now live in
 // the NestJS API (see ../../api/src/projects and .../milestones). Each action
@@ -297,6 +300,49 @@ export async function setReviewStaffing(projectId: string, formData: FormData) {
   await post(`/projects/${projectId}/review-staffing`, formToObject(formData));
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/team`);
+}
+
+/**
+ * Add a brand-new person to the delivering company and staff them on this
+ * project's delivery side, in one step. Used by the milestone assignee
+ * picker's "add someone new" affordance. Returns the created person so the
+ * caller can select them immediately.
+ */
+export async function addProjectDeliveryPerson(
+  projectId: string,
+  input: { name?: string; email: string },
+): Promise<NewPerson> {
+  const project = await getProject(projectId);
+  if (!project?.deliveringCompanyId) throw new Error("Project not found.");
+  const created = await post<NewPerson>(`/companies/${project.deliveringCompanyId}/members`, {
+    name: input.name?.trim() ?? "",
+    email: input.email.trim(),
+    role: "member",
+  });
+  const next = Array.from(new Set([...(project.assignedMemberIds ?? []), created.id]));
+  await post(`/projects/${projectId}/delivery-staffing`, { memberIds: next });
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/team`);
+  revalidatePath(`/projects/${projectId}/milestones/new`);
+  return { id: created.id, email: created.email, name: created.name };
+}
+
+/**
+ * Add a brand-new person to a company's directory (used by the project People
+ * page staffing pickers' "add someone new"). Returns the created person; the
+ * surrounding form still persists the actual assignment on Save.
+ */
+export async function addCompanyPerson(
+  companyId: string,
+  input: { name?: string; email: string },
+): Promise<NewPerson> {
+  const created = await post<NewPerson>(`/companies/${companyId}/members`, {
+    name: input.name?.trim() ?? "",
+    email: input.email.trim(),
+    role: "member",
+  });
+  revalidatePath("/team");
+  return { id: created.id, email: created.email, name: created.name };
 }
 
 /** Accept an invitation as the already-signed-in matching user. */

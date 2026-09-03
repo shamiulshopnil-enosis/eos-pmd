@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createProject } from "@/lib/actions";
+import { addCompanyPerson, createProject } from "@/lib/actions";
 import { getMyCompany, listCompanyMembers, searchCompanies } from "@/lib/data";
 import { Field, FormActions, RadioCards, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
@@ -102,7 +102,15 @@ export default async function NewProjectPage() {
               and add whoever works on this project — only they (plus your company&apos;s owners and
               admins) will see it. You can change this later on the project&apos;s People page.
             </p>
-            <PeoplePicker members={members} name="memberIds" />
+            <PeoplePicker
+              directory={members}
+              name="memberIds"
+              emit="id"
+              placeholder="Search your company by name or email…"
+              addPerson={addCompanyPerson.bind(null, company.id)}
+              addContextLabel="your company"
+              emptyHint="No one added yet — you'll be the project owner regardless."
+            />
           </fieldset>
 
           <ProjectMilestonesField />
