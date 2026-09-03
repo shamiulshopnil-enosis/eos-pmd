@@ -210,14 +210,36 @@ export function computeAlerts(projects: ProjectWithMilestones[], now: Date = new
   return alerts;
 }
 
-/** Average milestone rating over time, bucketed by the month it was reviewed. */
-export function computeRatingTrend(projects: ProjectWithMilestones[], months = 6) {
+export type RatingTrendPoint = {
+  /** Short axis label, e.g. "Jul 26". */
+  label: string;
+  /** Full label for tooltips, e.g. "July 2026". */
+  monthLabel: string;
+  /** Mean of the milestone ratings reviewed in this month, or null if none. */
+  avgRating: number | null;
+  /** How many milestones were reviewed in this month. */
+  count: number;
+  /** Running mean of every rating reviewed from the window start through this
+   *  month — the stable line the noisy monthly average moves around. */
+  cumulativeAvg: number | null;
+};
+
+/**
+ * Milestone rating over time, bucketed by the month it was reviewed. Returns the
+ * monthly mean, the review count behind it, and a running (cumulative) mean so
+ * the chart can show signal (the trend) next to noise (one volatile month).
+ */
+export function computeRatingTrend(
+  projects: ProjectWithMilestones[],
+  months = 6,
+): RatingTrendPoint[] {
   const now = new Date();
-  const buckets: { label: string; year: number; month: number; ratings: number[] }[] = [];
+  const buckets: { label: string; monthLabel: string; year: number; month: number; ratings: number[] }[] = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     buckets.push({
       label: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+      monthLabel: d.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
       year: d.getFullYear(),
       month: d.getMonth(),
       ratings: [],
@@ -233,5 +255,15 @@ export function computeRatingTrend(projects: ProjectWithMilestones[], months = 6
     }
   }
 
-  return buckets.map((b) => ({ label: b.label, avgRating: average(b.ratings) }));
+  const seen: number[] = [];
+  return buckets.map((b) => {
+    seen.push(...b.ratings);
+    return {
+      label: b.label,
+      monthLabel: b.monthLabel,
+      avgRating: average(b.ratings),
+      count: b.ratings.length,
+      cumulativeAvg: seen.length > 0 ? average(seen) : null,
+    };
+  });
 }
