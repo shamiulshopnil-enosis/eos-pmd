@@ -8,21 +8,31 @@ import { ACTIVITY_LABELS } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
 import type { ActivityWithMilestoneName } from "@/lib/types";
 
-// The project's activity log lives behind this button. Opens a PrimeReact
-// <Dialog> with the full history.
+// The project's activity log. Uncontrolled by default (renders its own
+// "Activity" button); pass `open` + `onOpenChange` to drive it from elsewhere
+// (e.g. a "More actions" menu item), in which case no trigger button renders.
 export default function ActivityLogModal({
   activities,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   activities: ActivityWithMilestoneName[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (v: boolean) => (isControlled ? onOpenChange?.(v) : setUncontrolledOpen(v));
 
   return (
     <>
-      <Button type="button" outlined severity="secondary" className="eos-btn" icon="pi pi-history" onClick={() => setOpen(true)}>
-        <span className="ml-1.5">Activity</span>
-        {activities.length > 0 ? <Badge value={activities.length} severity="secondary" className="ml-1.5" /> : null}
-      </Button>
+      {!isControlled ? (
+        <Button type="button" outlined severity="secondary" className="eos-btn" icon="pi pi-history" onClick={() => setOpen(true)}>
+          <span className="ml-1.5">Activity</span>
+          {activities.length > 0 ? <Badge value={activities.length} severity="secondary" className="ml-1.5" /> : null}
+        </Button>
+      ) : null}
 
       <Dialog
         header="Activity history"
