@@ -1158,6 +1158,13 @@ a.eos-linkbtn.p-button-secondary:hover {
 .eos-filter-pop.p-overlaypanel .p-overlaypanel-content {
   padding: 0.625rem;
 }
+/* Project "People" popover — the + on the project header */
+.eos-people-op.p-overlaypanel {
+  width: min(24rem, calc(100vw - 1.5rem));
+}
+.eos-people-op.p-overlaypanel .p-overlaypanel-content {
+  padding: 0.875rem;
+}
 .eos-checklist-items {
   max-height: 15rem;
   overflow-y: auto;

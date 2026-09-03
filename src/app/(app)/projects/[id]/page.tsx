@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { getProjectDetail } from "@/lib/data";
+import { getMyCompany, getProjectDetail, listCompanyMembers } from "@/lib/data";
 import {
   canAccessDelivery,
   canAccessReview,
@@ -45,12 +45,16 @@ import {
 import { Icon } from "@/components/icon";
 import { Select } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
-import { MoreActions, type MoreAction } from "@/components/MoreActions";
+import {
+  ProjectActionsMenu,
+  type ApprovalState,
+  type MenuActionItem,
+} from "@/components/ProjectActionsMenu";
+import { ProjectPeopleField } from "@/components/ProjectPeopleField";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 import MilestoneReviewForm from "@/components/MilestoneReviewForm";
 import MilestoneRejectForm from "@/components/MilestoneRejectForm";
-import ActivityLogModal from "@/components/ActivityLogModal";
 import ProjectMilestoneTable from "@/components/ProjectMilestoneTable";
 
 const WINDOW_MS = RATING_SELF_CORRECTION_HOURS * 60 * 60 * 1000;
@@ -73,9 +77,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const perf = computeProjectPerformance(project);
   const isWhole = project.projectType === "whole";
 
-  const moreActions: MoreAction[] = [];
+  // People management (delivery team) — the "+" popover on the People cell.
+  const myCompany = await getMyCompany().catch(() => null);
+  const canManagePeople =
+    delLead && !!myCompany && myCompany.id === project.deliveringCompanyId;
+  const companyMembers = canManagePeople && myCompany ? await listCompanyMembers(myCompany.id) : [];
+
+  // Everything that isn't Edit / Add milestone lives under the "⋯" menu.
+  const menuExtras: MenuActionItem[] = [];
   if (delLead && project.executionStatus === "ongoing") {
-    moreActions.push({
+    menuExtras.push({
       label: "Request completion",
       icon: "pi pi-flag",
       action: requestCompletion.bind(null, project.id),
@@ -83,12 +94,25 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     });
   }
   if (delLead && project.executionStatus === "completed" && !project.capstone?.requested) {
-    moreActions.push({
+    menuExtras.push({
       label: "Request capstone endorsement",
       icon: "pi pi-verified",
       action: requestCapstone.bind(null, project.id),
       success: "Capstone endorsement requested.",
     });
+  }
+
+  let approval: ApprovalState = null;
+  if (delLead) {
+    if (project.visibility === "PUBLIC") {
+      approval = { kind: "publicPage", href: `/projects/${project.id}/public-preview` };
+    } else if (project.adminStatus === "published") {
+      approval = { kind: "publish", href: `/projects/${project.id}/publish` };
+    } else if (project.adminStatus === "pending_approval") {
+      approval = { kind: "pending" };
+    } else {
+      approval = { kind: "submit", action: submitForApproval.bind(null, project.id) };
+    }
   }
 
   return (
@@ -103,12 +127,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         back={{ href: "/projects", label: "All projects" }}
         action={
           <>
-            <ActivityLogModal activities={project.activities} />
-            {delLead || revLead ? (
-              <GhostLink href={`/projects/${project.id}/team`} icon="group">
-                People
-              </GhostLink>
-            ) : null}
             {delLead ? (
               <GhostLink href={`/projects/${project.id}/edit`} icon="edit">
                 Edit
@@ -119,28 +137,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 Add milestone
               </GhostLink>
             ) : null}
-            <MoreActions actions={moreActions} />
-            {delLead ? (
-              project.visibility === "PUBLIC" ? (
-                <InkLink href={`/projects/${project.id}/public-preview`} icon="public">
-                  View public page
-                </InkLink>
-              ) : project.adminStatus === "published" ? (
-                <InkLink href={`/projects/${project.id}/publish`} icon="publish">
-                  Publish project
-                </InkLink>
-              ) : project.adminStatus === "pending_approval" ? (
-                <StatusPill icon="hourglass_top" tone="warn">
-                  Pending admin approval
-                </StatusPill>
-              ) : (
-                <ActionForm action={submitForApproval.bind(null, project.id)} success="Submitted for admin approval.">
-                  <InkButton type="submit" icon="send">
-                    Submit for approval
-                  </InkButton>
-                </ActionForm>
-              )
-            ) : null}
+            <ProjectActionsMenu
+              activities={project.activities}
+              approval={approval}
+              extras={menuExtras}
+            />
           </>
         }
       />
@@ -203,7 +204,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <Info label="Actual completion" value={formatDate(project.actualCompletionDate)} mono />
             {del ? <Info label="Team size" value={project.teamSize?.toString() ?? "—"} mono /> : null}
             {del ? <Info label="Engagement model" value={project.engagementModel} /> : null}
-            {del ? <Info label="Internal reference" value={project.internalRef} mono /> : null}
+            {del ? (
+              <Info
+                label="Client contacts"
+                value={
+                  project.clientContacts.map((c) => c.name ?? c.email).join(", ") || "—"
+                }
+              />
+            ) : null}
+            {del ? (
+              <ProjectPeopleField
+                projectId={project.id}
+                team={project.vendorTeam.map((m) => ({
+                  email: m.email,
+                  name: m.name,
+                  invitePending: m.invitePending,
+                }))}
+                canManage={canManagePeople}
+                directory={companyMembers}
+                selectedMemberIds={project.assignedMemberIds}
+                companyId={project.deliveringCompanyId ?? ""}
+              />
+            ) : null}
           </dl>
           {project.description ? (
             <p className="prose-ledger mt-5 max-w-[68ch] whitespace-pre-line border-t border-rule pt-4 text-sm">
@@ -462,27 +484,6 @@ function SummaryRow({
         {value}
       </dd>
     </div>
-  );
-}
-
-function StatusPill({
-  children,
-  icon,
-  tone,
-}: {
-  children: React.ReactNode;
-  icon: string;
-  tone: "warn" | "link";
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-ledger border px-3 py-2 text-sm font-medium ${
-        tone === "warn" ? "border-rag-warn/50 text-rag-warn" : "border-link/50 text-link"
-      }`}
-    >
-      <Icon name={icon} className="text-[16px]" />
-      {children}
-    </span>
   );
 }
 
