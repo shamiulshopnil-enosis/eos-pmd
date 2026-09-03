@@ -422,7 +422,7 @@ export function FilterDateRange({
 }) {
   return (
     <div>
-      <div className="mb-1.5 text-xs font-semibold text-ink">{label}</div>
+      <div className="mb-1 text-xs font-semibold text-ink">{label}</div>
       <div className="flex items-center gap-2">
         <Calendar
           value={from ? new Date(from) : null}
