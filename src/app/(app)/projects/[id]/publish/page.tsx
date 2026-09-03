@@ -43,33 +43,33 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
 
       <Card className="p-6">
         <ActionForm action={action} className="space-y-5">
-          <Field label="Project Image URL" hint="Recommended 1920×1080 (16:9), matching the existing public project form.">
+          <Field label="Project image URL" optional hint="Recommended 1920×1080 (16:9), matching the existing public project form.">
             <TextInput type="url" name="publicImageUrl" placeholder="https://…" />
           </Field>
 
-          <Field label="Project Summary">
+          <Field label="Project summary" optional>
             <TextArea name="publicSummary" rows={3} defaultValue={project.description ?? ""} />
           </Field>
-          <Field label="Key Challenges">
+          <Field label="Key challenges" optional>
             <TextArea name="publicKeyChallenges" rows={2} placeholder="What were the main challenges?" />
           </Field>
-          <Field label="Project Solution">
+          <Field label="Project solution" optional>
             <TextArea name="publicSolution" rows={3} placeholder="How did you solve them?" />
           </Field>
-          <Field label="Project Outcome">
+          <Field label="Project outcome" optional>
             <TextArea name="publicOutcome" rows={2} placeholder="What was the final outcome?" />
           </Field>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field label="Tech Stack" hint="Comma-separated">
+            <Field label="Tech stack" optional hint="Comma-separated">
               <TextInput name="publicTechStack" placeholder="React Native, Node.js" />
             </Field>
-            <Field label="Platforms" hint="Comma-separated">
+            <Field label="Platforms" optional hint="Comma-separated">
               <TextInput name="publicPlatforms" placeholder="iOS, Android" />
             </Field>
           </div>
 
-          <Field label="Budget Range">
+          <Field label="Budget range" optional>
             <TextInput name="publicBudget" placeholder="e.g. 10K – 49K" />
           </Field>
 

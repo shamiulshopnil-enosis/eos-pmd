@@ -5,7 +5,7 @@ import { getMilestone, getProject } from "@/lib/data";
 import { canAccessDelivery } from "@/lib/permissions";
 import { updateMilestone } from "@/lib/actions";
 import { toDateInputValue } from "@/lib/format";
-import { Field, SubmitButton, TextInput } from "@/components/form";
+import { Field, FormActions, SubmitButton, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
@@ -42,43 +42,47 @@ export default async function EditMilestonePage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title={`Edit Milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
+      <PageHeader title={`Edit milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to milestone" }} />
 
       <Card className="p-6">
-        <ActionForm action={action} className="space-y-5">
-          <Field label="Milestone Title" required>
-            <TextInput name="title" required defaultValue={milestone.title} />
+        <ActionForm action={action} success="Milestone updated." className="space-y-6">
+          <Field label="Milestone title" required>
+            <TextInput name="title" required defaultValue={milestone.title} placeholder="e.g. Milestone 1 — Product Catalog" />
           </Field>
 
           <div>
-            <span className="mb-1 block text-sm font-medium text-ink">Description</span>
-            <RichTextField name="description" defaultValue={milestone.description} placeholder="Features and deliverables in this milestone…" />
-            <span className="mt-1 block text-xs text-ink-muted">Supports bold and bulleted lists.</span>
+            <span className="mb-1 block text-xs font-semibold text-ink">
+              Description <span className="font-normal text-ink-muted">(optional)</span>
+            </span>
+            <RichTextField name="description" defaultValue={milestone.description} placeholder="What's delivered in this milestone? Features, deliverables, acceptance criteria…" />
+            <span className="mt-1.5 block text-xs text-ink-muted">Supports bold and bulleted lists.</span>
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <Field label="Start Date">
+            <Field label="Start date" optional width="sm">
               <TextInput type="date" name="startDate" defaultValue={toDateInputValue(milestone.startDate)} />
             </Field>
-            <Field label="Due Date">
+            <Field label="Due date" optional width="sm">
               <TextInput type="date" name="dueDate" defaultValue={toDateInputValue(milestone.dueDate)} />
             </Field>
-            <Field label="URL" hint="Optional — repo, demo, or spec link.">
+            <Field label="URL" optional hint="Repo, demo, or spec link.">
               <TextInput type="url" name="url" defaultValue={milestone.url ?? ""} placeholder="https://…" />
             </Field>
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-medium text-ink">Assign to</legend>
+            <legend className="mb-1 text-xs font-semibold text-ink">
+              Assign to <span className="font-normal text-ink-muted">(optional)</span>
+            </legend>
             <AssigneeCheckboxes
               people={project.vendorTeam}
               defaultSelectedEmails={milestone.assignees.map((a) => a.email)}
             />
           </fieldset>
 
-          <div className="flex items-center justify-end gap-3 border-t border-rule pt-5">
-            <SubmitButton>Save Changes</SubmitButton>
-          </div>
+          <FormActions>
+            <SubmitButton>Save changes</SubmitButton>
+          </FormActions>
         </ActionForm>
       </Card>
     </div>
