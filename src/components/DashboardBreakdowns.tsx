@@ -78,20 +78,25 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
         {status.length === 0 ? (
           <Empty>No milestones yet.</Empty>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-1">
             {status.map((r) => (
-              <li key={r.status} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 text-sm">
-                <span className="truncate text-ink-muted">{r.label}</span>
-                <span className="h-2 rounded-full bg-band">
-                  <span
-                    className="block h-full rounded-full"
-                    style={{ width: `${Math.max(r.pct, 2)}%`, background: TONE_VAR[r.tone] }}
-                  />
-                </span>
-                <span className="font-mono text-xs tabular-nums text-ink">
-                  {r.count}
-                  <span className="ml-1.5 text-ink-subtle">{Math.round(r.pct)}%</span>
-                </span>
+              <li key={r.status}>
+                <Link
+                  href={`/milestones?status=${r.status}`}
+                  className="-mx-1 grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 rounded-[4px] px-1 py-1 text-sm transition-colors hover:bg-paper"
+                >
+                  <span className="truncate text-ink-muted">{r.label}</span>
+                  <span className="h-2 rounded-full bg-band">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${Math.max(r.pct, 2)}%`, background: TONE_VAR[r.tone] }}
+                    />
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-ink">
+                    {r.count}
+                    <span className="ml-1.5 text-ink-subtle">{Math.round(r.pct)}%</span>
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

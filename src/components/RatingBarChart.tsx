@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Chart } from "primereact/chart";
-import type { Plugin } from "chart.js";
+import type { ActiveElement, Chart as ChartJS, ChartEvent, Plugin } from "chart.js";
 import type { RatingDistributionBar } from "@/lib/derived";
 
 type Tokens = { ink: string; subtle: string; rule: string; good: string; warn: string; bad: string };
@@ -44,6 +45,7 @@ const toneColor = (tone: RatingDistributionBar["tone"], t: Tokens) =>
 
 /** Milestone reviews bucketed by rating band — a small coloured bar chart. */
 export function RatingBarChart({ bars }: { bars: RatingDistributionBar[] }) {
+  const router = useRouter();
   const [t, setT] = useState<Tokens>(() => readTokens());
   useEffect(() => {
     const obs = new MutationObserver(() => setT(readTokens()));
@@ -98,6 +100,13 @@ export function RatingBarChart({ bars }: { bars: RatingDistributionBar[] }) {
     () => ({
       maintainAspectRatio: false,
       layout: { padding: { top: 16 } },
+      onHover: (_e: ChartEvent, els: ActiveElement[], chart: ChartJS) => {
+        chart.canvas.style.cursor = els.length ? "pointer" : "default";
+      },
+      onClick: (_e: ChartEvent, els: ActiveElement[]) => {
+        const band = bars[els[0]?.index ?? -1]?.band;
+        if (band) router.push(`/milestones?rating=${band}`);
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -127,7 +136,7 @@ export function RatingBarChart({ bars }: { bars: RatingDistributionBar[] }) {
         },
       },
     }),
-    [t, total],
+    [t, total, bars, router],
   );
 
   if (total === 0) {
