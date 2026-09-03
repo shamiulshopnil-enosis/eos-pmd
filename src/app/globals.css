@@ -569,6 +569,11 @@ a.eos-linkbtn.p-button-secondary:hover {
 .p-dropdown .p-dropdown-label.p-placeholder,
 .p-multiselect .p-multiselect-label.p-placeholder {
   color: var(--ink-subtle);
+  opacity: 0.55;
+}
+.dark .p-dropdown .p-dropdown-label.p-placeholder,
+.dark .p-multiselect .p-multiselect-label.p-placeholder {
+  opacity: 0.62;
 }
 .p-dropdown .p-dropdown-trigger,
 .p-multiselect .p-multiselect-trigger {
@@ -611,10 +616,19 @@ a.eos-linkbtn.p-button-secondary:hover {
   box-shadow: 0 0 0 3px var(--input-ring);
   outline: 0;
 }
+/* Placeholders read as a faint prompt to fill in — clearly not entered text. */
 .p-inputtext::placeholder,
-.p-inputtextarea::placeholder {
+.p-inputtextarea::placeholder,
+.p-autocomplete .p-autocomplete-input::placeholder,
+.p-inputnumber-input::placeholder {
   color: var(--ink-subtle);
-  opacity: 1;
+  opacity: 0.55;
+}
+.dark .p-inputtext::placeholder,
+.dark .p-inputtextarea::placeholder,
+.dark .p-autocomplete .p-autocomplete-input::placeholder,
+.dark .p-inputnumber-input::placeholder {
+  opacity: 0.62;
 }
 .p-inputtext:disabled,
 .p-inputtextarea:disabled,
