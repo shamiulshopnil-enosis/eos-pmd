@@ -28,6 +28,22 @@ colors:
   rag-bad: "#ae2e24"
   rag-bad-fill: "#ca3521"
   rag-bad-bg: "#ffeceb"
+  chip-blue-bg: "#eaf2fe"
+  chip-blue-fg: "#1d4fd8"
+  chip-indigo-bg: "#eeecfe"
+  chip-indigo-fg: "#5b3ff0"
+  chip-green-bg: "#e3faf0"
+  chip-green-fg: "#0f9d58"
+  chip-amber-bg: "#fff4d6"
+  chip-amber-fg: "#b45f06"
+  chip-orange-bg: "#ffedd9"
+  chip-orange-fg: "#c2410c"
+  chip-purple-bg: "#f1ebfe"
+  chip-purple-fg: "#7c3aed"
+  chip-teal-bg: "#e1f7f5"
+  chip-teal-fg: "#0f766e"
+  chip-rose-bg: "#ffe7ec"
+  chip-rose-fg: "#be123c"
 typography:
   display:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', Arial, sans-serif"
@@ -235,9 +251,12 @@ Each hue carries a **text tone**, a **solid fill** (discs, meters, message rules
 - **Bad**  `#AE2E24` / `#CA3521` / `#FFECEB`  (dark `#FD9891` / `#E2483D` / `#42221F`)
 
 ### Named Rules
-**The One-Accent Rule.** Navy is the only saturated non-status colour on any screen. It
-never tints a surface except as `link-subtle-bg`, and status green/amber/red never
-emphasise a heading, a link, or a figure that isn't itself a concerning count.
+**The One-Accent Rule.** Navy is the only saturated colour used for *action* — buttons,
+links, focus, the active nav item — and status green/amber/red never emphasise a heading,
+a link, or a figure that isn't itself a concerning count. The one bounded exception is
+**field icon chips** (below): a fixed, categorical palette that labels *what kind of field
+this is* in a dense overview panel. Chips are never clickable, never carry a RAG meaning,
+and never appear outside that one job — everything actionable is still navy-or-neutral.
 
 **The Field-Fill Rule.** A control is a filled `input-bg` panel with a 1px `input-border`
 — never a borderless line of text on the card surface. Focus swaps the fill to white and
@@ -299,8 +318,9 @@ optional intro, one PrimeReact `Card`, optional footer note. `/login` and `/invi
   cards (8px radius, 1px `rule`, big metric), then a two-column Attention / Rating-trend
   row, then the Client ledger (`DataTable`, row-expansion) and the Project-performance
   `DataTable` at full width.
-- Project / milestone detail: `grid lg:grid-cols-[minmax(0,1fr)_18rem]` — wide overview
-  beside a narrow bordered performance rail.
+- Project / milestone detail: `grid lg:grid-cols-[minmax(0,1fr)_18rem]` — a wide Overview
+  `Card` (field icon chips in a 3-column grid) beside a narrower Performance `Card` (a
+  `StatRow` stack).
 - Forms: `mx-auto max-w-3xl` inside a `Card`, fields in `space-y-6`, closing with
   `FormActions` (right-aligned bar over a `border-t border-rule pt-5`). Short fields
   (dates, counts) take a `Field width` of `xs`–`lg` so width hints at the expected input.
@@ -411,6 +431,32 @@ Borders are 1px everywhere. No sharp corners, no pills on buttons or lozenges.
   padding, opens with the 120ms `ledger-reveal`.
 - Sort glyph `ink-subtle` → `link` when active; the row toggler is a 24px `subtle-btn`
   hover target. No paginator — lists show in full.
+
+### Field icon chips (`FieldIcon` / `InfoField` / `StatRow`)
+A small **8px-radius** square, categorical (never status) icon tag beside a label/value
+pair — the one deliberate exception to the One-Accent Rule, scoped to dense overview
+panels (Project detail, Milestone detail, the public project preview). Two sizes: `md`
+(2rem, the default, for a field grid) and `sm` (1.75rem, for a stacked stat rail).
+
+A fixed **tone → meaning** table — extend it rather than inventing a new tone per field:
+- **blue** — organisation / contact identity (client, delivered-by, client email) and a
+  "reviewed" count.
+- **indigo** — classification (services, project type).
+- **green** — a start-of-range date, or a count of things that exist (milestones).
+- **amber** — a rating or star-adjacent metric.
+- **orange** — a due / deadline date — distinct from `amber` so "a date" and "a score"
+  never share a colour.
+- **purple** — people (team size, client contacts, assignees, the People avatar stack) and
+  an in-progress state.
+- **teal** — a rate or percentage (response rate, budget).
+- **rose** — a tag/classification field (engagement model) and client health.
+- **slate** — anything with no strong category (bookkeeping dates like "Created", a
+  secondary rating).
+
+`InfoField` composes a chip with a stacked `field-label` caption + value, replacing a bare
+`<dt>/<dd>` pair. `StatRow` composes a chip with the label on the left and a right-aligned
+`tabular-nums` value, for a Performance-style rail. Both sit inside a `Card` — the panel
+itself keeps the normal 1px `rule` + 8px radius + no shadow, only the chips carry colour.
 
 ### Score meter (`StarRating` — deliberately not stars)
 A numeric value (14px / 500, or 24px for `size="lg"`) + a thin 34×4px (56×6px large) pill

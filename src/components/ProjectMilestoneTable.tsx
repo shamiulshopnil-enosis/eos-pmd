@@ -5,7 +5,7 @@ import Link from "next/link";
 import { DataTable, type DataTableExpandedRows } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { Milestone } from "@/lib/types";
-import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
+import { getMilestoneDisplayStatus, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { FlagBadge, ListCard, MilestoneStatusBadge, StarRating } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -37,7 +37,7 @@ export default function ProjectMilestoneTable({
           <ListCard href={`/projects/${projectId}/milestones/${m.id}`}>
             <div className="font-medium text-ink">{m.title}</div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <MilestoneStatusBadge status={m.status} />
+              <MilestoneStatusBadge status={getMilestoneDisplayStatus(m)} />
               <FlagBadge flag={getMilestoneFlag(m)} />
             </div>
             <div className="mt-2 flex items-center justify-between gap-3 border-t border-rule pt-2 font-mono text-xs text-ink-muted">
@@ -142,7 +142,7 @@ export default function ProjectMilestoneTable({
         header="Status"
         body={(m: Milestone) => (
           <span className="flex flex-wrap items-center gap-1.5">
-            <MilestoneStatusBadge status={m.status} />
+            <MilestoneStatusBadge status={getMilestoneDisplayStatus(m)} />
             <FlagBadge flag={getMilestoneFlag(m)} />
           </span>
         )}

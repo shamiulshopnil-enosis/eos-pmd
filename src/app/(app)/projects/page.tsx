@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import {
   getMyProjectSides,
@@ -6,9 +5,7 @@ import {
   listReviewProjects,
 } from "@/lib/data";
 import { getViewMode } from "@/lib/view-mode";
-import { reviewRoleLabel } from "@/lib/permissions";
-import { EmptyState, InkLink, PageHeader, SectionHeading } from "@/components/ui";
-import { ExecutionStatusBadge } from "@/components/ui";
+import { EmptyState, InkLink, PageHeader } from "@/components/ui";
 import ProjectsTable from "@/components/ProjectsTable";
 
 // The table reads its filters from the URL via useSearchParams and always reflects live data.
@@ -43,15 +40,14 @@ export default async function ProjectsPage() {
     );
   }
 
-  const [allProjects, reviewProjects] = await Promise.all([
-    listProjectsWithMilestones(),
-    listReviewProjects(),
-  ]);
+  // The review-side view lives entirely behind the Client switch above — no
+  // need to fetch it here just to say how many review projects exist.
+  const allProjects = await listProjectsWithMilestones();
   // `allProjects` is already the full delivery list — no need for a separate
   // count round-trip to the API.
   const totalCount = allProjects.length;
 
-  if (totalCount === 0 && reviewProjects.length === 0) {
+  if (totalCount === 0 && !sides.review) {
     return (
       <div>
         <PageHeader title="Projects" action={<NewProjectButton />} />
@@ -78,47 +74,13 @@ export default async function ProjectsPage() {
         <EmptyState
           icon="folder_open"
           title="You're not delivering any projects"
-          description="Create one, or check the projects you review below."
+          description="Switch to Client view above to see what you review."
           actionHref="/projects/new"
           actionLabel="Create project"
         />
       ) : (
         <ProjectsTable projects={allProjects} />
       )}
-
-      {reviewProjects.length > 0 ? (
-        <section className="mt-10">
-          <SectionHeading>Projects you review</SectionHeading>
-          <div className="rounded-ledger border border-rule bg-panel">
-            <ul className="divide-y divide-rule">
-              {reviewProjects.map((p) => {
-                const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
-                const role = reviewRoleLabel(p);
-                return (
-                  <li
-                    key={p.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band sm:grid-cols-[minmax(0,1fr)_7rem_auto]"
-                  >
-                    <Link
-                      href={`/projects/${p.id}`}
-                      className="block min-w-0 truncate font-medium text-ink hover:text-link hover:underline"
-                    >
-                      {p.name}
-                    </Link>
-                    <span className="hidden text-xs capitalize text-ink-muted sm:block">{role}</span>
-                    <span className="flex shrink-0 items-center gap-3 justify-self-end">
-                      <ExecutionStatusBadge status={p.executionStatus} />
-                      <span className="font-mono text-xs tabular-nums text-ink-muted">
-                        {reviewed} / {p.milestones.length}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

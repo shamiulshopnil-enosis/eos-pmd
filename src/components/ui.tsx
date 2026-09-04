@@ -99,7 +99,13 @@ export function ProjectStatusBadge({ status }: { status: string }) {
   return <Badge tone={projectStatusTone[status] ?? "slate"}>{PROJECT_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
-const milestoneStatusTone: Record<string, Tone> = { draft: "slate", sent: "amber", reviewed: "green", rejected: "red" };
+const milestoneStatusTone: Record<string, Tone> = {
+  draft: "slate",
+  overdue: "red",
+  sent: "amber",
+  reviewed: "green",
+  rejected: "red",
+};
 export function MilestoneStatusBadge({ status }: { status: string }) {
   return <Badge tone={milestoneStatusTone[status] ?? "slate"}>{MILESTONE_STATUS_LABELS[status] ?? status}</Badge>;
 }
@@ -125,6 +131,92 @@ export function ExecutionStatusBadge({ status }: { status: string }) {
   return <Badge tone={executionStatusTone[status] ?? "slate"}>{EXECUTION_STATUS_LABELS[status] ?? status}</Badge>;
 }
 
+/* --- Field icon chips ----------------------------------------------- *
+ * A small categorical icon tag beside a label/value pair, used on the
+ * Project, Milestone and public-preview detail pages wherever a plain <dl>
+ * used to sit. The tone is purely categorical (what kind of field this is),
+ * never a status signal — RAG badges (`Badge`, `HealthBadge`) still own
+ * status. See DESIGN.md "Field icon chips" for the tone → meaning table. */
+
+export type ChipTone =
+  | "blue"
+  | "indigo"
+  | "green"
+  | "amber"
+  | "orange"
+  | "purple"
+  | "teal"
+  | "rose"
+  | "slate";
+
+export function FieldIcon({
+  icon,
+  tone,
+  size = "md",
+}: {
+  icon: string;
+  tone: ChipTone;
+  size?: "sm" | "md";
+}) {
+  return (
+    <span className={`eos-chip-icon eos-chip-${tone} eos-chip-size-${size}`} aria-hidden="true">
+      <Icon name={icon} />
+    </span>
+  );
+}
+
+/** A labelled overview field: an icon chip beside a stacked label/value. */
+export function InfoField({
+  icon,
+  tone,
+  label,
+  value,
+  mono,
+}: {
+  icon: string;
+  tone: ChipTone;
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <FieldIcon icon={icon} tone={tone} />
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-ink-muted">{label}</div>
+        <div className={`text-ink ${mono ? "font-mono text-xs" : "text-sm"}`}>{value || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+/** A performance-rail row: icon + label on the left, value right-aligned. */
+export function StatRow({
+  icon,
+  tone,
+  label,
+  value,
+  strong,
+}: {
+  icon: string;
+  tone: ChipTone;
+  label: string;
+  value: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-2.5 text-sm text-ink-muted">
+        <FieldIcon icon={icon} tone={tone} size="sm" />
+        {label}
+      </span>
+      <span className={`font-mono tabular-nums text-ink ${strong ? "text-base font-semibold" : "text-sm"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 /* --- Client health: icon + word --------------------------------- */
 
 const healthIcon: Record<ClientHealth, { icon: string; cls: string }> = {
@@ -146,13 +238,9 @@ export function HealthBadge({ health }: { health: ClientHealth }) {
 
 export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null }) {
   if (!flag) return null;
-  if (flag === "OVERDUE")
-    return (
-      <Badge tone="red">
-        <Icon name="event_busy" className="text-[11px]" />
-        Overdue
-      </Badge>
-    );
+  // Overdue is folded into the status badge itself (see getMilestoneDisplayStatus)
+  // so it isn't shown twice.
+  if (flag === "OVERDUE") return null;
   if (flag === "DUE_SOON")
     return (
       <Badge tone="amber">

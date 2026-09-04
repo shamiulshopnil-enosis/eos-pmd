@@ -12,6 +12,7 @@ import {
   COMPLETION_TIMEOUT_DAYS,
   DUE_SOON_WINDOW_DAYS,
   MILESTONE_REVIEW_DIMENSIONS,
+  MILESTONE_STATUS_LABELS,
   SATISFACTION_THRESHOLDS,
   SATISFIED_RATING_THRESHOLD,
   STALE_MILESTONE_REVIEW_DAYS,
@@ -39,6 +40,14 @@ export function getMilestoneFlag(milestone: Milestone, now: Date = new Date()): 
 
 export function isAwaitingReview(milestone: Milestone): boolean {
   return milestone.status === "sent";
+}
+
+/** The status as shown to users: "draft"/"sent" collapse into "overdue" once
+ *  the due date has lapsed, so the Overdue flag doesn't duplicate as a second
+ *  badge next to the status. */
+export function getMilestoneDisplayStatus(milestone: Milestone, now: Date = new Date()): string {
+  if (getMilestoneFlag(milestone, now) === "OVERDUE") return "overdue";
+  return milestone.status;
 }
 
 /** A milestone is "reviewed" once the client has recorded a rating. */
@@ -160,7 +169,7 @@ export function computeAlerts(projects: ProjectWithMilestones[], now: Date = new
       id: "overdue",
       severity: "critical",
       message: `${overdueCount} milestone${overdueCount === 1 ? "" : "s"} overdue`,
-      href: "/milestones?flag=OVERDUE",
+      href: "/milestones?status=overdue",
     });
   }
 
@@ -382,28 +391,31 @@ export function computeRatingDistribution(projects: ProjectWithMilestones[]): Ra
 }
 
 export type StatusBreakdownRow = {
-  status: Milestone["status"];
+  status: string;
   label: string;
   count: number;
   pct: number;
   tone: "good" | "warn" | "bad" | "slate";
 };
 
-/** Share of every milestone by status, most common first. */
+/** Share of every milestone by status, most common first. Buckets on the same
+ *  display status as the status badge (see getMilestoneDisplayStatus), so a
+ *  late draft/sent milestone counts as Overdue here too. */
 export function computeMilestoneStatusBreakdown(
   projects: ProjectWithMilestones[],
 ): StatusBreakdownRow[] {
   const all = projects.flatMap((p) => p.milestones);
   const total = all.length;
-  const meta: { status: Milestone["status"]; label: string; tone: StatusBreakdownRow["tone"] }[] = [
-    { status: "reviewed", label: "Reviewed", tone: "good" },
-    { status: "sent", label: "With client", tone: "warn" },
-    { status: "draft", label: "Draft", tone: "slate" },
-    { status: "rejected", label: "Rejected", tone: "bad" },
+  const meta: { status: string; label: string; tone: StatusBreakdownRow["tone"] }[] = [
+    { status: "reviewed", label: MILESTONE_STATUS_LABELS.reviewed, tone: "good" },
+    { status: "sent", label: MILESTONE_STATUS_LABELS.sent, tone: "warn" },
+    { status: "draft", label: MILESTONE_STATUS_LABELS.draft, tone: "slate" },
+    { status: "overdue", label: MILESTONE_STATUS_LABELS.overdue, tone: "bad" },
+    { status: "rejected", label: MILESTONE_STATUS_LABELS.rejected, tone: "bad" },
   ];
   return meta
     .map((m) => {
-      const count = all.filter((x) => x.status === m.status).length;
+      const count = all.filter((x) => getMilestoneDisplayStatus(x) === m.status).length;
       return { ...m, count, pct: total > 0 ? (count / total) * 100 : 0 };
     })
     .sort((a, b) => b.count - a.count);
