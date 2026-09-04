@@ -727,12 +727,15 @@ async function main() {
     `Inserting ${companyDocs.length} client companies, ${projectDocs.length} projects, ` +
       `${milestoneDocs.length} milestones, ${activityDocs.length} activities …`,
   );
+  // Raw driver inserts: the docs are already fully shaped (explicit _id, ObjectId
+  // refs, Date fields, every schema field set) and we want the CSV-derived
+  // createdAt/updatedAt kept verbatim rather than stamped with "now".
   if (companyDocs.length) await CompanyModel.collection.insertMany(companyDocs);
   if (companyMemberDocs.length) await CompanyMemberModel.collection.insertMany(companyMemberDocs);
-  await ProjectModel.insertMany(projectDocs, { timestamps: false });
-  await MilestoneModel.insertMany(milestoneDocs, { timestamps: false });
-  await ActivityModel.insertMany(activityDocs, { timestamps: false });
-  await InvitationModel.insertMany(invitationDocs, { timestamps: false });
+  await ProjectModel.collection.insertMany(projectDocs);
+  await MilestoneModel.collection.insertMany(milestoneDocs);
+  await ActivityModel.collection.insertMany(activityDocs);
+  await InvitationModel.collection.insertMany(invitationDocs);
 
   const completedN = projectDocs.filter((p) => p.executionStatus === "completed").length;
   console.log("\nDone.");
