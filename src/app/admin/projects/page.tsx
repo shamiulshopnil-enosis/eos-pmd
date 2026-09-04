@@ -21,7 +21,6 @@ export default async function AdminProjectsPage() {
     id: p.id,
     name: p.name,
     clientCompanyName: p.clientCompanyName,
-    projectType: p.projectType,
     adminStatus: p.adminStatus,
     updatedAt: formatDateTime(p.updatedAt),
   });

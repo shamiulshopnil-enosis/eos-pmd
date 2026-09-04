@@ -5,7 +5,6 @@
 
 export type ProjectStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
 export type ProjectVisibility = "PRIVATE" | "PUBLIC";
-export type ProjectType = "whole" | "milestone";
 export type AdminStatus = "draft" | "pending_approval" | "published" | "rejected" | "edited" | "trashed";
 export type ExecutionStatus = "ongoing" | "awaiting_completion" | "completed";
 export type MilestoneStatus = "draft" | "sent" | "reviewed" | "rejected";
@@ -71,6 +70,10 @@ export interface Project {
   clientCompanyId: string | null;
   deliveringCompanyId: string | null;
   receivingCompanyId: string | null;
+  /** Resolved on read from the delivering company — the vendor's name. */
+  deliveringCompanyName: string | null;
+  /** Resolved on read from the receiving company — the client's name. */
+  receivingCompanyName: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -85,7 +88,6 @@ export interface Project {
   projectUrl: string | null;
   visibility: ProjectVisibility;
 
-  projectType: ProjectType;
   adminStatus: AdminStatus;
   executionStatus: ExecutionStatus;
   minReviewThreshold: number;
@@ -145,6 +147,7 @@ export type MilestoneReviewDimension =
   | "communication";
 
 export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
+export type MilestoneReviewNotes = Record<MilestoneReviewDimension, string | null>;
 
 export interface Milestone {
   id: string;
@@ -158,6 +161,7 @@ export interface Milestone {
   assignees: MilestoneAssignee[];
   attachments: MilestoneAttachment[];
   ratings: MilestoneReview | null; // the five Enosis feedback dimensions, 1–5
+  ratingNotes: MilestoneReviewNotes | null; // optional per-dimension client comments
   rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;

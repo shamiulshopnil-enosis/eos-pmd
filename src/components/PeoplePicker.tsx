@@ -38,6 +38,7 @@ export default function PeoplePicker({
   emptyHint,
   selectedLayout = "chips",
   leadRole = "owner",
+  required = false,
 }: {
   directory: Person[];
   name?: string;
@@ -51,6 +52,8 @@ export default function PeoplePicker({
   selectedLayout?: "chips" | "rows";
   /** Role value that gets the accent badge in "rows" layout. */
   leadRole?: string;
+  /** When true, the form won't submit until at least one person is selected. */
+  required?: boolean;
 }) {
   const key = (p: Person) => (emit === "id" ? p.id ?? p.email : p.email);
 
@@ -147,6 +150,16 @@ export default function PeoplePicker({
       {selected.map((p) => (
         <input key={key(p)} type="hidden" name={name} value={key(p)} />
       ))}
+      {required ? (
+        <input
+          type="text"
+          required
+          value={selected.length > 0 ? "ok" : ""}
+          onChange={() => {}}
+          aria-label="Select at least one person"
+          className="sr-only"
+        />
+      ) : null}
 
       <div className="relative">
         <IconField iconPosition="left" className="block">

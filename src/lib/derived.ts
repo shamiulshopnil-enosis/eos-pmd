@@ -224,15 +224,20 @@ export type RatingTrendPoint = {
   cumulativeAvg: number | null;
 };
 
-/** Granularity the rating trend can be bucketed at. */
-export type TrendPeriod = "daily" | "weekly" | "monthly" | "yearly";
+/** Relative window the rating trend can be shown over. */
+export type TrendPeriod = "week" | "month" | "quarter" | "year";
 
-/** How many buckets each period shows — the visible window. */
-export const TREND_PERIOD_BUCKETS: Record<TrendPeriod, number> = {
-  daily: 30,
-  weekly: 12,
-  monthly: 12,
-  yearly: 5,
+type TrendGranularity = "day" | "week" | "month";
+
+/** Each window's bucket granularity and how many buckets it spans. */
+export const TREND_PERIOD_CONFIG: Record<
+  TrendPeriod,
+  { granularity: TrendGranularity; buckets: number }
+> = {
+  week: { granularity: "day", buckets: 7 },
+  month: { granularity: "day", buckets: 30 },
+  quarter: { granularity: "week", buckets: 13 },
+  year: { granularity: "month", buckets: 12 },
 };
 
 /** A single reviewed rating, serialisation-safe across the server→client boundary. */
@@ -265,10 +270,10 @@ const startOfWeek = (d: Date) => {
  */
 export function computeRatingTrend(
   samples: RatingSample[],
-  period: TrendPeriod = "monthly",
+  period: TrendPeriod = "quarter",
   now: Date = new Date(),
 ): RatingTrendPoint[] {
-  const n = TREND_PERIOD_BUCKETS[period];
+  const { granularity, buckets: n } = TREND_PERIOD_CONFIG[period];
   const buckets: {
     start: number;
     end: number;
@@ -282,7 +287,7 @@ export function computeRatingTrend(
     let end: Date;
     let label: string;
     let fullLabel: string;
-    if (period === "daily") {
+    if (granularity === "day") {
       start = startOfDay(now);
       start.setDate(start.getDate() - i);
       end = new Date(start);
@@ -294,7 +299,7 @@ export function computeRatingTrend(
         day: "numeric",
         year: "numeric",
       });
-    } else if (period === "weekly") {
+    } else if (granularity === "week") {
       start = startOfWeek(now);
       start.setDate(start.getDate() - i * 7);
       end = new Date(start);
@@ -305,16 +310,11 @@ export function computeRatingTrend(
         day: "numeric",
         year: "numeric",
       })}`;
-    } else if (period === "monthly") {
+    } else {
       start = new Date(now.getFullYear(), now.getMonth() - i, 1);
       end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
       label = start.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
       fullLabel = start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    } else {
-      start = new Date(now.getFullYear() - i, 0, 1);
-      end = new Date(now.getFullYear() - i + 1, 0, 1);
-      label = String(start.getFullYear());
-      fullLabel = label;
     }
     buckets.push({ start: start.getTime(), end: end.getTime(), label, fullLabel, ratings: [] });
   }

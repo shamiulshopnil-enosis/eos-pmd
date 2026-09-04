@@ -6,8 +6,6 @@ import mongoose, { Schema, model, models, type InferSchemaType } from "mongoose"
 
 const PROJECT_STATUS = ["ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED", "ARCHIVED"] as const;
 const PROJECT_VISIBILITY = ["PRIVATE", "PUBLIC"] as const;
-// Milestones plan, Phase 1.
-const PROJECT_TYPE = ["whole", "milestone"] as const;
 const ADMIN_STATUS = ["draft", "pending_approval", "published", "rejected", "edited", "trashed"] as const;
 const EXECUTION_STATUS = ["ongoing", "awaiting_completion", "completed"] as const;
 const MILESTONE_STATUS = ["draft", "sent", "reviewed", "rejected"] as const;
@@ -163,8 +161,6 @@ const projectSchema = new Schema(
     projectUrl: { type: String, default: null },
     visibility: { type: String, enum: PROJECT_VISIBILITY, default: "PRIVATE" },
 
-    // --- Milestones plan, Phase 1 ---
-    projectType: { type: String, enum: PROJECT_TYPE, default: "whole" },
     adminStatus: { type: String, enum: ADMIN_STATUS, default: "draft" },
     executionStatus: { type: String, enum: EXECUTION_STATUS, default: "ongoing" },
     minReviewThreshold: { type: Number, default: 0 },
@@ -236,6 +232,17 @@ const milestoneReviewSchema = new Schema(
   { _id: false },
 );
 
+const milestoneReviewNotesSchema = new Schema(
+  {
+    deliverables: { type: String, default: null },
+    timeliness: { type: String, default: null },
+    understanding: { type: String, default: null },
+    planning: { type: String, default: null },
+    communication: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const milestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
@@ -248,6 +255,7 @@ const milestoneSchema = new Schema(
     assignees: { type: [milestoneAssigneeSchema], default: [] },
     attachments: { type: [milestoneAttachmentSchema], default: [] },
     ratings: { type: milestoneReviewSchema, default: null }, // the five review dimensions
+    ratingNotes: { type: milestoneReviewNotesSchema, default: null }, // per-dimension client comments
     rating: { type: Number, default: null }, // average of `ratings`, drives scoring
     comment: { type: String, default: null },
     editRequestedByVendor: { type: Boolean, default: false },

@@ -173,6 +173,11 @@ export class MilestonesService {
     );
     this.projectsService.assertActiveProject(project);
 
+    const assignees = this.resolveAssignees(project, strList(body, "assigneeEmails"));
+    if (assignees.length === 0) {
+      throw new BadRequestException("Assign at least one teammate to this milestone.");
+    }
+
     const milestone = await this.milestones.create({
       projectId,
       title: str(body, "title"),
@@ -180,7 +185,7 @@ export class MilestonesService {
       url: optStr(body, "url"),
       startDate: optDate(body, "startDate"),
       dueDate: optDate(body, "dueDate"),
-      assignees: this.resolveAssignees(project, strList(body, "assigneeEmails")),
+      assignees,
       status: "draft",
     });
     const milestoneId = String(milestone._id);
@@ -222,7 +227,11 @@ export class MilestonesService {
     existing.startDate = optDate(body, "startDate");
     existing.dueDate = optDate(body, "dueDate");
     if (body.assigneeEmails !== undefined) {
-      existing.assignees = this.resolveAssignees(project, strList(body, "assigneeEmails"));
+      const nextAssignees = this.resolveAssignees(project, strList(body, "assigneeEmails"));
+      if (nextAssignees.length === 0) {
+        throw new BadRequestException("A milestone must keep at least one assignee.");
+      }
+      existing.assignees = nextAssignees;
     }
     await existing.save();
     await this.activity.log({
@@ -250,8 +259,9 @@ export class MilestonesService {
     if (existing.status === "sent") {
       throw new BadRequestException("This milestone is locked while it is with the client for review.");
     }
-    if (project.projectType === "whole") {
-      throw new BadRequestException("A Whole Project must always keep its single milestone.");
+    const remaining = await this.milestones.countDocuments({ projectId });
+    if (remaining <= 1) {
+      throw new BadRequestException("A project must keep at least one milestone.");
     }
     await this.milestones.findByIdAndDelete(milestoneId);
     await this.projectsService.recomputeProjectScore(projectId);
@@ -356,19 +366,23 @@ export class MilestonesService {
    */
   private parseReview(body: Record<string, unknown>): {
     ratings: Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number>;
+    notes: Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], string | null> | null;
     overall: number;
   } {
     const ratings = {} as Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number>;
+    const notes = {} as Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], string | null>;
     for (const key of MILESTONE_REVIEW_DIMENSION_KEYS) {
       const n = Number.parseInt(String(body[key] ?? ""), 10);
       if (Number.isNaN(n) || n < 1 || n > 5) {
         throw new BadRequestException("Please answer every review question (1–5).");
       }
       ratings[key] = n;
+      notes[key] = optStr(body, `${key}Note`);
     }
     const values = MILESTONE_REVIEW_DIMENSION_KEYS.map((k) => ratings[k]);
     const overall = values.reduce((a, b) => a + b, 0) / values.length;
-    return { ratings, overall };
+    const anyNote = MILESTONE_REVIEW_DIMENSION_KEYS.some((k) => notes[k]);
+    return { ratings, notes: anyNote ? notes : null, overall };
   }
 
   async submitMilestoneRating(
@@ -391,9 +405,10 @@ export class MilestonesService {
     if (milestone.status !== "sent") {
       throw new BadRequestException("This milestone is not awaiting your review.");
     }
-    const { ratings, overall } = this.parseReview(body);
+    const { ratings, notes, overall } = this.parseReview(body);
     const now = new Date();
     milestone.ratings = ratings;
+    milestone.ratingNotes = notes;
     milestone.rating = overall;
     milestone.comment = optStr(body, "comment");
     milestone.status = "reviewed";
@@ -535,8 +550,9 @@ export class MilestonesService {
     if (!withinWindow && !milestone.editRequestedByVendor) {
       throw new BadRequestException("The window to change this rating has closed.");
     }
-    const { ratings, overall } = this.parseReview(body);
+    const { ratings, notes, overall } = this.parseReview(body);
     milestone.ratings = ratings;
+    milestone.ratingNotes = notes;
     milestone.rating = overall;
     milestone.comment = optStr(body, "comment");
     await milestone.save();

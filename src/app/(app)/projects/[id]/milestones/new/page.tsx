@@ -8,19 +8,19 @@ import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { RichTextField } from "@/components/RichTextField";
 import PeoplePicker from "@/components/PeoplePicker";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function NewMilestonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireUser();
   const project = await getProject(id);
   if (!project || !canAccessDelivery(project)) notFound();
-  // Whole Projects always have exactly one milestone, created with the project.
-  if (project.projectType === "whole") notFound();
 
   const action = createMilestone.bind(null, project.id);
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title="New milestone"
         description={`Under project — ${project.name}`}
@@ -55,7 +55,7 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
 
           <fieldset className="space-y-2">
             <legend className="mb-1 text-xs font-semibold text-ink">
-              Assign to <span className="font-normal text-ink-muted">(optional)</span>
+              Assign to <span className="text-rag-bad">*</span>
             </legend>
             <PeoplePicker
               directory={project.vendorTeam.map((m) => ({
@@ -65,10 +65,11 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
               }))}
               name="assigneeEmails"
               emit="email"
+              required
               placeholder="Search people on this project…"
               addPerson={addProjectDeliveryPerson.bind(null, project.id)}
               addContextLabel="this project"
-              emptyHint="No one assigned — search above to add people from this project."
+              emptyHint="Assign at least one teammate — a milestone can't be created without one."
             />
           </fieldset>
 

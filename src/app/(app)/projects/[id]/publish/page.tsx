@@ -11,6 +11,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { Field, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { SingleCheckbox } from "@/components/CheckboxField";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function PublishProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,6 +28,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title="Publish Project"
         description="Private project fields are carried over automatically; complete anything the public project page still needs."

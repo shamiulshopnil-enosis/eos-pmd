@@ -9,6 +9,7 @@ import { unpublishProject } from "@/lib/actions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import { Badge, Card, GhostButton, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function PublicPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +26,7 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title="Public project preview"
         description="How the converted project would appear on the EOS public project page."

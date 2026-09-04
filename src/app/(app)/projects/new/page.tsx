@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { addCompanyPerson, createProject } from "@/lib/actions";
 import { getMyCompany, listCompanyMembers, searchCompanies } from "@/lib/data";
-import { Field, FormActions, RadioCards, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { Field, FormActions, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
 import { Card, PageHeader } from "@/components/ui";
 import CompanyPicker from "@/components/CompanyPicker";
@@ -25,30 +25,6 @@ export default async function NewProjectPage() {
 
       <Card className="p-6">
         <ActionForm action={createProject} error="Couldn't create the project — check the required fields." className="space-y-6">
-          <fieldset className="space-y-2">
-            <legend className="mb-1 text-xs font-semibold text-ink">
-              Project type
-            </legend>
-            <RadioCards
-              name="projectType"
-              defaultValue="milestone"
-              options={[
-                {
-                  value: "milestone",
-                  label: "Milestone project",
-                  description:
-                    "Broken into milestones. The client rates each milestone as it completes; the project score is the average of those ratings.",
-                },
-                {
-                  value: "whole",
-                  label: "Whole project",
-                  description:
-                    "One client review after the whole project is delivered. How projects work today.",
-                },
-              ]}
-            />
-          </fieldset>
-
           <Field label="Project name" required>
             <TextInput name="name" required placeholder="e.g. E-commerce Platform Development" />
           </Field>
@@ -113,7 +89,9 @@ export default async function NewProjectPage() {
             />
           </fieldset>
 
-          <ProjectMilestonesField />
+          <ProjectMilestonesField
+            people={members.map((m) => ({ id: m.id, email: m.email, name: m.name }))}
+          />
 
           <FormActions>
             <SubmitButton>Create project</SubmitButton>

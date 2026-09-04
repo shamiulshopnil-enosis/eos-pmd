@@ -5,7 +5,6 @@
 
 export type ProjectStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "CANCELLED" | "ARCHIVED";
 export type ProjectVisibility = "PRIVATE" | "PUBLIC";
-export type ProjectType = "whole" | "milestone";
 export type AdminStatus = "draft" | "pending_approval" | "published" | "rejected" | "edited" | "trashed";
 export type ExecutionStatus = "ongoing" | "awaiting_completion" | "completed";
 export type MilestoneStatus = "draft" | "sent" | "reviewed" | "rejected";
@@ -75,6 +74,10 @@ export interface Project {
   clientCompanyId: string | null;
   deliveringCompanyId: string | null;
   receivingCompanyId: string | null;
+  /** Resolved on read — the delivering (vendor) company's name. */
+  deliveringCompanyName: string | null;
+  /** Resolved on read — the receiving (client) company's name. */
+  receivingCompanyName: string | null;
   clientContactName: string | null;
   clientEmail: string;
   services: string | null;
@@ -89,7 +92,6 @@ export interface Project {
   projectUrl: string | null;
   visibility: ProjectVisibility;
 
-  projectType: ProjectType;
   adminStatus: AdminStatus;
   executionStatus: ExecutionStatus;
   minReviewThreshold: number;
@@ -151,6 +153,9 @@ export type MilestoneReviewDimension =
 /** The five Enosis Client Feedback Form delivery dimensions, each 1–5 (5 = best). */
 export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
 
+/** Optional free-text the client attaches to each rating dimension. */
+export type MilestoneReviewNotes = Record<MilestoneReviewDimension, string | null>;
+
 export interface Milestone {
   id: string;
   projectId: string;
@@ -163,6 +168,7 @@ export interface Milestone {
   assignees: MilestoneAssignee[]; // vendor teammates responsible for this milestone
   attachments: MilestoneAttachment[];
   ratings: MilestoneReview | null; // the five review dimensions
+  ratingNotes: MilestoneReviewNotes | null; // optional per-dimension client comments
   rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;

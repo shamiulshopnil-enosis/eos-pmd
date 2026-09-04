@@ -6,13 +6,12 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { forceCompleteProject } from "@/lib/actions";
-import { AdminStatusBadge, ListCard, ProjectTypeBadge } from "@/components/ui";
+import { AdminStatusBadge, ListCard } from "@/components/ui";
 
 export type AdminProjectRow = {
   id: string;
   name: string;
   clientCompanyName: string;
-  projectType: string;
   adminStatus: string;
   updatedAt: string;
 };
@@ -36,7 +35,6 @@ export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
             <div className="font-medium text-ink">{p.name}</div>
             <div className="mt-0.5 text-xs text-ink-muted">{p.clientCompanyName}</div>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <ProjectTypeBadge type={p.projectType} />
               <AdminStatusBadge status={p.adminStatus} />
             </div>
             <div className="mt-2 text-xs text-ink-subtle">Updated {p.updatedAt}</div>
@@ -64,7 +62,6 @@ export function AdminProjectsTable({ rows }: { rows: AdminProjectRow[] }) {
         )}
       />
       <Column header="Client" body={(p: AdminProjectRow) => <span className="text-ink-muted">{p.clientCompanyName}</span>} />
-      <Column header="Type" body={(p: AdminProjectRow) => <ProjectTypeBadge type={p.projectType} />} />
       <Column header="Approval" body={(p: AdminProjectRow) => <AdminStatusBadge status={p.adminStatus} />} />
       <Column header="Last updated" body={(p: AdminProjectRow) => <span className="text-ink-muted">{p.updatedAt}</span>} />
     </DataTable>

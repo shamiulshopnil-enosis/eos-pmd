@@ -8,6 +8,7 @@ import { toDateInputValue } from "@/lib/format";
 import { Field, FormActions, Select, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
+import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +20,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-3xl">
+      <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title={`Edit project — ${project.name}`}
         back={{ href: `/projects/${project.id}`, label: "Back to project" }}
