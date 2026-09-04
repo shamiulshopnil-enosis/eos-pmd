@@ -50,6 +50,11 @@ export async function listReviewProjects(): Promise<ProjectWithMilestones[]> {
   return apiFetch<ProjectWithMilestones[]>(`/projects/mine`);
 }
 
+/** Which sides of any project the signed-in user is on — drives the role switch. */
+export async function getMyProjectSides(): Promise<{ delivery: boolean; review: boolean }> {
+  return apiFetch<{ delivery: boolean; review: boolean }>(`/projects/my-sides`);
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   try {
     return await apiFetch<Project>(`/projects/${id}`);
@@ -96,15 +101,21 @@ export async function getProjectDetail(
 // milestones
 // ---------------------------------------------------------------------------
 
-export async function countMilestones(): Promise<number> {
-  const { count } = await apiFetch<{ count: number }>(`/milestones/count`);
+export async function countMilestones(
+  filter: { side?: "delivery" | "review" | "any" } = {},
+): Promise<number> {
+  const { count } = await apiFetch<{ count: number }>(
+    `/milestones/count${qs({ side: filter.side })}`,
+  );
   return count;
 }
 
 export async function listMilestonesWithProject(
-  filter: { status?: string } = {},
+  filter: { status?: string; side?: "delivery" | "review" | "any" } = {},
 ): Promise<MilestoneWithProject[]> {
-  return apiFetch<MilestoneWithProject[]>(`/milestones${qs({ status: filter.status })}`);
+  return apiFetch<MilestoneWithProject[]>(
+    `/milestones${qs({ status: filter.status, side: filter.side })}`,
+  );
 }
 
 export async function getMilestone(id: string): Promise<Milestone | null> {

@@ -10,7 +10,7 @@ import type { Readable } from "stream";
 import { MODEL } from "../schemas/schemas";
 import { ActivityService } from "../activity/activity.service";
 import { ProjectsService } from "../projects/projects.service";
-import { serializeMilestone, serializeProject } from "../common/serialize";
+import { serializeMilestone, serializeMilestoneLean, serializeProject } from "../common/serialize";
 import { sanitizeMilestoneHtml } from "../common/richtext";
 import { MILESTONE_REVIEW_DIMENSION_KEYS, RATING_SELF_CORRECTION_HOURS } from "../common/constants";
 import {
@@ -90,53 +90,61 @@ export class MilestonesService {
     return out;
   }
 
-  private projectIdsForVendor(vendorUserId?: string): Promise<Types.ObjectId[] | null> {
-    return this.projectsService.projectIdsForUser(vendorUserId, "delivery");
-  }
-
   // -------------------------------------------------------------------------
   // reads (ported from data.ts)
   // -------------------------------------------------------------------------
 
-  async countMilestones(vendorUserId?: string): Promise<number> {
-    const ids = await this.projectIdsForVendor(vendorUserId);
+  async countMilestones(
+    userId?: string,
+    side: "delivery" | "review" | "any" = "delivery",
+  ): Promise<number> {
+    const ids = await this.projectsService.projectIdsForUser(userId, side);
     return this.milestones.countDocuments(ids ? { projectId: { $in: ids } } : {});
   }
 
   async listMilestonesWithProject(
-    filter: { status?: string; vendorUserId?: string } = {},
+    filter: {
+      status?: string;
+      userId?: string;
+      side?: "delivery" | "review" | "any";
+    } = {},
   ): Promise<MilestoneWithProject[]> {
     const query: Record<string, unknown> = {};
     if (filter.status) query.status = filter.status;
-    const ids = await this.projectIdsForVendor(filter.vendorUserId);
+    const ids = await this.projectsService.projectIdsForUser(
+      filter.userId,
+      filter.side ?? "delivery",
+    );
     if (ids) query.projectId = { $in: ids };
 
-    const milestoneDocs = await this.milestones.find(query).sort({ updatedAt: -1 }).lean();
-    const milestones = milestoneDocs.map((m) => serializeMilestone(m as Record<string, unknown>));
+    // The list view reads only a milestone's scalar fields; skip the rich-text
+    // description, attachments and review sub-docs both in the projection and on
+    // the wire (see serializeMilestoneLean).
+    const milestoneDocs = await this.milestones
+      .find(query)
+      .select("-description -attachments -ratingNotes -reviewDraft -comment -rejectionReason")
+      .sort({ updatedAt: -1 })
+      .lean();
+    const milestones = milestoneDocs.map((m) => serializeMilestoneLean(m as Record<string, unknown>));
 
     const projectDocs = await this.projects
       .find({ _id: { $in: milestones.map((m) => m.projectId) } })
+      .select({ name: 1, clientCompanyName: 1 })
       .lean();
     const projectById = new Map(
-      projectDocs.map((p) => {
-        const project = serializeProject(p as Record<string, unknown>);
-        return [project.id, project] as const;
-      }),
+      projectDocs.map((p) => [
+        String((p as Record<string, unknown>)._id),
+        {
+          id: String((p as Record<string, unknown>)._id),
+          name: String((p as Record<string, unknown>).name ?? ""),
+          clientCompanyName: String((p as Record<string, unknown>).clientCompanyName ?? ""),
+        },
+      ] as const),
     );
 
     return milestones
       .filter((m) => projectById.has(m.projectId))
-      .map((m) => {
-        const project = projectById.get(m.projectId)!;
-        return {
-          ...m,
-          project: {
-            id: project.id,
-            name: project.name,
-            clientCompanyName: project.clientCompanyName,
-          },
-        };
-      });
+      .map((m) => ({ ...m, project: projectById.get(m.projectId)! }));
   }
 
   async getMilestone(id: string): Promise<Milestone | null> {

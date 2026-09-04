@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataTableExpandedRows } from "primereact/datatable";
 import { Column } from "primereact/column";
@@ -9,6 +9,7 @@ import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { FlagBadge, ListCard, MilestoneStatusBadge, StarRating } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { Pager, pageSlice, usePagination } from "@/components/pagination";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
 
 /** One milestone list for the project page. Each row expands in place (PrimeReact
@@ -22,11 +23,16 @@ export default function ProjectMilestoneTable({
   milestones: Milestone[];
 }) {
   const [expanded, setExpanded] = useState<DataTableExpandedRows>({});
+  const { first, setFirst, pageSize } = usePagination(milestones.length, "");
+  const pageRows = useMemo(
+    () => pageSlice(milestones, first, pageSize),
+    [milestones, first, pageSize],
+  );
 
   return (
     <>
     <ul className="space-y-2 sm:hidden">
-      {milestones.map((m) => (
+      {pageRows.map((m) => (
         <li key={m.id}>
           <ListCard href={`/projects/${projectId}/milestones/${m.id}`}>
             <div className="font-medium text-ink">{m.title}</div>
@@ -48,7 +54,7 @@ export default function ProjectMilestoneTable({
       ))}
     </ul>
     <DataTable
-      value={milestones}
+      value={pageRows}
       dataKey="id"
       className="eos-table hidden sm:block"
       expandedRows={expanded}
@@ -151,6 +157,7 @@ export default function ProjectMilestoneTable({
         }
       />
     </DataTable>
+    <Pager first={first} total={milestones.length} onChange={setFirst} noun="milestones" />
     </>
   );
 }

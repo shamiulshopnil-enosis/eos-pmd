@@ -244,6 +244,28 @@ export function serializeMilestone(m: Raw): Milestone {
   };
 }
 
+/**
+ * The list pages (`/projects`, `/milestones`) and the dashboard only read a
+ * milestone's small scalar fields — status, rating, dates, assignees, the
+ * five-dimension `ratings` object. This variant returns the same `Milestone`
+ * shape but leaves the heavy fields empty: the rich-text `description`, the
+ * `attachments` array, the per-dimension `ratingNotes`, the saved `reviewDraft`,
+ * the free-text `comment` and `rejectionReason`. Pair it with a matching
+ * `.select("-description -attachments -ratingNotes -reviewDraft -comment
+ * -rejectionReason")` so those columns never leave Mongo either.
+ */
+export function serializeMilestoneLean(m: Raw): Milestone {
+  return serializeMilestone({
+    ...m,
+    description: undefined,
+    attachments: undefined,
+    ratingNotes: undefined,
+    reviewDraft: undefined,
+    comment: undefined,
+    rejectionReason: undefined,
+  });
+}
+
 export function serializeActivity(a: Raw): Activity {
   return {
     id: String(a._id),

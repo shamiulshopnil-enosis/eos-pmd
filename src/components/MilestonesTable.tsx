@@ -24,6 +24,7 @@ import {
   type Selected,
   type SortState,
 } from "@/components/filters";
+import { Pager, pageSlice, usePagination } from "@/components/pagination";
 
 type SortKey = "title" | "project" | "client" | "assignees" | "start" | "due" | "reviewed" | "status" | "rating";
 
@@ -203,6 +204,13 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
     return [...filtered].sort((a, b) => cmp(a[sort.key], b[sort.key]) * dir);
   }, [filtered, sort]);
 
+  // Only one page of rows is rendered at a time — see components/pagination.
+  const { first, setFirst, pageSize } = usePagination(
+    sorted.length,
+    JSON.stringify([q, selected, dates, sort]),
+  );
+  const pageRows = useMemo(() => pageSlice(sorted, first, pageSize), [sorted, first, pageSize]);
+
   const dateGroups: [string, string, string, string][] = [
     ["start", "Start date", dates.startFrom, dates.startTo],
     ["due", "Due date", dates.dueFrom, dates.dueTo],
@@ -261,6 +269,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
         sort={sort}
         onSort={setSort}
         sortOptions={SORT_OPTIONS}
+        page={{ first, pageSize, onChange: setFirst }}
       />
 
       {filtered.length === 0 ? (
@@ -272,7 +281,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
       ) : (
         <>
         <ul className="space-y-2 sm:hidden">
-          {sorted.map((r) => (
+          {pageRows.map((r) => (
             <li key={r.id}>
               <ListCard href={`/projects/${r.projectId}/milestones/${r.id}`}>
                 <div className="font-medium text-ink">{r.title}</div>
@@ -295,7 +304,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
           ))}
         </ul>
         <DataTable
-          value={sorted}
+          value={pageRows}
           dataKey="id"
           removableSort
           sortField={sort.key}
@@ -369,6 +378,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
             body={(r: Row) => (isMilestoneReviewed(r.m) ? <StarRating value={r.rating} /> : <span className="text-ink-muted">—</span>)}
           />
         </DataTable>
+        <Pager first={first} total={sorted.length} onChange={setFirst} noun="milestones" />
         </>
       )}
     </>

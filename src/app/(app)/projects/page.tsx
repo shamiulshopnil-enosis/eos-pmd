@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { countProjects, listProjectsWithMilestones, listReviewProjects } from "@/lib/data";
+import {
+  getMyProjectSides,
+  listProjectsWithMilestones,
+  listReviewProjects,
+} from "@/lib/data";
+import { getViewMode } from "@/lib/view-mode";
 import { reviewRoleLabel } from "@/lib/permissions";
 import { EmptyState, InkLink, PageHeader, SectionHeading } from "@/components/ui";
 import { ExecutionStatusBadge } from "@/components/ui";
@@ -12,11 +17,39 @@ export const dynamic = "force-dynamic";
 export default async function ProjectsPage() {
   await requireUser();
 
-  const [totalCount, allProjects, reviewProjects] = await Promise.all([
-    countProjects(),
+  const sides = await getMyProjectSides().catch(() => ({ delivery: false, review: false }));
+  const viewMode = await getViewMode(sides);
+
+  if (viewMode === "client") {
+    const reviewProjects = await listReviewProjects();
+    return (
+      <div>
+        <PageHeader
+          title="Projects"
+          description={`${reviewProjects.length} project${
+            reviewProjects.length === 1 ? "" : "s"
+          } you review`}
+        />
+        {reviewProjects.length === 0 ? (
+          <EmptyState
+            icon="folder_open"
+            title="No projects to review"
+            description="When a delivery team adds you to a project, it will appear here."
+          />
+        ) : (
+          <ProjectsTable projects={reviewProjects} />
+        )}
+      </div>
+    );
+  }
+
+  const [allProjects, reviewProjects] = await Promise.all([
     listProjectsWithMilestones(),
     listReviewProjects(),
   ]);
+  // `allProjects` is already the full delivery list — no need for a separate
+  // count round-trip to the API.
+  const totalCount = allProjects.length;
 
   if (totalCount === 0 && reviewProjects.length === 0) {
     return (

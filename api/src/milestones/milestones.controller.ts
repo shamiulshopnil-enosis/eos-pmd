@@ -30,17 +30,19 @@ export class MilestonesController {
   @Get()
   list(
     @CurrentUser() user: SessionUser,
-    @Query("scope") scope?: string,
+    @Query("side") side?: string,
     @Query("status") status?: string,
   ) {
-    const vendorUserId = user.role === "admin" ? undefined : user.id;
-    return this.milestones.listMilestonesWithProject({ status, vendorUserId });
+    const userId = user.role === "admin" ? undefined : user.id;
+    const s = side === "review" || side === "any" ? side : "delivery";
+    return this.milestones.listMilestonesWithProject({ status, userId, side: s });
   }
 
   @Get("count")
-  async count(@CurrentUser() user: SessionUser, @Query("scope") scope?: string) {
-    const vendorUserId = user.role === "admin" ? undefined : user.id;
-    return { count: await this.milestones.countMilestones(vendorUserId) };
+  async count(@CurrentUser() user: SessionUser, @Query("side") side?: string) {
+    const userId = user.role === "admin" ? undefined : user.id;
+    const s = side === "review" || side === "any" ? side : "delivery";
+    return { count: await this.milestones.countMilestones(userId, s) };
   }
 
   @Get(":id")

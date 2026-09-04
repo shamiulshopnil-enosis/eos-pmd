@@ -48,43 +48,92 @@ function reviveDates<T>(value: T): T {
   return value;
 }
 
-async function authHeader(): Promise<Record<string, string>> {
+async function sessionToken(): Promise<string | undefined> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return store.get(SESSION_COOKIE)?.value;
+}
+
+// ---------------------------------------------------------------------------
+// Short-TTL response cache
+// ---------------------------------------------------------------------------
+// The list/dashboard pages are `dynamic = "force-dynamic"` (they read the
+// session cookie), so Next does no caching of its own and every navigation
+// re-hits the API — several sequential queries against a remote Atlas cluster.
+// This is a small in-process cache that holds each GET's result for a few
+// seconds, keyed by the session token so it is never shared across users. Any
+// mutation (`apiFetch` with a non-GET method, or `apiUpload`) flushes it, so a
+// write is always followed by fresh reads; cross-user staleness is bounded by
+// the TTL. Set `API_CACHE_TTL_MS=0` to disable.
+
+const CACHE_TTL_MS = Math.max(0, Number(process.env.API_CACHE_TTL_MS ?? 10_000));
+const CACHE_MAX_ENTRIES = 500;
+type CacheEntry = { expires: number; promise: Promise<unknown> };
+const responseCache = new Map<string, CacheEntry>();
+
+/** Drop every cached response. Called on every write. */
+export function clearApiCache(): void {
+  responseCache.clear();
 }
 
 type Options = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
-  /** Passed through to fetch cache control. Reads default to no-store. */
+  /**
+   * Passed through to fetch cache control. Reads default to no-store. Setting
+   * this to any value also opts the call out of the short-TTL response cache.
+   */
   cache?: RequestCache;
 };
 
 export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> {
   const { method = "GET", body, cache = "no-store" } = opts;
+  const token = await sessionToken();
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    cache,
-    headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(await authHeader()),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  // A write can invalidate any cached read — flush the whole cache.
+  if (method !== "GET") clearApiCache();
 
-  const text = await res.text();
-  const payload = text ? JSON.parse(text) : null;
+  const useCache = method === "GET" && CACHE_TTL_MS > 0 && opts.cache === undefined;
+  const key = useCache ? `${token ?? "anon"}::${path}` : "";
 
-  if (!res.ok) {
-    const message =
-      (payload && (payload.message || payload.error)) ||
-      `API ${method} ${path} failed (${res.status})`;
-    throw new ApiError(Array.isArray(message) ? message.join(", ") : String(message), res.status);
+  if (useCache) {
+    const hit = responseCache.get(key);
+    if (hit && hit.expires > Date.now()) return hit.promise as Promise<T>;
   }
 
-  return reviveDates(payload) as T;
+  const request = (async () => {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      cache,
+      headers: {
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    const text = await res.text();
+    const payload = text ? JSON.parse(text) : null;
+
+    if (!res.ok) {
+      const message =
+        (payload && (payload.message || payload.error)) ||
+        `API ${method} ${path} failed (${res.status})`;
+      throw new ApiError(Array.isArray(message) ? message.join(", ") : String(message), res.status);
+    }
+
+    return reviveDates(payload) as T;
+  })();
+
+  if (useCache) {
+    if (responseCache.size >= CACHE_MAX_ENTRIES) clearApiCache();
+    responseCache.set(key, { expires: Date.now() + CACHE_TTL_MS, promise: request });
+    // Never cache a failure.
+    request.catch(() => {
+      if (responseCache.get(key)?.promise === request) responseCache.delete(key);
+    });
+  }
+
+  return request;
 }
 
 /**
@@ -93,10 +142,12 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
  * action from the incoming request's files.
  */
 export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  clearApiCache(); // a file upload is a write
+  const token = await sessionToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     cache: "no-store",
-    headers: { ...(await authHeader()) },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
 

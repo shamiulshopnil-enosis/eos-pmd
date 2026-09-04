@@ -13,6 +13,7 @@
     "test": "vitest run",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:seed:itgeeks": "tsx --env-file=.env scripts/seed-itgeeks.ts",
+    "db:seed:geek-client": "tsx --env-file=.env scripts/seed-geek-as-client.ts",
     "migrate:000": "tsx --env-file=.env scripts/migrations/000_seed_users.ts",
     "migrate:001": "tsx --env-file=.env scripts/migrations/001_project_type_status.ts",
     "migrate:002": "tsx --env-file=.env scripts/migrations/002_release_to_milestone.ts",

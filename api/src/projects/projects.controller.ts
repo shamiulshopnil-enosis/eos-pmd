@@ -43,6 +43,16 @@ export class ProjectsController {
     return this.projects.listProjectsForUser(user);
   }
 
+  /**
+   * Which sides of any project this user is personally on — drives the top-bar
+   * role switch. This is real project membership, not platform-admin status: an
+   * admin who isn't staffed on projects gets neither lens here.
+   */
+  @Get("my-sides")
+  mySides(@CurrentUser() user: SessionUser) {
+    return this.projects.listMyProjectSides(user.id);
+  }
+
   @Get("admin")
   @Roles("admin")
   admin(@Query("adminStatus") adminStatus?: string) {
