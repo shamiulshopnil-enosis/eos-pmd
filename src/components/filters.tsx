@@ -10,6 +10,7 @@ import { Checkbox } from "primereact/checkbox";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { InputText } from "primereact/inputtext";
+import { PageNav } from "@/components/pagination";
 
 /* ------------------------------------------------------------------ *
  * Faceted filtering for the Projects and Milestones lists, modelled
@@ -369,6 +370,7 @@ export function ResultBar<K extends string>({
   sort,
   onSort,
   sortOptions,
+  page,
 }: {
   count: number;
   total: number;
@@ -376,14 +378,42 @@ export function ResultBar<K extends string>({
   sort: SortState<K>;
   onSort: (s: SortState<K>) => void;
   sortOptions: { label: string; key: K; dir: "asc" | "desc" }[];
+  /** When the list is paginated, the current page offset and page size — the
+   *  summary then reads as a range and page controls appear inline. */
+  page?: { first: number; pageSize: number; onChange: (first: number) => void };
 }) {
   const value = `${sort.key}:${sort.dir}`;
+  const paged = page && count > page.pageSize;
+  const start = paged ? page!.first + 1 : 0;
+  const end = paged ? Math.min(page!.first + page!.pageSize, count) : 0;
   return (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-      <span className="text-sm text-ink-muted">
-        Showing <span className="font-semibold text-ink tabular-nums">{count}</span>
-        {count !== total ? <> of <span className="tabular-nums">{total}</span></> : null} {noun}
-      </span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-sm text-ink-muted">
+          {paged ? (
+            <>
+              Showing{" "}
+              <span className="font-semibold text-ink tabular-nums">{start}–{end}</span> of{" "}
+              <span className="tabular-nums">{count}</span>
+              {count !== total ? <> (of {total})</> : null} {noun}
+            </>
+          ) : (
+            <>
+              Showing <span className="font-semibold text-ink tabular-nums">{count}</span>
+              {count !== total ? <> of <span className="tabular-nums">{total}</span></> : null} {noun}
+            </>
+          )}
+        </span>
+        {paged ? (
+          <PageNav
+            first={page!.first}
+            total={count}
+            pageSize={page!.pageSize}
+            onChange={page!.onChange}
+            label={`${noun} pagination`}
+          />
+        ) : null}
+      </div>
       <label className="flex items-center gap-2 text-sm text-ink-muted">
         Sort by
         <Dropdown

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { listProjectsWithMilestones, listReviewProjects } from "@/lib/data";
+import { getMyProjectSides, listProjectsWithMilestones, listReviewProjects } from "@/lib/data";
+import { getViewMode } from "@/lib/view-mode";
+import { ClientDashboard } from "@/components/ClientDashboard";
 import {
   average,
   collectRatingSamples,
@@ -94,7 +96,15 @@ function ReviewSection({
 }
 
 export default async function DashboardPage() {
-  await requireUser();
+  const user = await requireUser();
+  const sides = await getMyProjectSides().catch(() => ({ delivery: false, review: false }));
+  const viewMode = await getViewMode(sides);
+
+  if (viewMode === "client") {
+    const reviewProjects = await listReviewProjects();
+    return <ClientDashboard projects={reviewProjects} viewerId={user.id} />;
+  }
+
   const [projects, reviewProjects] = await Promise.all([
     listProjectsWithMilestones(),
     listReviewProjects(),

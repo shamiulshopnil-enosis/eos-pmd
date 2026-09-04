@@ -1,20 +1,25 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "primereact/button";
-import { getMyCompany, recentActivities } from "@/lib/data";
+import { getMyCompany, getMyProjectSides, recentActivities } from "@/lib/data";
 import type { SessionUser } from "@/lib/session";
 import { signOut } from "@/app/login/actions";
+import { canSwitchViewMode, getViewMode } from "@/lib/view-mode";
 import { ThemeToggle } from "@/components/theme";
 import { NavLinks } from "@/components/NavLinks";
+import { RoleSwitch } from "@/components/RoleSwitch";
 import { ActivityMenu, MobileMenu } from "@/components/AppChrome";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BrandLogo } from "@/components/BrandLogo";
 
 export default async function NavShell({ user, children }: { user: SessionUser; children: ReactNode }) {
-  const [recentActivity, company] = await Promise.all([
+  const [recentActivity, company, sides] = await Promise.all([
     recentActivities(8),
     getMyCompany().catch(() => null),
+    getMyProjectSides().catch(() => ({ delivery: false, review: false })),
   ]);
+  const viewMode = await getViewMode(sides);
+  const showSwitch = canSwitchViewMode(sides);
 
   return (
     <div className="flex min-h-screen bg-paper">
@@ -26,9 +31,9 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
 
         <div className="flex-1 overflow-y-auto px-2.5 py-4">
           <div className="mb-2 px-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
-            Register
+            {viewMode === "client" ? "Review" : "Register"}
           </div>
-          <NavLinks />
+          <NavLinks mode={viewMode} />
         </div>
 
         <div className="border-t border-rule px-4 py-3">
@@ -51,7 +56,7 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-rule bg-panel px-4 py-2.5 md:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <MobileMenu email={user.email} signOut={signOut} />
+            <MobileMenu email={user.email} signOut={signOut} mode={viewMode} />
             <Link href="/dashboard" className="shrink-0 md:hidden">
               <BrandLogo variant="icon" className="h-7 w-auto" priority />
             </Link>
@@ -61,6 +66,7 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
           </div>
 
           <div className="flex items-center gap-2">
+            {showSwitch ? <RoleSwitch mode={viewMode} /> : null}
             <ActivityMenu activities={recentActivity} />
             <div className="md:hidden">
               <ThemeToggle />

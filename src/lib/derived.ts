@@ -4,13 +4,14 @@
 // `rating` per milestone). The running-average / public-threshold definitions
 // live in ./scoring (Phase 5); this module composes them into UI-shaped views.
 
-import type { Milestone, ProjectWithMilestones } from "./types";
+import type { Milestone, MilestoneReviewDimension, ProjectWithMilestones } from "./types";
 import { runningAverage } from "./scoring";
 import {
   AT_RISK_RATING_THRESHOLD,
   CLIENT_HEALTH_LABELS,
   COMPLETION_TIMEOUT_DAYS,
   DUE_SOON_WINDOW_DAYS,
+  MILESTONE_REVIEW_DIMENSIONS,
   SATISFACTION_THRESHOLDS,
   SATISFIED_RATING_THRESHOLD,
   STALE_MILESTONE_REVIEW_DAYS,
@@ -438,6 +439,224 @@ export function computeProjectProgress(projects: ProjectWithMilestones[]): Proje
     })
     .filter((r) => r.total > 0)
     .sort((a, b) => b.pct - a.pct || b.total - a.total);
+}
+
+// ---------------------------------------------------------------------------
+// Client (review-side) dashboard. These run off the projects the viewer's
+// company receives — `listReviewProjects()` — and answer "how is delivery
+// going, and what do I owe a review?" rather than "how am I scoring".
+// ---------------------------------------------------------------------------
+
+export interface ReviewWorkload {
+  /** Milestones sitting with the client, oldest first. */
+  awaiting: {
+    project: ProjectWithMilestones;
+    milestone: Milestone;
+    /** Whole days the milestone has been waiting, or null if `sentAt` is unknown. */
+    waitingDays: number | null;
+  }[];
+  awaitingCount: number;
+  /** Of those, how many have been waiting longer than the stale-review window. */
+  overdueToReview: number;
+  /** Reviewed milestones across every project the company receives. */
+  reviewedByCompany: number;
+  /** …of which this viewer personally submitted. */
+  reviewedByYou: number;
+}
+
+export function computeReviewWorkload(
+  projects: ProjectWithMilestones[],
+  viewerId: string | null,
+  now: Date = new Date(),
+): ReviewWorkload {
+  const awaiting = projects
+    .flatMap((project) =>
+      project.milestones
+        .filter((m) => m.status === "sent")
+        .map((milestone) => ({
+          project,
+          milestone,
+          waitingDays:
+            milestone.sentAt != null
+              ? Math.floor((now.getTime() - milestone.sentAt.getTime()) / MS_PER_DAY)
+              : null,
+        })),
+    )
+    .sort(
+      (a, b) =>
+        (a.milestone.sentAt?.getTime() ?? 0) - (b.milestone.sentAt?.getTime() ?? 0),
+    );
+
+  const overdueToReview = awaiting.filter(
+    ({ waitingDays }) => waitingDays != null && waitingDays > STALE_MILESTONE_REVIEW_DAYS,
+  ).length;
+
+  const reviewed = projects.flatMap((p) => p.milestones.filter(isMilestoneReviewed));
+  const reviewedByYou = viewerId
+    ? reviewed.filter((m) => m.reviewedByUserId === viewerId).length
+    : 0;
+
+  return {
+    awaiting,
+    awaitingCount: awaiting.length,
+    overdueToReview,
+    reviewedByCompany: reviewed.length,
+    reviewedByYou,
+  };
+}
+
+export interface DimensionAverage {
+  key: MilestoneReviewDimension;
+  label: string;
+  avg: number | null;
+  count: number;
+}
+
+export interface GivenSatisfaction {
+  avgRating: number | null;
+  reviewedCount: number;
+  /** Share of reviews at or above the "satisfied" line. */
+  satisfactionRate: number | null;
+  /** Mean score the client has given on each of the five feedback dimensions. */
+  dimensionAverages: DimensionAverage[];
+}
+
+export function computeGivenSatisfaction(projects: ProjectWithMilestones[]): GivenSatisfaction {
+  const reviewed = projects.flatMap((p) => p.milestones.filter(isMilestoneReviewed));
+  const ratings = reviewed.map((m) => m.rating);
+  const satisfied = ratings.filter((r) => r >= SATISFIED_RATING_THRESHOLD).length;
+
+  const dimensionAverages: DimensionAverage[] = MILESTONE_REVIEW_DIMENSIONS.map((dim) => {
+    const values: number[] = [];
+    for (const m of reviewed) {
+      const v = m.ratings?.[dim.key];
+      if (typeof v === "number") values.push(v);
+    }
+    return { key: dim.key, label: dim.label, avg: average(values), count: values.length };
+  });
+
+  return {
+    avgRating: average(ratings),
+    reviewedCount: reviewed.length,
+    satisfactionRate: ratings.length > 0 ? (satisfied / ratings.length) * 100 : null,
+    dimensionAverages,
+  };
+}
+
+export interface VendorBreakdownRow {
+  id: string;
+  name: string;
+  projectCount: number;
+  totalMilestones: number;
+  reviewedMilestones: number;
+  latestRating: number | null;
+  avgRating: number | null;
+  health: ClientHealth;
+}
+
+/** Reviewed-milestone performance grouped by the delivering company. */
+export function computeVendorBreakdown(projects: ProjectWithMilestones[]): VendorBreakdownRow[] {
+  const byKey = new Map<string, ProjectWithMilestones[]>();
+  const order: string[] = [];
+  for (const p of projects) {
+    const key = p.deliveringCompanyId ?? p.deliveringCompanyName ?? "Delivery team";
+    if (!byKey.has(key)) {
+      byKey.set(key, []);
+      order.push(key);
+    }
+    byKey.get(key)!.push(p);
+  }
+
+  return order
+    .map((key) => {
+      const group = byKey.get(key)!;
+      const reviewed = group
+        .flatMap((p) => p.milestones.filter(isMilestoneReviewed))
+        .sort((a, b) => (b.reviewedAt?.getTime() ?? 0) - (a.reviewedAt?.getTime() ?? 0));
+      const ratings = reviewed.map((m) => m.rating);
+      const latestRating = ratings[0] ?? null;
+      return {
+        id: key,
+        name: group[0].deliveringCompanyName ?? "Delivery team",
+        projectCount: group.length,
+        totalMilestones: group.reduce((n, p) => n + p.milestones.length, 0),
+        reviewedMilestones: reviewed.length,
+        latestRating,
+        avgRating: average(ratings),
+        health: classifyHealth(latestRating),
+      };
+    })
+    .sort((a, b) => {
+      const ah = a.avgRating ?? Infinity;
+      const bh = b.avgRating ?? Infinity;
+      return ah - bh || b.reviewedMilestones - a.reviewedMilestones;
+    });
+}
+
+export interface ClientProjectRow {
+  id: string;
+  name: string;
+  vendor: string;
+  health: ClientHealth;
+  /** Nearest un-reviewed milestone with a due date. */
+  nextDue: { title: string; date: Date } | null;
+  overdueCount: number;
+  awaitingReview: number;
+  /** Share of sent-or-reviewed milestones (with a due date) delivered by their due date. */
+  onTimePct: number | null;
+  reviewed: number;
+  total: number;
+  pct: number;
+}
+
+export function computeClientProjectRows(
+  projects: ProjectWithMilestones[],
+  now: Date = new Date(),
+): ClientProjectRow[] {
+  return projects
+    .map((p) => {
+      const total = p.milestones.length;
+      const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
+      const overdueCount = p.milestones.filter(
+        (m) => getMilestoneFlag(m, now) === "OVERDUE",
+      ).length;
+      const awaitingReview = p.milestones.filter((m) => m.status === "sent").length;
+
+      const upcoming = p.milestones
+        .filter((m) => (m.status === "draft" || m.status === "sent") && m.dueDate != null)
+        .sort((a, b) => (a.dueDate!.getTime() ?? 0) - (b.dueDate!.getTime() ?? 0))[0];
+
+      const delivered = p.milestones.filter(
+        (m) => (m.status === "sent" || m.status === "reviewed") && m.dueDate != null,
+      );
+      const onTime = delivered.filter((m) => {
+        const mark = m.sentAt ?? m.reviewedAt;
+        return mark != null && mark.getTime() <= m.dueDate!.getTime();
+      }).length;
+
+      const latestRating =
+        reviewedMilestones(p)[0]?.rating ?? null;
+
+      return {
+        id: p.id,
+        name: p.name,
+        vendor: p.deliveringCompanyName ?? "Delivery team",
+        health: classifyHealth(latestRating),
+        nextDue: upcoming ? { title: upcoming.title, date: upcoming.dueDate! } : null,
+        overdueCount,
+        awaitingReview,
+        onTimePct: delivered.length > 0 ? (onTime / delivered.length) * 100 : null,
+        reviewed,
+        total,
+        pct: total > 0 ? (reviewed / total) * 100 : 0,
+      };
+    })
+    .sort((a, b) => {
+      // Trouble first: overdue, then awaiting review, then least complete.
+      if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
+      if (b.awaitingReview !== a.awaitingReview) return b.awaitingReview - a.awaitingReview;
+      return a.pct - b.pct;
+    });
 }
 
 export type WorkloadRow = {

@@ -4,8 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "primereact/menu";
 import type { MenuItem } from "primereact/menuitem";
+import type { ViewMode } from "@/lib/view-mode";
 
-const NAV_ITEMS = [
+type NavItem = { href: string; label: string; icon: string };
+
+const DELIVERY_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "pi-th-large" },
   { href: "/projects", label: "Projects", icon: "pi-folder-open" },
   { href: "/milestones", label: "Milestones", icon: "pi-flag" },
@@ -13,10 +16,24 @@ const NAV_ITEMS = [
   { href: "/companies", label: "Clients", icon: "pi-building" },
 ];
 
-export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
+// Client (review) lens: no project creation, no company administration.
+const CLIENT_NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "pi-th-large" },
+  { href: "/projects", label: "Projects", icon: "pi-folder-open" },
+  { href: "/milestones", label: "Milestones", icon: "pi-flag" },
+];
 
-  const model: MenuItem[] = NAV_ITEMS.map((item) => {
+export function NavLinks({
+  mode = "delivery",
+  onNavigate,
+}: {
+  mode?: ViewMode;
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
+  const items = mode === "client" ? CLIENT_NAV : DELIVERY_NAV;
+
+  const model: MenuItem[] = items.map((item) => {
     const active =
       pathname === item.href ||
       (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));

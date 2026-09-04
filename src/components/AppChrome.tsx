@@ -9,9 +9,18 @@ import { NavLinks } from "@/components/NavLinks";
 import { ACTIVITY_LABELS } from "@/lib/constants";
 import { formatDateTime } from "@/lib/format";
 import type { RecentActivity } from "@/lib/types";
+import type { ViewMode } from "@/lib/view-mode";
 
 /** Mobile nav drawer — PrimeReact <Sidebar> behind an icon <Button>. */
-export function MobileMenu({ email, signOut }: { email: string; signOut: () => void }) {
+export function MobileMenu({
+  email,
+  signOut,
+  mode = "delivery",
+}: {
+  email: string;
+  signOut: () => void;
+  mode?: ViewMode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -28,7 +37,7 @@ export function MobileMenu({ email, signOut }: { email: string; signOut: () => v
         <div className="mb-2 px-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
           Register
         </div>
-        <NavLinks onNavigate={() => setOpen(false)} />
+        <NavLinks mode={mode} onNavigate={() => setOpen(false)} />
         <div className="mt-4 border-t border-rule px-2 pt-3">
           <div className="truncate font-mono text-xs text-ink-muted">{email}</div>
           <form action={signOut} className="mt-1">

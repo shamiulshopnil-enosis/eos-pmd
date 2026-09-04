@@ -14,6 +14,7 @@ import {
   serializeActivity,
   serializeInvitation,
   serializeMilestone,
+  serializeMilestoneLean,
   serializeProject,
 } from "../common/serialize";
 import { runningAverage } from "../common/scoring";
@@ -127,13 +128,26 @@ export class ProjectsService {
   // assembly helpers (ported from data.ts)
   // -------------------------------------------------------------------------
 
-  private async attachMilestones(projects: Project[]): Promise<ProjectWithMilestones[]> {
+  /**
+   * Attach each project's milestones. `lean` (the default) drops the heavy
+   * per-milestone fields the list pages and dashboard never read — the rich-text
+   * description, attachments and review sub-docs — from both the Mongo
+   * projection and the response. Pass `lean: false` only where the full
+   * milestone is rendered (the project detail page).
+   */
+  private async attachMilestones(
+    projects: Project[],
+    opts: { lean?: boolean } = {},
+  ): Promise<ProjectWithMilestones[]> {
+    const lean = opts.lean ?? true;
     const projectIds = projects.map((p) => p.id);
-    const milestoneDocs = await this.milestones
-      .find({ projectId: { $in: projectIds } })
-      .sort({ createdAt: 1 })
-      .lean();
-    const milestones = milestoneDocs.map((m) => serializeMilestone(m as Record<string, unknown>));
+    const q = this.milestones.find({ projectId: { $in: projectIds } }).sort({ createdAt: 1 });
+    if (lean) {
+      q.select("-description -attachments -ratingNotes -reviewDraft -comment -rejectionReason");
+    }
+    const milestoneDocs = await q.lean();
+    const serialize = lean ? serializeMilestoneLean : serializeMilestone;
+    const milestones = milestoneDocs.map((m) => serialize(m as Record<string, unknown>));
 
     const byProject = new Map<string, Milestone[]>();
     for (const milestone of milestones) {
@@ -360,6 +374,23 @@ export class ProjectsService {
     return this.attachMilestones(await this.hydrateProjectPeople(projects));
   }
 
+  /**
+   * Whether the user is personally on the delivery and/or review side of at
+   * least one project. Drives the top-bar role switch, so it reflects real
+   * project membership only — not platform-admin reach.
+   */
+  async listMyProjectSides(userId?: string): Promise<{ delivery: boolean; review: boolean }> {
+    if (!userId || !isValidId(userId)) return { delivery: false, review: false };
+    const [deliveryIds, reviewIds] = await Promise.all([
+      this.projectIdsForUser(userId, "delivery"),
+      this.projectIdsForUser(userId, "review"),
+    ]);
+    return {
+      delivery: (deliveryIds?.length ?? 0) > 0,
+      review: (reviewIds?.length ?? 0) > 0,
+    };
+  }
+
   async listProjectsForUser(user: SessionUser): Promise<ProjectWithMilestones[]> {
     const ids = await this.projectIdsForUser(user.id, "review");
     if (!ids || ids.length === 0) return [];
@@ -404,7 +435,8 @@ export class ProjectsService {
   async getProjectWithMilestones(id: string, user?: SessionUser): Promise<ProjectWithMilestones | null> {
     const project = await this.getProject(id, user);
     if (!project) return null;
-    const [withMilestones] = await this.attachMilestones([project]);
+    // Detail page renders full milestones (description, attachments, review).
+    const [withMilestones] = await this.attachMilestones([project], { lean: false });
     return withMilestones;
   }
 

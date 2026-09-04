@@ -35,6 +35,7 @@ import {
   type Selected,
   type SortState,
 } from "@/components/filters";
+import { Pager, pageSlice, usePagination } from "@/components/pagination";
 
 type SortKey = "name" | "client" | "milestones" | "rating" | "healthRank";
 
@@ -184,6 +185,13 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
     return [...filtered].sort((a, b) => cmp(a[sort.key], b[sort.key]) * dir);
   }, [filtered, sort]);
 
+  // Only one page of rows is rendered at a time — see components/pagination.
+  const { first, setFirst, pageSize } = usePagination(
+    sorted.length,
+    JSON.stringify([q, selected, dates, sort]),
+  );
+  const pageRows = useMemo(() => pageSlice(sorted, first, pageSize), [sorted, first, pageSize]);
+
   const dateActive =
     (dates.startFrom || dates.startTo ? 1 : 0) + (dates.dueFrom || dates.dueTo ? 1 : 0);
   const extraChips: ExtraChip[] = [];
@@ -251,6 +259,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
         sort={sort}
         onSort={setSort}
         sortOptions={SORT_OPTIONS}
+        page={{ first, pageSize, onChange: setFirst }}
       />
 
       {filtered.length === 0 ? (
@@ -262,7 +271,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
       ) : (
         <>
         <ul className="space-y-2 sm:hidden">
-          {sorted.map((r) => (
+          {pageRows.map((r) => (
             <li key={r.id}>
               <ListCard href={`/projects/${r.id}`}>
                 <div className="min-w-0">
@@ -282,7 +291,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           ))}
         </ul>
         <DataTable
-          value={sorted}
+          value={pageRows}
           dataKey="id"
           removableSort
           sortField={sort.key}
@@ -338,6 +347,7 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           <Column field="healthRank" header="Client health" sortable body={(r: Row) => <HealthBadge health={r.perf.health} />} />
           <Column field="approval" header="EOS approval" sortable body={(r: Row) => <AdminStatusBadge status={r.approval} />} />
         </DataTable>
+        <Pager first={first} total={sorted.length} onChange={setFirst} noun="projects" />
         </>
       )}
     </>
