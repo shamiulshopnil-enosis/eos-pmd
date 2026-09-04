@@ -24,12 +24,15 @@ const blank = (): Row => ({
 });
 
 /**
- * Inline milestone planning on the new-project form. Every project is a
- * milestone project now, so this is always shown and always required: at least
- * one milestone, and every milestone needs at least one assignee. The rows are
- * serialised into a hidden `milestonesJson` field that `createProject` reads.
+ * Inline milestone planning on the new-project form. Milestones are optional at
+ * creation time — the planner stays hidden behind a CTA and can be revealed to
+ * plan a few upfront, or skipped entirely and added later from the project
+ * page. Any milestone that IS planned here still needs at least one assignee.
+ * The rows are serialised into a hidden `milestonesJson` field that
+ * `createProject` reads ("[]" while the planner is collapsed).
  */
 export default function ProjectMilestonesField({ people }: { people: MilestonePerson[] }) {
+  const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<Row[]>([blank()]);
 
   const update = (i: number, patch: Partial<Row>) =>
@@ -50,16 +53,23 @@ export default function ProjectMilestonesField({ people }: { people: MilestonePe
       ),
     );
 
-  const kept = rows.filter((r) => r.title.trim() !== "");
+  const collapse = () => {
+    setRows([blank()]);
+    setExpanded(false);
+  };
+
+  const kept = expanded ? rows.filter((r) => r.title.trim() !== "") : [];
   const payload = JSON.stringify(kept);
-  const valid = kept.length > 0 && kept.every((r) => r.assigneeEmails.length > 0);
+  // Optional: fine with no milestones. But a titled row must carry an assignee,
+  // otherwise the create call would fail server-side.
+  const valid = kept.every((r) => r.assigneeEmails.length > 0);
 
   return (
     <fieldset className="space-y-3 border-t border-rule pt-5">
       <legend className="text-sm font-medium text-ink">
-        Milestones <span className="text-rag-bad">*</span>
+        Milestones
         <span className="ml-1 font-normal text-ink-muted">
-          — at least one, each with an assignee
+          (optional — plan now or add them later)
         </span>
       </legend>
 
@@ -69,38 +79,55 @@ export default function ProjectMilestonesField({ people }: { people: MilestonePe
         required
         value={valid ? "ok" : ""}
         onChange={() => {}}
-        aria-label="Add at least one milestone, each with an assignee"
+        aria-label="Every planned milestone needs an assignee"
         className="sr-only"
       />
 
-      {people.length === 0 ? (
-        <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-xs text-rag-warn">
-          Add people to your company directory first — every milestone needs an assignee.
-        </p>
-      ) : null}
+      {!expanded ? (
+        <Button
+          type="button"
+          outlined
+          size="small"
+          icon="pi pi-plus"
+          label="Plan milestones"
+          onClick={() => setExpanded(true)}
+        />
+      ) : (
+        <>
+          <div className="space-y-3">
+            {rows.map((row, i) => (
+              <MilestoneRow
+                key={i}
+                row={row}
+                index={i}
+                people={people}
+                onChange={(patch) => update(i, patch)}
+                onRemove={() => remove(i)}
+                onToggleAssignee={(email) => toggleAssignee(i, email)}
+              />
+            ))}
+          </div>
 
-      <div className="space-y-3">
-        {rows.map((row, i) => (
-          <MilestoneRow
-            key={i}
-            row={row}
-            index={i}
-            people={people}
-            onChange={(patch) => update(i, patch)}
-            onRemove={() => remove(i)}
-            onToggleAssignee={(email) => toggleAssignee(i, email)}
-          />
-        ))}
-      </div>
-
-      <Button
-        type="button"
-        text
-        size="small"
-        icon="pi pi-plus"
-        label="Add milestone"
-        onClick={() => setRows((rs) => [...rs, blank()])}
-      />
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              text
+              size="small"
+              icon="pi pi-plus"
+              label="Add milestone"
+              onClick={() => setRows((rs) => [...rs, blank()])}
+            />
+            <Button
+              type="button"
+              text
+              size="small"
+              severity="secondary"
+              label="Cancel"
+              onClick={collapse}
+            />
+          </div>
+        </>
+      )}
     </fieldset>
   );
 }
@@ -202,7 +229,7 @@ function MilestoneRow({
           </ul>
         ) : (
           <p className="mb-2 text-xs text-rag-warn">
-            Pick at least one person — a milestone can&apos;t be created without an assignee.
+            Pick at least one person. A milestone can&apos;t be created without an assignee.
           </p>
         )}
         {people.length > 6 ? (

@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 private_docs/
+
+# impeccable skill cache (local only)
+.impeccable/

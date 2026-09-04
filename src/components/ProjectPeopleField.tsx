@@ -108,7 +108,7 @@ export function ProjectPeopleField({
                   placeholder="Search your company by name or email…"
                   addPerson={addCompanyPerson.bind(null, companyId)}
                   addContextLabel="your company"
-                  emptyHint="No one on this project yet — search above to add people from your company."
+                  emptyHint="No one on this project yet. Search above to add people from your company."
                 />
                 <SubmitButton>Save</SubmitButton>
               </ActionForm>

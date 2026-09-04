@@ -53,7 +53,7 @@ export const MILESTONE_REVIEW_DIMENSIONS = [
     key: "understanding",
     label: "Understanding of requirements",
     question:
-      "How would you rate the team's understanding of your project's requirements — your product, target users, business goals, vision, and the broader industry you operate in?",
+      "How would you rate the team's understanding of your project's requirements: your product, target users, business goals, vision, and the broader industry you operate in?",
     options: ["Very Good", "Good", "Satisfactory", "Poor", "Very Poor"],
   },
   {

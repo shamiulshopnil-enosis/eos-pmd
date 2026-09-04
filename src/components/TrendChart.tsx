@@ -337,7 +337,7 @@ export function TrendChart({ samples }: { samples: RatingSample[] }) {
           {periodToggle}
         </div>
         <div className="flex h-44 items-center justify-center px-4 text-center text-sm text-ink-muted">
-          No milestones reviewed in this window — try a wider period, or wait for clients to rate.
+          No milestones reviewed in this window. Try a wider period, or wait for clients to rate.
         </div>
       </div>
     );

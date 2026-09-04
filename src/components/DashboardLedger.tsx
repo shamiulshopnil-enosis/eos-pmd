@@ -130,13 +130,18 @@ function ProjectBlock({ p }: { p: LedgerRow }) {
   );
 }
 
+const INITIAL_VISIBLE = 5;
+
 export function DashboardLedger({ groups }: { groups: ClientGroup[] }) {
   const [expanded, setExpanded] = useState<DataTableExpandedRows>({});
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? groups : groups.slice(0, INITIAL_VISIBLE);
+  const hiddenCount = groups.length - INITIAL_VISIBLE;
 
   return (
     <>
       <div className="space-y-2 sm:hidden">
-        {groups.map((g) => (
+        {visible.map((g) => (
           <details
             key={g.id}
             className="group overflow-hidden rounded-[8px] border border-rule bg-panel"
@@ -166,7 +171,7 @@ export function DashboardLedger({ groups }: { groups: ClientGroup[] }) {
       </div>
 
       <DataTable
-        value={groups}
+        value={visible}
         dataKey="id"
         className="eos-table eos-ledger hidden sm:block"
         expandedRows={expanded}
@@ -231,6 +236,19 @@ export function DashboardLedger({ groups }: { groups: ClientGroup[] }) {
           )}
         />
       </DataTable>
+
+      {hiddenCount > 0 ? (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="inline-flex items-center gap-1 text-xs font-medium text-link hover:text-link-strong"
+          >
+            {showAll ? "Show fewer" : `See all ${groups.length}`}
+            <Icon name={showAll ? "expand_less" : "expand_more"} className="text-[14px]" />
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

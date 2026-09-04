@@ -158,7 +158,7 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
       {/* Delivery workload */}
       <CardShell
         title="Delivery workload"
-        hint="Milestones per teammate — open vs done."
+        hint="Milestones per teammate: open vs done."
         link={{ href: "/milestones", label: "View all" }}
       >
         {workload.length === 0 ? (

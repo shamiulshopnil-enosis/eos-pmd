@@ -10,8 +10,8 @@ import { Providers } from "@/components/providers";
 const themeScript = `(function(){try{var s=localStorage.getItem('eos-theme');var d=s?s==='dark':window.matchMedia('(prefers-color-scheme:dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 export const metadata: Metadata = {
-  title: "EOS Performance Monitoring",
-  description: "Private project delivery & milestone-based client reviews (MVP prototype)",
+  title: "Enosis PM Dashboard",
+  description: "Private project delivery and milestone-based client reviews.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -23,14 +23,14 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
       <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
         title="New milestone"
-        description={`Under project — ${project.name}`}
+        description={`Under project: ${project.name}`}
         back={{ href: `/projects/${project.id}`, label: "Back to project" }}
       />
 
       <Card className="p-6">
         <ActionForm action={action} success="Milestone added." className="space-y-6">
-          <Field label="Milestone title" required hint="Plain text, e.g. Milestone 3 — Payment Gateway Integration">
-            <TextInput name="title" required placeholder="e.g. Milestone 1 — Product Catalog" />
+          <Field label="Milestone title" required hint="Plain text, e.g. Milestone 3: Payment Gateway Integration">
+            <TextInput name="title" required placeholder="e.g. Milestone 1: Product Catalog" />
           </Field>
 
           <div>
@@ -69,7 +69,7 @@ export default async function NewMilestonePage({ params }: { params: Promise<{ i
               placeholder="Search people on this project…"
               addPerson={addProjectDeliveryPerson.bind(null, project.id)}
               addContextLabel="this project"
-              emptyHint="Assign at least one teammate — a milestone can't be created without one."
+              emptyHint="Assign at least one teammate. A milestone can't be created without one."
             />
           </fieldset>
 

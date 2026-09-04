@@ -79,7 +79,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
             <div className="mb-2 text-sm font-medium text-ink">Verified delivery performance</div>
             {reviewedCount === 0 ? (
               <p className="text-sm text-ink-muted">
-                No reviewed milestones yet — this section won&apos;t appear on the public page until at least one milestone has a client rating.
+                No reviewed milestones yet. This section won&apos;t appear on the public page until at least one milestone has a client rating.
               </p>
             ) : (
               <>
@@ -89,7 +89,7 @@ export default async function PublishProjectPage({ params }: { params: Promise<{
                   </p>
                 ) : (
                   <p className="mb-3 text-sm text-rag-warn">
-                    {reviewedCount} of {totalMilestones} milestones reviewed — below the {threshold}-milestone threshold, so
+                    {reviewedCount} of {totalMilestones} milestones reviewed, below the {threshold}-milestone threshold, so
                     the summary stays hidden on the public page until then. You can still record consent now.
                   </p>
                 )}

@@ -28,7 +28,7 @@ export default async function CapstonePage({ params }: { params: Promise<{ id: s
     <div>
       <SetBreadcrumb entries={{ [`/projects/${id}`]: project.name }} />
       <PageHeader
-        title={`Capstone Endorsement — ${project.name}`}
+        title={`Capstone Endorsement: ${project.name}`}
         description="A short qualitative wrap-up of the whole engagement. No star rating here."
         back={{ href: `/projects/${id}`, label: "Back to Project" }}
       />

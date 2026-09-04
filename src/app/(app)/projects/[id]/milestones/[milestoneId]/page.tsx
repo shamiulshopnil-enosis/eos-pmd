@@ -37,7 +37,6 @@ export default async function MilestoneDetailPage({
 
   const flag = getMilestoneFlag(milestone);
   const siblingSent = project.milestones.find((m) => m.id !== milestoneId && m.status === "sent");
-  const canDeleteMilestone = project.milestones.length > 1;
 
   return (
     <div>
@@ -49,7 +48,7 @@ export default async function MilestoneDetailPage({
       />
       <PageHeader
         title={milestone.title}
-        description={`Project — ${project.name}`}
+        description={`Project: ${project.name}`}
         back={{ href: `/projects/${id}`, label: project.name }}
         action={
           milestone.status === "sent" ? null : (
@@ -168,7 +167,7 @@ export default async function MilestoneDetailPage({
               </p>
               {siblingSent ? (
                 <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-xs text-rag-warn">
-                  &ldquo;{siblingSent.title}&rdquo; is with the client right now — only one milestone can be under
+                  &ldquo;{siblingSent.title}&rdquo; is with the client right now. Only one milestone can be under
                   review at a time.
                 </p>
               ) : null}
@@ -197,7 +196,7 @@ export default async function MilestoneDetailPage({
               </div>
               {milestone.editRequestedByVendor ? (
                 <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-xs text-rag-warn">
-                  Reconsideration requested — waiting on the client. They may or may not change it.
+                  Reconsideration requested. Waiting on the client. They may or may not change it.
                 </p>
               ) : (
                 <ActionForm
@@ -212,7 +211,7 @@ export default async function MilestoneDetailPage({
             </div>
           )}
 
-          {milestone.status !== "sent" && canDeleteMilestone ? (
+          {milestone.status !== "sent" ? (
             <form
               action={deleteMilestone.bind(null, id, milestoneId)}
               className="mt-5 border-t border-rule pt-4"

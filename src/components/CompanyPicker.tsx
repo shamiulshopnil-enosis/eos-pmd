@@ -140,7 +140,7 @@ export default function CompanyPicker({ companies }: { companies: PickerOrg[] })
       ) : null}
 
       <p className="text-xs text-ink-muted">
-        Pick an existing company or add a new one — a project needs a client company.
+        Pick an existing company or add a new one. A project needs a client company.
       </p>
     </div>
   );

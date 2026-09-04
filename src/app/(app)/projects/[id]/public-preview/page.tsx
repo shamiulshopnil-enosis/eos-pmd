@@ -100,7 +100,7 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
                 {formatPercent(perf.responseRate)} response rate
               </p>
               <p className="mt-1 text-xs text-ink-muted">
-                Aggregate only — individual milestone ratings and comments stay private.
+                Aggregate only. Individual milestone ratings and comments stay private.
               </p>
             </div>
           ) : project.publicPerformanceConsent ? (
@@ -134,7 +134,7 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
                 <p className="text-sm italic text-ink">&ldquo;{project.capstone.testimonial}&rdquo;</p>
               ) : null}
               <p className="mt-1.5 text-xs text-ink-muted">
-                — {project.capstone.anonymous ? "Anonymous client" : project.clientCompanyName}
+                {project.capstone.anonymous ? "Anonymous client" : project.clientCompanyName}
               </p>
             </div>
           ) : null}

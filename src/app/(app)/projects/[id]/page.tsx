@@ -93,7 +93,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       action: deleteProject.bind(null, project.id),
       confirm: {
         title: "Delete this project?",
-        body: `"${project.name}" and everything under it — its milestones, uploaded files, activity log and pending invites — will be permanently removed. This can't be undone.`,
+        body: `"${project.name}" and everything under it (its milestones, uploaded files, activity log and pending invites) will be permanently removed. This can't be undone.`,
         confirmLabel: "Delete project",
       },
     });
@@ -138,7 +138,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {canRequestCompletion ? (
               <ActionForm
                 action={requestCompletion.bind(null, project.id)}
-                success="Completion requested — the client has been notified."
+                success="Completion requested. The client has been notified."
               >
                 <GhostButton type="submit" icon="flag">
                   Request completion

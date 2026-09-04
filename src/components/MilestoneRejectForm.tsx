@@ -62,7 +62,7 @@ export default function MilestoneRejectForm({
         action={action}
         success={
           notify && assignees.length > 0
-            ? "Milestone rejected — the assignees have been emailed."
+            ? "Milestone rejected. The assignees have been emailed."
             : "Milestone rejected."
         }
         className="space-y-3"
@@ -93,7 +93,7 @@ export default function MilestoneRejectForm({
               />
               <span className="text-ink">
                 Email the assignee{assignees.length > 1 ? "s" : ""}
-                <span className="text-ink-muted"> — {names}</span>
+                <span className="text-ink-muted">: {names}</span>
                 <span className="text-ink-muted"> and the delivery lead</span>
               </span>
             </label>
@@ -108,7 +108,7 @@ export default function MilestoneRejectForm({
                     setMessageDirty(true);
                     setMessage(e.target.value);
                   }}
-                  placeholder="Optional note to the assignees — the reason above is included automatically."
+                  placeholder="Optional note to the assignees. The reason above is included automatically."
                 />
                 <p className="mt-1 text-xs text-ink-muted">
                   This prototype logs the email to the server console rather than sending it.
