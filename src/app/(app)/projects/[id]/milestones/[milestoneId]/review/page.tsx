@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
@@ -10,7 +11,7 @@ import {
 } from "@/lib/actions";
 import { RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import { FlagBadge, MilestoneStatusBadge, PageHeader } from "@/components/ui";
+import { FlagBadge, MilestoneStatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
 import MilestoneReviewForm from "@/components/MilestoneReviewForm";
@@ -54,18 +55,21 @@ export default async function MilestoneReviewPage({
           [`/projects/${id}/milestones/${milestoneId}`]: milestone.title,
         }}
       />
-      <PageHeader
-        title={isSubmit ? "Review milestone" : "Update your review"}
-        back={{ href: `/projects/${id}`, label: project.name }}
-      />
+      <Link
+        href={`/projects/${id}`}
+        className="mb-3 inline-flex items-center gap-1 text-xs text-link hover:text-link-strong"
+      >
+        <Icon name="arrow_back" className="text-[13px]" />
+        {project.name}
+      </Link>
 
       {/* Milestone context */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4 rounded-[10px] border border-rule bg-panel p-5">
+      <div className="mb-4 flex flex-col gap-3 rounded-[10px] border border-rule bg-panel p-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4 sm:p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[var(--link-subtle-bg)] text-link">
             <Icon name="clipboard" className="text-[18px]" />
           </span>
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold text-ink">{milestone.title}</h1>
               <MilestoneStatusBadge status={milestone.status} />
@@ -79,7 +83,7 @@ export default async function MilestoneReviewPage({
           </div>
         </div>
         {milestone.startDate || milestone.dueDate ? (
-          <span className="flex items-center gap-1.5 font-mono text-xs text-ink-muted">
+          <span className="flex shrink-0 items-center gap-1.5 pl-[3.25rem] font-mono text-xs text-ink-muted sm:pl-0">
             <Icon name="calendar" className="text-[14px]" />
             {formatDate(milestone.startDate)} – {formatDate(milestone.dueDate)}
           </span>
@@ -103,7 +107,7 @@ export default async function MilestoneReviewPage({
       />
 
       {isSubmit ? (
-        <div className="mt-4 rounded-[10px] border border-rule bg-panel p-5">
+        <div className="mt-4 rounded-[10px] border border-rule bg-panel p-4 sm:p-5">
           <MilestoneRejectForm
             action={rejectMilestone.bind(null, id, milestoneId)}
             assignees={milestone.assignees}

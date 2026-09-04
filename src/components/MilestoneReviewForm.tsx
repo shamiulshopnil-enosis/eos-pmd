@@ -71,7 +71,7 @@ export default function MilestoneReviewForm({
 
   return (
     <div className="overflow-hidden rounded-[10px] border border-rule bg-panel">
-      <div className="flex items-start gap-3 border-b border-rule p-5">
+      <div className="flex items-start gap-3 border-b border-rule p-4 sm:p-5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[var(--link-subtle-bg)] text-link">
           <Icon name="rate_review" className="text-[18px]" />
         </span>
@@ -84,7 +84,7 @@ export default function MilestoneReviewForm({
       </div>
 
       {draftLoaded ? (
-        <p className="border-b border-rule bg-[var(--link-subtle-bg)] px-5 py-2 text-xs text-link-strong">
+        <p className="border-b border-rule bg-[var(--link-subtle-bg)] px-4 py-2 text-xs text-link-strong sm:px-5">
           Your saved draft has been loaded.
         </p>
       ) : null}
@@ -96,7 +96,7 @@ export default function MilestoneReviewForm({
           return (
             <fieldset
               key={dim.key}
-              className="grid grid-cols-1 gap-x-8 gap-y-5 border-b border-rule p-5 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,1.1fr)_minmax(0,1fr)]"
+              className="grid grid-cols-1 gap-x-6 gap-y-4 border-b border-rule p-4 sm:gap-y-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,1.1fr)_minmax(0,1fr)] lg:gap-x-8"
             >
               <input type="hidden" name={dim.key} value={current ?? ""} />
 
@@ -197,7 +197,7 @@ export default function MilestoneReviewForm({
         })}
 
         {/* Overall comment */}
-        <div className="border-b border-rule p-5">
+        <div className="border-b border-rule p-4 sm:p-5">
           <label htmlFor="review-comment" className="text-sm font-semibold text-ink">
             Additional feedback{" "}
             <span className="font-normal text-ink-muted">(optional)</span>
@@ -221,7 +221,7 @@ export default function MilestoneReviewForm({
         </div>
 
         {/* Thank-you callout */}
-        <div className="m-5 flex items-start gap-3 rounded-[8px] bg-[var(--link-subtle-bg)] p-4">
+        <div className="m-4 flex items-start gap-3 rounded-[8px] bg-[var(--link-subtle-bg)] p-4 sm:m-5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-panel text-link">
             <Icon name="verified" className="text-[16px]" />
           </span>
@@ -257,13 +257,14 @@ function Footer({
 }) {
   const { pending } = useFormStatus();
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule p-5">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-3 border-t border-rule p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         {onSaveDraft ? (
           <Button
             type="button"
             outlined
             severity="secondary"
+            className="w-full sm:w-auto"
             icon="pi pi-save"
             label="Save Draft"
             loading={savingDraft}
@@ -277,6 +278,7 @@ function Footer({
       </div>
       <Button
         type="submit"
+        className="w-full sm:w-auto"
         icon="pi pi-send"
         iconPos="right"
         label={mode === "edit" ? "Update Review" : "Submit Review"}
