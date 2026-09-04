@@ -14,12 +14,9 @@ import { CAPSTONE_TIER_LABELS, RATING_SELF_CORRECTION_HOURS } from "@/lib/consta
 import {
   confirmCompletion,
   deleteProject,
-  editOwnMilestoneRating,
-  rejectMilestone,
   requestCapstone,
   requestCompletion,
   submitForApproval,
-  submitMilestoneRating,
 } from "@/lib/actions";
 import {
   AdminStatusBadge,
@@ -48,8 +45,6 @@ import {
 import { ProjectPeopleField } from "@/components/ProjectPeopleField";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
-import MilestoneReviewForm from "@/components/MilestoneReviewForm";
-import MilestoneRejectForm from "@/components/MilestoneRejectForm";
 import ProjectMilestoneTable from "@/components/ProjectMilestoneTable";
 
 const WINDOW_MS = RATING_SELF_CORRECTION_HOURS * 60 * 60 * 1000;
@@ -349,17 +344,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   ) : null}
 
                   {m.status === "sent" ? (
-                    <>
-                      <MilestoneReviewForm
-                        action={submitMilestoneRating.bind(null, id, m.id)}
-                        submitLabel="Submit review"
-                        intro="Please rate this milestone on each of the following."
-                      />
-                      <MilestoneRejectForm
-                        action={rejectMilestone.bind(null, id, m.id)}
-                        assignees={m.assignees}
-                      />
-                    </>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+                      <InkLink href={`/projects/${id}/milestones/${m.id}/review`} icon="rate_review">
+                        {m.reviewDraft ? "Continue your review" : "Review this milestone"}
+                      </InkLink>
+                      {m.reviewDraft ? (
+                        <span className="text-xs text-ink-muted">You have a saved draft.</span>
+                      ) : null}
+                    </div>
                   ) : null}
 
                   {m.status === "rejected" ? (
@@ -390,13 +382,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                           You can still change this rating for {RATING_SELF_CORRECTION_HOURS} hours after submitting.
                         </p>
                       )}
-                      <MilestoneReviewForm
-                        action={editOwnMilestoneRating.bind(null, id, m.id)}
-                        submitLabel="Update review"
-                        defaultReview={m.ratings}
-                        defaultNotes={m.ratingNotes}
-                        defaultComment={m.comment ?? ""}
-                      />
+                      <InkLink href={`/projects/${id}/milestones/${m.id}/review`} icon="rate_review">
+                        Update your review
+                      </InkLink>
                     </div>
                   ) : null}
 

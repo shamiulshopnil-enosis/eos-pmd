@@ -19,6 +19,7 @@ function milestone(p: Partial<Milestone>): Milestone {
     attachments: [],
     ratings: null,
     ratingNotes: null,
+    reviewDraft: null,
     rating: null,
     comment: null,
     editRequestedByVendor: false,

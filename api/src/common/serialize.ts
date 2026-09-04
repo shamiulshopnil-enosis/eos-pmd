@@ -197,6 +197,15 @@ function serializeMilestoneReviewNotes(r: Raw | null | undefined): Milestone["ra
   };
 }
 
+function serializeMilestoneReviewDraft(r: Raw | null | undefined): Milestone["reviewDraft"] {
+  if (!r) return null;
+  return {
+    ratings: serializeMilestoneReview(r.ratings as Raw | null | undefined),
+    ratingNotes: serializeMilestoneReviewNotes(r.ratingNotes as Raw | null | undefined),
+    comment: str(r.comment),
+  };
+}
+
 export function serializeMilestone(m: Raw): Milestone {
   return {
     id: String(m._id),
@@ -215,6 +224,7 @@ export function serializeMilestone(m: Raw): Milestone {
       : [],
     ratings: serializeMilestoneReview(m.ratings as Raw | null | undefined),
     ratingNotes: serializeMilestoneReviewNotes(m.ratingNotes as Raw | null | undefined),
+    reviewDraft: serializeMilestoneReviewDraft(m.reviewDraft as Raw | null | undefined),
     rating: num(m.rating),
     comment: str(m.comment),
     editRequestedByVendor: Boolean(m.editRequestedByVendor),

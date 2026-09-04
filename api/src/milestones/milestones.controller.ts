@@ -106,6 +106,15 @@ export class MilestonesController {
     return this.milestones.editOwnMilestoneRating(user, id, body);
   }
 
+  @Post(":id/review-draft")
+  saveReviewDraft(
+    @CurrentUser() user: SessionUser,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.milestones.saveMilestoneReviewDraft(user, id, body);
+  }
+
   @Post(":id/request-reconsideration")
   reconsider(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     return this.milestones.requestRatingReconsideration(user, id);

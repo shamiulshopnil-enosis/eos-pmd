@@ -173,7 +173,7 @@ export async function reopenMilestone(projectId: string, milestoneId: string) {
 function revalidateReview(projectId: string, milestoneId: string) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/milestones/${milestoneId}`);
-  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/milestones/${milestoneId}/review`);
   revalidatePath("/projects");
   revalidatePath("/milestones");
   revalidatePath("/dashboard");
@@ -182,10 +182,22 @@ function revalidateReview(projectId: string, milestoneId: string) {
 export async function submitMilestoneRating(projectId: string, milestoneId: string, formData: FormData) {
   await post(`/milestones/${milestoneId}/rating`, formToObject(formData));
   revalidateReview(projectId, milestoneId);
+  redirect(`/projects/${projectId}`);
 }
 
 export async function editOwnMilestoneRating(projectId: string, milestoneId: string, formData: FormData) {
   await post(`/milestones/${milestoneId}/rating/edit`, formToObject(formData));
+  revalidateReview(projectId, milestoneId);
+  redirect(`/projects/${projectId}`);
+}
+
+/** Save the client's in-progress review without submitting it. Stays on the page. */
+export async function saveMilestoneReviewDraft(
+  projectId: string,
+  milestoneId: string,
+  formData: FormData,
+) {
+  await post(`/milestones/${milestoneId}/review-draft`, formToObject(formData));
   revalidateReview(projectId, milestoneId);
 }
 
@@ -201,6 +213,7 @@ export async function requestRatingReconsideration(projectId: string, milestoneI
 export async function rejectMilestone(projectId: string, milestoneId: string, formData: FormData) {
   await post(`/milestones/${milestoneId}/reject`, formToObject(formData));
   revalidateReview(projectId, milestoneId);
+  redirect(`/projects/${projectId}`);
 }
 
 // ---------------------------------------------------------------------------

@@ -148,6 +148,11 @@ export type MilestoneReviewDimension =
 
 export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
 export type MilestoneReviewNotes = Record<MilestoneReviewDimension, string | null>;
+export type MilestoneReviewDraft = {
+  ratings: MilestoneReview | null;
+  ratingNotes: MilestoneReviewNotes | null;
+  comment: string | null;
+};
 
 export interface Milestone {
   id: string;
@@ -162,6 +167,7 @@ export interface Milestone {
   attachments: MilestoneAttachment[];
   ratings: MilestoneReview | null; // the five Enosis feedback dimensions, 1–5
   ratingNotes: MilestoneReviewNotes | null; // optional per-dimension client comments
+  reviewDraft: MilestoneReviewDraft | null; // saved-but-not-submitted review
   rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;

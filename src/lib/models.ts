@@ -243,6 +243,15 @@ const milestoneReviewNotesSchema = new Schema(
   { _id: false },
 );
 
+const milestoneReviewDraftSchema = new Schema(
+  {
+    ratings: { type: milestoneReviewSchema, default: null },
+    ratingNotes: { type: milestoneReviewNotesSchema, default: null },
+    comment: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const milestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
@@ -256,6 +265,7 @@ const milestoneSchema = new Schema(
     attachments: { type: [milestoneAttachmentSchema], default: [] },
     ratings: { type: milestoneReviewSchema, default: null }, // the five review dimensions
     ratingNotes: { type: milestoneReviewNotesSchema, default: null }, // per-dimension client comments
+    reviewDraft: { type: milestoneReviewDraftSchema, default: null }, // saved-but-not-submitted review
     rating: { type: Number, default: null }, // average of `ratings`, drives scoring
     comment: { type: String, default: null },
     editRequestedByVendor: { type: Boolean, default: false },

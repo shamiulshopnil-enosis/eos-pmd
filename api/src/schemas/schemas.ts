@@ -245,6 +245,17 @@ const milestoneReviewNotesSchema = new Schema(
   { _id: false },
 );
 
+// A partly-filled review the client saved but hasn't submitted. Cleared once
+// the milestone is reviewed. Does not feed scoring.
+const milestoneReviewDraftSchema = new Schema(
+  {
+    ratings: { type: milestoneReviewSchema, default: null },
+    ratingNotes: { type: milestoneReviewNotesSchema, default: null },
+    comment: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 export const MilestoneSchema = new Schema(
   {
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true, index: true },
@@ -258,6 +269,7 @@ export const MilestoneSchema = new Schema(
     attachments: { type: [milestoneAttachmentSchema], default: [] },
     ratings: { type: milestoneReviewSchema, default: null },
     ratingNotes: { type: milestoneReviewNotesSchema, default: null }, // per-dimension client comments
+    reviewDraft: { type: milestoneReviewDraftSchema, default: null }, // saved-but-not-submitted review
     rating: { type: Number, default: null }, // average of `ratings`, drives scoring
     comment: { type: String, default: null },
     editRequestedByVendor: { type: Boolean, default: false },

@@ -156,6 +156,13 @@ export type MilestoneReview = Record<MilestoneReviewDimension, number | null>;
 /** Optional free-text the client attaches to each rating dimension. */
 export type MilestoneReviewNotes = Record<MilestoneReviewDimension, string | null>;
 
+/** A review the client saved without submitting — does not feed scoring. */
+export type MilestoneReviewDraft = {
+  ratings: MilestoneReview | null;
+  ratingNotes: MilestoneReviewNotes | null;
+  comment: string | null;
+};
+
 export interface Milestone {
   id: string;
   projectId: string;
@@ -169,6 +176,7 @@ export interface Milestone {
   attachments: MilestoneAttachment[];
   ratings: MilestoneReview | null; // the five review dimensions
   ratingNotes: MilestoneReviewNotes | null; // optional per-dimension client comments
+  reviewDraft: MilestoneReviewDraft | null; // saved-but-not-submitted review
   rating: number | null; // average of `ratings`, drives all scoring
   comment: string | null;
   editRequestedByVendor: boolean;
