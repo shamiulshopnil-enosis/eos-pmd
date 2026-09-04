@@ -32,17 +32,29 @@ export default async function EditMilestonePage({
     />
   );
 
-  if (milestone.status === "sent") {
+  if (milestone.status === "sent" || milestone.status === "reviewed") {
     return (
       <div className="mx-auto max-w-3xl">
         {crumbs}
         <PageHeader title={`Edit Milestone: ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
         <Card className="p-6 text-sm text-ink-muted">
-          This milestone is locked for editing while it is with the client for review.{" "}
-          <Link href={backHref} className="text-link hover:underline">
-            Back to the milestone
-          </Link>{" "}
-          to recall it first.
+          {milestone.status === "sent" ? (
+            <>
+              This milestone is locked for editing while it is with the client for review.{" "}
+              <Link href={backHref} className="text-link hover:underline">
+                Back to the milestone
+              </Link>{" "}
+              to recall it first.
+            </>
+          ) : (
+            <>
+              This milestone has been reviewed by the client and can no longer be edited.{" "}
+              <Link href={backHref} className="text-link hover:underline">
+                Back to the milestone
+              </Link>
+              .
+            </>
+          )}
         </Card>
       </div>
     );

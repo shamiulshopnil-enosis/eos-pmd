@@ -51,7 +51,7 @@ export default async function MilestoneDetailPage({
         description={`Project: ${project.name}`}
         back={{ href: `/projects/${id}`, label: project.name }}
         action={
-          milestone.status === "sent" ? null : (
+          milestone.status === "sent" || milestone.status === "reviewed" ? null : (
             <GhostLink href={`/projects/${id}/milestones/${milestoneId}/edit`} icon="edit">
               Edit milestone
             </GhostLink>
