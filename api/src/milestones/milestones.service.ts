@@ -259,10 +259,6 @@ export class MilestonesService {
     if (existing.status === "sent") {
       throw new BadRequestException("This milestone is locked while it is with the client for review.");
     }
-    const remaining = await this.milestones.countDocuments({ projectId });
-    if (remaining <= 1) {
-      throw new BadRequestException("A project must keep at least one milestone.");
-    }
     await this.milestones.findByIdAndDelete(milestoneId);
     await this.projectsService.recomputeProjectScore(projectId);
     await this.activity.log({

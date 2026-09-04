@@ -22,6 +22,7 @@ import {
 import { Icon } from "@/components/icon";
 import { TrendChart } from "@/components/TrendChart";
 import { DashboardBreakdowns } from "@/components/DashboardBreakdowns";
+import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { DashboardLedger, type ClientGroup, type LedgerRow } from "@/components/DashboardLedger";
 
 // Live metrics — always render against the current database, never a build snapshot.
@@ -247,13 +248,19 @@ export default async function DashboardPage() {
       {/* Summary — the headline figures */}
       <section>
         <SectionHeading>Summary</SectionHeading>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <FigureBlock
             label="Active projects"
             value={kpis.activeProjects}
             icon="folder_open"
             hint={`of ${projects.length} total`}
             href="/projects?status=ACTIVE"
+          />
+          <FigureBlock
+            label="Completed projects"
+            value={kpis.completedProjects}
+            icon="verified"
+            href="/projects?status=COMPLETED"
           />
           <FigureBlock
             label="Active milestones"
@@ -333,26 +340,7 @@ export default async function DashboardPage() {
             Nothing needs attention.
           </p>
         ) : (
-          <ul className="divide-y divide-rule overflow-hidden rounded-ledger border border-l-[3px] border-rag-warn-fill bg-[var(--rag-warn-bg,rgba(127,95,1,0.12))]">
-            {alerts.map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={a.href}
-                  className="flex items-start gap-2 px-3 py-2.5 text-sm text-ink hover:bg-black/[0.03] hover:text-link dark:hover:bg-white/[0.04]"
-                >
-                  <Icon
-                    name={a.severity === "critical" ? "warning" : "error"}
-                    className={`mt-0.5 shrink-0 text-[15px] ${
-                      a.severity === "critical" ? "text-rag-bad" : "text-rag-warn"
-                    }`}
-                    fill
-                  />
-                  <span className="flex-1">{a.message}</span>
-                  <Icon name="chevron_right" className="mt-0.5 shrink-0 text-[16px] text-ink-muted" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <DashboardAlerts alerts={alerts} />
         )}
       </section>
 
@@ -433,8 +421,12 @@ function FigureBlock({
           {label}
           {href ? <Icon name="north_east" className="text-[12px]" /> : null}
         </span>
-        <span className={figCls}>{value}</span>
-        {hint ? <span className="text-xs text-ink-subtle">{hint}</span> : null}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className={`${figCls} shrink-0`}>{value}</span>
+          {hint ? (
+            <span className="truncate whitespace-nowrap text-xs text-ink-subtle">{hint}</span>
+          ) : null}
+        </span>
       </span>
     </>
   );

@@ -21,7 +21,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
     <div className="mx-auto max-w-3xl">
       <SetBreadcrumb entries={{ [`/projects/${project.id}`]: project.name }} />
       <PageHeader
-        title={`Edit project — ${project.name}`}
+        title={`Edit project: ${project.name}`}
         back={{ href: `/projects/${project.id}`, label: "Back to project" }}
       />
 

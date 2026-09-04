@@ -39,6 +39,7 @@ export default function PeoplePicker({
   selectedLayout = "chips",
   leadRole = "owner",
   required = false,
+  onSelectionChange,
 }: {
   directory: Person[];
   name?: string;
@@ -54,6 +55,9 @@ export default function PeoplePicker({
   leadRole?: string;
   /** When true, the form won't submit until at least one person is selected. */
   required?: boolean;
+  /** Fires whenever the selected set changes, so a parent can react (e.g. scope a
+   *  milestone assignee picker to the people on the project). */
+  onSelectionChange?: (selected: Person[]) => void;
 }) {
   const key = (p: Person) => (emit === "id" ? p.id ?? p.email : p.email);
 
@@ -69,6 +73,13 @@ export default function PeoplePicker({
     defaultSelected.filter((k) => pool.some((p) => key(p) === k)),
   );
   const selected = selectedKeys.map((k) => byKey.get(k)).filter((p): p is Person => !!p);
+
+  // Let a parent mirror the selection. Keyed off the id list + pool so it also
+  // fires when an inline-added person resolves into the pool.
+  useEffect(() => {
+    onSelectionChange?.(selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKeys, pool]);
 
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -251,7 +262,7 @@ export default function PeoplePicker({
 
       {selected.length === 0 ? (
         <p className="mt-2 text-xs text-ink-muted">
-          {emptyHint ?? "No one assigned yet — search above to add people."}
+          {emptyHint ?? "No one assigned yet. Search above to add people."}
         </p>
       ) : selectedLayout === "rows" ? (
         <ul className="mt-2 divide-y divide-rule overflow-hidden rounded-control border border-rule">

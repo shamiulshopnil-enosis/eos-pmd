@@ -559,13 +559,11 @@ export class ProjectsService {
       strList(body, "memberIds"),
     );
 
-    // Every project is a milestone project now: it must ship with at least one
-    // milestone, and every milestone must name at least one assignee. Validate
-    // before the project row is written so a rejected form leaves nothing behind.
+    // Milestones may be planned inline on the new-project form or added later.
+    // Any milestone that IS planned inline must still name at least one
+    // assignee. Validate before the project row is written so a rejected form
+    // leaves nothing behind.
     const inlineMilestones = parseInlineMilestones(body);
-    if (inlineMilestones.length === 0) {
-      throw new BadRequestException("Add at least one milestone — every project needs one.");
-    }
     const wantedAssigneeEmails = [
       ...new Set(inlineMilestones.flatMap((m) => m.assigneeEmails)),
     ];

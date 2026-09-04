@@ -105,6 +105,7 @@ export function computeProjectPerformance(project: ProjectWithMilestones): Proje
 
 export interface DashboardKpis {
   activeProjects: number;
+  completedProjects: number;
   activeMilestones: number;
   milestonesReviewed: number;
   awaitingReview: number;
@@ -126,6 +127,7 @@ export function computeDashboardKpis(
 
   return {
     activeProjects: projects.filter((p) => p.status === "ACTIVE").length,
+    completedProjects: projects.filter((p) => p.status === "COMPLETED").length,
     activeMilestones: allMilestones.filter((m) => m.status === "draft").length,
     milestonesReviewed: allReviewed.filter((m) => inPeriod(m.reviewedAt)).length,
     awaitingReview: allMilestones.filter((m) => m.status === "sent").length,

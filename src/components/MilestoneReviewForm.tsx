@@ -123,7 +123,7 @@ export default function MilestoneReviewForm({
                 </div>
                 <div
                   role="radiogroup"
-                  aria-label={`${dim.label} — 1 to 5`}
+                  aria-label={`${dim.label}, 1 to 5`}
                   className="relative mt-3"
                 >
                   <div

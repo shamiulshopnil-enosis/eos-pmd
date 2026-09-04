@@ -36,7 +36,7 @@ export default async function EditMilestonePage({
     return (
       <div className="mx-auto max-w-3xl">
         {crumbs}
-        <PageHeader title={`Edit Milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
+        <PageHeader title={`Edit Milestone: ${milestone.title}`} back={{ href: backHref, label: "Back to Milestone" }} />
         <Card className="p-6 text-sm text-ink-muted">
           This milestone is locked for editing while it is with the client for review.{" "}
           <Link href={backHref} className="text-link hover:underline">
@@ -53,12 +53,12 @@ export default async function EditMilestonePage({
   return (
     <div className="mx-auto max-w-3xl">
       {crumbs}
-      <PageHeader title={`Edit milestone — ${milestone.title}`} back={{ href: backHref, label: "Back to milestone" }} />
+      <PageHeader title={`Edit milestone: ${milestone.title}`} back={{ href: backHref, label: "Back to milestone" }} />
 
       <Card className="p-6">
         <ActionForm action={action} success="Milestone updated." className="space-y-6">
           <Field label="Milestone title" required>
-            <TextInput name="title" required defaultValue={milestone.title} placeholder="e.g. Milestone 1 — Product Catalog" />
+            <TextInput name="title" required defaultValue={milestone.title} placeholder="e.g. Milestone 1: Product Catalog" />
           </Field>
 
           <div>
@@ -102,7 +102,7 @@ export default async function EditMilestonePage({
               placeholder="Search people on this project…"
               addPerson={addProjectDeliveryPerson.bind(null, id)}
               addContextLabel="this project"
-              emptyHint="No one assigned — search above to add people from this project."
+              emptyHint="No one assigned. Search above to add people from this project."
             />
           </fieldset>
 
