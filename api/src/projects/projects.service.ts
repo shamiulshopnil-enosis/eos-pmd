@@ -633,7 +633,6 @@ export class ProjectsService {
       expectedCompletionDate: optDate(body, "expectedCompletionDate"),
       teamSize: optInt(body, "teamSize"),
       engagementModel: optStr(body, "engagementModel"),
-      internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
       assignedMemberIds: allAssignedMemberIds,
       vendorTeam: [
@@ -710,6 +709,8 @@ export class ProjectsService {
   async updateProject(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
     await this.requirePermission(projectId, user, canManageProject, "Only a project owner can edit the project.");
 
+    // `actualCompletionDate` and `internalRef` are no longer editable from the
+    // UI — leave whatever a project already has rather than nulling it here.
     await this.projects.findByIdAndUpdate(projectId, {
       name: str(body, "name"),
       clientCompanyName: str(body, "clientCompanyName"),
@@ -719,10 +720,8 @@ export class ProjectsService {
       description: optStr(body, "description"),
       startDate: optDate(body, "startDate"),
       expectedCompletionDate: optDate(body, "expectedCompletionDate"),
-      actualCompletionDate: optDate(body, "actualCompletionDate"),
       teamSize: optInt(body, "teamSize"),
       engagementModel: optStr(body, "engagementModel"),
-      internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
       status: str(body, "status"),
     });

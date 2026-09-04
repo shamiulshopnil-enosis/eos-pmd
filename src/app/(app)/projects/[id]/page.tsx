@@ -204,7 +204,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <Info label="Services" value={project.services} />
             <Info label="Start date" value={formatDate(project.startDate)} mono />
             <Info label="Expected completion" value={formatDate(project.expectedCompletionDate)} mono />
-            <Info label="Actual completion" value={formatDate(project.actualCompletionDate)} mono />
             {del ? <Info label="Team size" value={project.teamSize?.toString() ?? "—"} mono /> : null}
             {del ? <Info label="Engagement model" value={project.engagementModel} /> : null}
             {del ? (

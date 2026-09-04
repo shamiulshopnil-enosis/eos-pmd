@@ -11,7 +11,7 @@ import {
 } from "@/lib/derived";
 import { reviewRoleLabel } from "@/lib/permissions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
-import { CLIENT_HEALTH_LABELS, type ClientHealth } from "@/lib/constants";
+import type { ClientHealth } from "@/lib/constants";
 import {
   EmptyState,
   InkLink,
@@ -379,14 +379,6 @@ export default async function DashboardPage() {
           Client ledger
         </SectionHeading>
         <DashboardLedger groups={clientGroups} />
-        <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
-          {(["AT_RISK", "NEEDS_ATTENTION", "HAPPY", "NO_DATA"] as ClientHealth[]).map((h) => (
-            <span key={h} className="inline-flex items-center gap-1.5">
-              <RagKey health={h} />
-              {CLIENT_HEALTH_LABELS[h]}
-            </span>
-          ))}
-        </p>
       </section>
 
       {reviewProjects.length > 0 ? <ReviewSection reviewProjects={reviewProjects} /> : null}
@@ -430,14 +422,4 @@ function FigureBlock({
   ) : (
     <div className={cls}>{body}</div>
   );
-}
-
-function RagKey({ health }: { health: ClientHealth }) {
-  const cls: Record<ClientHealth, string> = {
-    HAPPY: "bg-rag-good-fill ring-black/15 dark:ring-white/25",
-    NEEDS_ATTENTION: "bg-rag-warn-fill ring-black/15 dark:ring-white/25",
-    AT_RISK: "bg-rag-bad-fill ring-black/15 dark:ring-white/25",
-    NO_DATA: "bg-transparent ring-rule-strong",
-  };
-  return <span className={`inline-block h-2 w-2 rounded-full ring-1 ring-inset ${cls[health]}`} />;
 }

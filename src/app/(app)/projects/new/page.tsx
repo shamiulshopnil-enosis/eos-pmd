@@ -57,14 +57,10 @@ export default async function NewProjectPage() {
             <Field label="Engagement model">
               <TextInput name="engagementModel" placeholder="e.g. Offshore, Dedicated Team" />
             </Field>
-            <Field label="Internal project reference / ID">
-              <TextInput name="internalRef" placeholder="e.g. WAV-2026-014" />
+            <Field label="Project URL" hint="Optional — live link, repo, or case study.">
+              <TextInput type="url" name="projectUrl" placeholder="https://…" />
             </Field>
           </div>
-
-          <Field label="Project URL" hint="Optional — live link, repo, or case study.">
-            <TextInput type="url" name="projectUrl" placeholder="https://…" />
-          </Field>
 
           <fieldset className="space-y-3 border-t border-rule pt-5">
             <legend className="text-xs font-semibold text-ink">
