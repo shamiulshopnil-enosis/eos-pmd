@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Menu } from "primereact/menu";
 import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
 import type { MenuItem } from "primereact/menuitem";
 import type { ActivityWithMilestoneName } from "@/lib/types";
 import { toastError, toastSuccess } from "@/components/toast";
@@ -25,6 +26,8 @@ export type MenuActionItem = {
   action: () => void | Promise<void>;
   success?: string;
   danger?: boolean;
+  /** When set, the action runs only after the user confirms it in a dialog. */
+  confirm?: { title: string; body: string; confirmLabel: string };
 };
 
 /** Approval-slot state for the project header — mutually exclusive. */
@@ -51,6 +54,8 @@ export function ProjectActionsMenu({
 }) {
   const menu = useRef<Menu>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [confirming, setConfirming] = useState<MenuActionItem | null>(null);
+  const [running, setRunning] = useState(false);
 
   const run = (a: MenuActionItem) => async () => {
     try {
@@ -85,7 +90,7 @@ export function ProjectActionsMenu({
       label: a.label,
       icon: a.icon,
       className: a.danger ? "eos-menu-danger" : undefined,
-      command: run(a),
+      command: a.confirm ? () => setConfirming(a) : run(a),
     });
   }
 
@@ -101,6 +106,45 @@ export function ProjectActionsMenu({
       />
       <Menu ref={menu} model={model} popup className="eos-menu-popup" />
       <ActivityLogModal activities={activities} open={activityOpen} onOpenChange={setActivityOpen} />
+
+      <Dialog
+        visible={!!confirming}
+        onHide={() => !running && setConfirming(null)}
+        header={confirming?.confirm?.title}
+        className="eos-dialog w-full max-w-md"
+        dismissableMask={!running}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              text
+              severity="secondary"
+              label="Cancel"
+              disabled={running}
+              onClick={() => setConfirming(null)}
+            />
+            <Button
+              type="button"
+              severity="danger"
+              label={confirming?.confirm?.confirmLabel ?? "Confirm"}
+              loading={running}
+              onClick={async () => {
+                const a = confirming;
+                if (!a) return;
+                setRunning(true);
+                try {
+                  await run(a)();
+                } finally {
+                  setRunning(false);
+                  setConfirming(null);
+                }
+              }}
+            />
+          </div>
+        }
+      >
+        <p className="text-sm text-ink-muted">{confirming?.confirm?.body}</p>
+      </Dialog>
     </>
   );
 }

@@ -633,7 +633,6 @@ export class ProjectsService {
       expectedCompletionDate: optDate(body, "expectedCompletionDate"),
       teamSize: optInt(body, "teamSize"),
       engagementModel: optStr(body, "engagementModel"),
-      internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
       assignedMemberIds: allAssignedMemberIds,
       vendorTeam: [
@@ -710,6 +709,8 @@ export class ProjectsService {
   async updateProject(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
     await this.requirePermission(projectId, user, canManageProject, "Only a project owner can edit the project.");
 
+    // `actualCompletionDate` and `internalRef` are no longer editable from the
+    // UI — leave whatever a project already has rather than nulling it here.
     await this.projects.findByIdAndUpdate(projectId, {
       name: str(body, "name"),
       clientCompanyName: str(body, "clientCompanyName"),
@@ -719,12 +720,9 @@ export class ProjectsService {
       description: optStr(body, "description"),
       startDate: optDate(body, "startDate"),
       expectedCompletionDate: optDate(body, "expectedCompletionDate"),
-      actualCompletionDate: optDate(body, "actualCompletionDate"),
       teamSize: optInt(body, "teamSize"),
       engagementModel: optStr(body, "engagementModel"),
-      internalRef: optStr(body, "internalRef"),
       projectUrl: optStr(body, "projectUrl"),
-      status: str(body, "status"),
     });
 
     await this.projects.updateOne(
@@ -733,6 +731,24 @@ export class ProjectsService {
     );
 
     await this.activity.log({ projectId, type: "PROJECT_UPDATED", message: "Project details updated" });
+  }
+
+  /**
+   * Permanently delete a project and everything under it: its milestones, the
+   * activity log, and any pending invitations. (Milestone file blobs in GridFS
+   * are left as orphans, matching how single-milestone deletes already behave.)
+   */
+  async deleteProject(user: SessionUser, projectId: string): Promise<void> {
+    await this.requirePermission(
+      projectId,
+      user,
+      canManageProject,
+      "Only a delivering-company owner or admin can delete a project.",
+    );
+    await this.milestones.deleteMany({ projectId });
+    await this.activities.deleteMany({ projectId });
+    await this.invitations.deleteMany({ projectId });
+    await this.projects.findByIdAndDelete(projectId);
   }
 
   /**
@@ -777,17 +793,6 @@ export class ProjectsService {
   async rejectProject(projectId: string): Promise<void> {
     await this.projects.findByIdAndUpdate(projectId, { adminStatus: "rejected" });
     await this.activity.log({ projectId, type: "PROJECT_UPDATED", message: "Project shell rejected by admin" });
-  }
-
-  async setProjectStatus(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can change the project status.");
-    const status = str(body, "status");
-    await this.projects.findByIdAndUpdate(projectId, { status });
-    await this.activity.log({
-      projectId,
-      type: status === "COMPLETED" ? "PROJECT_COMPLETED" : "PROJECT_UPDATED",
-      message: `Project status changed to ${status.replace("_", " ")}`,
-    });
   }
 
   // --- Completion (spec §5.2, §6.8) ---

@@ -10,20 +10,13 @@ import {
 } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
-import {
-  PROJECT_STATUS_LABELS,
-  CAPSTONE_TIER_LABELS,
-  RATING_SELF_CORRECTION_HOURS,
-} from "@/lib/constants";
+import { CAPSTONE_TIER_LABELS, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
   confirmCompletion,
-  editOwnMilestoneRating,
-  rejectMilestone,
+  deleteProject,
   requestCapstone,
   requestCompletion,
-  setProjectStatus,
   submitForApproval,
-  submitMilestoneRating,
 } from "@/lib/actions";
 import {
   AdminStatusBadge,
@@ -42,7 +35,6 @@ import {
   SectionHeading,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { Select } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
 import {
@@ -53,8 +45,6 @@ import {
 import { ProjectPeopleField } from "@/components/ProjectPeopleField";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
 import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
-import MilestoneReviewForm from "@/components/MilestoneReviewForm";
-import MilestoneRejectForm from "@/components/MilestoneRejectForm";
 import ProjectMilestoneTable from "@/components/ProjectMilestoneTable";
 
 const WINDOW_MS = RATING_SELF_CORRECTION_HOURS * 60 * 60 * 1000;
@@ -82,22 +72,30 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     delLead && !!myCompany && myCompany.id === project.deliveringCompanyId;
   const companyMembers = canManagePeople && myCompany ? await listCompanyMembers(myCompany.id) : [];
 
-  // Everything that isn't Edit / Add milestone lives under the "⋯" menu.
+  const canRequestCompletion = delLead && project.executionStatus === "ongoing";
+
+  // Everything that isn't Edit / Add milestone / Request completion lives under
+  // the "⋯" menu.
   const menuExtras: MenuActionItem[] = [];
-  if (delLead && project.executionStatus === "ongoing") {
-    menuExtras.push({
-      label: "Request completion",
-      icon: "pi pi-flag",
-      action: requestCompletion.bind(null, project.id),
-      success: "Completion requested — the client has been notified.",
-    });
-  }
   if (delLead && project.executionStatus === "completed" && !project.capstone?.requested) {
     menuExtras.push({
       label: "Request capstone endorsement",
       icon: "pi pi-verified",
       action: requestCapstone.bind(null, project.id),
       success: "Capstone endorsement requested.",
+    });
+  }
+  if (delLead) {
+    menuExtras.push({
+      label: "Delete project",
+      icon: "pi pi-trash",
+      danger: true,
+      action: deleteProject.bind(null, project.id),
+      confirm: {
+        title: "Delete this project?",
+        body: `"${project.name}" and everything under it — its milestones, uploaded files, activity log and pending invites — will be permanently removed. This can't be undone.`,
+        confirmLabel: "Delete project",
+      },
     });
   }
 
@@ -136,6 +134,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <GhostLink href={`/projects/${project.id}/milestones/new`} icon="add">
                 Add milestone
               </GhostLink>
+            ) : null}
+            {canRequestCompletion ? (
+              <ActionForm
+                action={requestCompletion.bind(null, project.id)}
+                success="Completion requested — the client has been notified."
+              >
+                <GhostButton type="submit" icon="flag">
+                  Request completion
+                </GhostButton>
+              </ActionForm>
             ) : null}
             <ProjectActionsMenu
               activities={project.activities}
@@ -204,7 +212,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <Info label="Services" value={project.services} />
             <Info label="Start date" value={formatDate(project.startDate)} mono />
             <Info label="Expected completion" value={formatDate(project.expectedCompletionDate)} mono />
-            <Info label="Actual completion" value={formatDate(project.actualCompletionDate)} mono />
             {del ? <Info label="Team size" value={project.teamSize?.toString() ?? "—"} mono /> : null}
             {del ? <Info label="Engagement model" value={project.engagementModel} /> : null}
             {del ? (
@@ -234,22 +241,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <p className="prose-ledger mt-5 max-w-[68ch] whitespace-pre-line border-t border-rule pt-4 text-sm">
               {project.description}
             </p>
-          ) : null}
-
-          {delLead ? (
-            <ActionForm
-              action={setProjectStatus.bind(null, project.id)}
-              success="Project status updated."
-              className="mt-5 flex flex-wrap items-end gap-3 border-t border-rule pt-4"
-            >
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-ink">Project status</span>
-                <div className="w-48">
-                  <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} />
-                </div>
-              </label>
-              <GhostButton type="submit">Update</GhostButton>
-            </ActionForm>
           ) : null}
         </div>
 
@@ -353,17 +344,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   ) : null}
 
                   {m.status === "sent" ? (
-                    <>
-                      <MilestoneReviewForm
-                        action={submitMilestoneRating.bind(null, id, m.id)}
-                        submitLabel="Submit review"
-                        intro="Please rate this milestone on each of the following."
-                      />
-                      <MilestoneRejectForm
-                        action={rejectMilestone.bind(null, id, m.id)}
-                        assignees={m.assignees}
-                      />
-                    </>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+                      <InkLink href={`/projects/${id}/milestones/${m.id}/review`} icon="rate_review">
+                        {m.reviewDraft ? "Continue your review" : "Review this milestone"}
+                      </InkLink>
+                      {m.reviewDraft ? (
+                        <span className="text-xs text-ink-muted">You have a saved draft.</span>
+                      ) : null}
+                    </div>
                   ) : null}
 
                   {m.status === "rejected" ? (
@@ -394,13 +382,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                           You can still change this rating for {RATING_SELF_CORRECTION_HOURS} hours after submitting.
                         </p>
                       )}
-                      <MilestoneReviewForm
-                        action={editOwnMilestoneRating.bind(null, id, m.id)}
-                        submitLabel="Update review"
-                        defaultReview={m.ratings}
-                        defaultNotes={m.ratingNotes}
-                        defaultComment={m.comment ?? ""}
-                      />
+                      <InkLink href={`/projects/${id}/milestones/${m.id}/review`} icon="rate_review">
+                        Update your review
+                      </InkLink>
                     </div>
                   ) : null}
 

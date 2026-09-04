@@ -9,7 +9,6 @@ import { Icon } from "@/components/icon";
 import {
   ExecutionStatusBadge,
   MilestoneStatusBadge,
-  RagDisc,
   Sparkline,
   StarRating,
 } from "@/components/ui";
@@ -83,7 +82,6 @@ function ProjectBlock({ p }: { p: LedgerRow }) {
   return (
     <div className="rounded-[6px] border border-rule bg-panel px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-        <RagDisc health={p.health} />
         <Link
           href={p.href}
           onClick={(e) => e.stopPropagation()}
@@ -144,7 +142,6 @@ export function DashboardLedger({ groups }: { groups: ClientGroup[] }) {
             className="group overflow-hidden rounded-[8px] border border-rule bg-panel"
           >
             <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
-              <RagDisc health={g.health} />
               <span className="min-w-0 flex-1">
                 <span className="block font-medium text-ink">{g.client}</span>
                 <span className="mt-0.5 block text-xs text-ink-muted">
@@ -196,24 +193,21 @@ export function DashboardLedger({ groups }: { groups: ClientGroup[] }) {
         <Column
           header="Client"
           body={(g: ClientGroup) => (
-            <div className="flex items-start gap-2">
-              <RagDisc health={g.health} className="mt-1" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-base font-semibold text-ink">{g.client}</span>
-                  {g.needsAttention ? (
-                    <span
-                      className="inline-flex shrink-0 items-center gap-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-rag-warn"
-                      title="A project under this client is at risk or declining"
-                    >
-                      <Icon name="priority_high" className="text-[11px]" />
-                      Attention
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-0.5 text-xs text-ink-muted">
-                  {g.projectCount} project{g.projectCount === 1 ? "" : "s"}
-                </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-base font-semibold text-ink">{g.client}</span>
+                {g.needsAttention ? (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-rag-warn"
+                    title="A project under this client is at risk or declining"
+                  >
+                    <Icon name="priority_high" className="text-[11px]" />
+                    Attention
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-0.5 text-xs text-ink-muted">
+                {g.projectCount} project{g.projectCount === 1 ? "" : "s"}
               </div>
             </div>
           )}

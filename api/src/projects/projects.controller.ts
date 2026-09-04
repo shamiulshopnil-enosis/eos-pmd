@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -98,6 +99,12 @@ export class ProjectsController {
     return { ok: true };
   }
 
+  @Delete(":id")
+  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.projects.deleteProject(user, id);
+    return { ok: true };
+  }
+
   @Post(":id/submit-for-approval")
   async submitForApproval(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     await this.projects.submitForApproval(user, id);
@@ -135,16 +142,6 @@ export class ProjectsController {
     @Body() body: Record<string, unknown>,
   ) {
     await this.projects.setReviewStaffing(user, id, body);
-    return { ok: true };
-  }
-
-  @Post(":id/status")
-  async setStatus(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.setProjectStatus(user, id, body);
     return { ok: true };
   }
 

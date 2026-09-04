@@ -385,6 +385,61 @@ export class MilestonesService {
     return { ratings, notes: anyNote ? notes : null, overall };
   }
 
+  /**
+   * Parse a partly-filled review for a saved draft — every field is optional.
+   * Ratings outside 1–5 are dropped to null; empty notes/comment become null.
+   */
+  private parseReviewDraft(body: Record<string, unknown>): {
+    ratings: Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number | null>;
+    ratingNotes: Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], string | null>;
+    comment: string | null;
+  } {
+    const ratings = {} as Record<(typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number], number | null>;
+    const ratingNotes = {} as Record<
+      (typeof MILESTONE_REVIEW_DIMENSION_KEYS)[number],
+      string | null
+    >;
+    for (const key of MILESTONE_REVIEW_DIMENSION_KEYS) {
+      const n = Number.parseInt(String(body[key] ?? ""), 10);
+      ratings[key] = !Number.isNaN(n) && n >= 1 && n <= 5 ? n : null;
+      ratingNotes[key] = optStr(body, `${key}Note`);
+    }
+    return { ratings, ratingNotes, comment: optStr(body, "comment") };
+  }
+
+  /** Save (or overwrite) the client's in-progress review without submitting it. */
+  async saveMilestoneReviewDraft(
+    user: SessionUser,
+    milestoneId: string,
+    body: Record<string, unknown>,
+  ): Promise<{ projectId: string }> {
+    const milestone = await this.milestones.findById(milestoneId);
+    if (!milestone) throw new NotFoundException("Milestone not found.");
+    const projectId = String(milestone.projectId);
+
+    const project = await this.projectsService.requirePermission(
+      projectId,
+      user,
+      canRateMilestone,
+      "Only a client contact on this project can review milestones.",
+    );
+    this.projectsService.assertActiveProject(project);
+
+    if (milestone.status !== "sent") {
+      throw new BadRequestException("This milestone is not awaiting your review.");
+    }
+
+    const { ratings, ratingNotes, comment } = this.parseReviewDraft(body);
+    const anyRating = MILESTONE_REVIEW_DIMENSION_KEYS.some((k) => ratings[k] != null);
+    const anyNote = MILESTONE_REVIEW_DIMENSION_KEYS.some((k) => ratingNotes[k]);
+    milestone.reviewDraft =
+      anyRating || anyNote || comment
+        ? { ratings, ratingNotes: anyNote ? ratingNotes : null, comment }
+        : null;
+    await milestone.save();
+    return { projectId };
+  }
+
   async submitMilestoneRating(
     user: SessionUser,
     milestoneId: string,
@@ -409,6 +464,7 @@ export class MilestonesService {
     const now = new Date();
     milestone.ratings = ratings;
     milestone.ratingNotes = notes;
+    milestone.reviewDraft = null;
     milestone.rating = overall;
     milestone.comment = optStr(body, "comment");
     milestone.status = "reviewed";

@@ -20,7 +20,6 @@ import {
   ExecutionStatusBadge,
   HealthBadge,
   ListCard,
-  RagDisc,
 } from "@/components/ui";
 import {
   FilterDateRange,
@@ -266,12 +265,9 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
           {sorted.map((r) => (
             <li key={r.id}>
               <ListCard href={`/projects/${r.id}`}>
-                <div className="flex items-start gap-2">
-                  <RagDisc health={r.perf.health} />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-ink">{r.name}</div>
-                    <div className="mt-0.5 text-xs text-ink-muted">{r.client}</div>
-                  </div>
+                <div className="min-w-0">
+                  <div className="font-medium text-ink">{r.name}</div>
+                  <div className="mt-0.5 text-xs text-ink-muted">{r.client}</div>
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                   <ExecutionStatusBadge status={r.execution} />
@@ -309,7 +305,6 @@ export default function ProjectsTable({ projects }: { projects: ProjectWithMiles
             style={{ minWidth: "14rem" }}
             body={(r: Row) => (
               <span className="flex items-center gap-2">
-                <RagDisc health={r.perf.health} />
                 <Link href={`/projects/${r.id}`} className="font-medium text-ink hover:text-link hover:underline">
                   {r.name}
                 </Link>
