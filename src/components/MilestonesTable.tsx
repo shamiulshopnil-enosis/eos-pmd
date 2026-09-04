@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DataTable, type DataTableSortEvent } from "primereact/datatable";
 import { Column } from "primereact/column";
 import type { MilestoneWithProject } from "@/lib/types";
-import { getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
+import { getMilestoneDisplayStatus, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { MILESTONE_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { EmptyState, FlagBadge, ListCard, MilestoneStatusBadge, StarRating } from "@/components/ui";
@@ -28,8 +28,9 @@ import { Pager, pageSlice, usePagination } from "@/components/pagination";
 
 type SortKey = "title" | "project" | "client" | "assignees" | "start" | "due" | "reviewed" | "status" | "rating";
 
+// Overdue lives in the Status filter now (see getMilestoneDisplayStatus) so it
+// isn't offered twice.
 const FLAG_OPTIONS = [
-  { value: "OVERDUE", label: "Overdue" },
   { value: "DUE_SOON", label: "Due soon" },
   { value: "AWAITING_REVIEW", label: "Awaiting review" },
 ];
@@ -155,7 +156,7 @@ export default function MilestonesTable({ milestones }: { milestones: MilestoneW
         projectId: m.project.id,
         client: m.project.clientCompanyName,
         assignees: m.assignees.map((a) => a.name ?? a.email).join(", "),
-        status: m.status,
+        status: getMilestoneDisplayStatus(m),
         flag: getMilestoneFlag(m) ?? "",
         ratingBand: ratingBand(m.rating),
         start: m.startDate ? new Date(m.startDate).getTime() : null,

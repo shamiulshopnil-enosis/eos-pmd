@@ -260,6 +260,12 @@ export function TrendChart({ samples }: { samples: RatingSample[] }) {
         legend: { display: false },
         tooltip: {
           backgroundColor: t.ink,
+          // `t.ink` flips light/dark with the theme; pin the text to the
+          // surface color so it always reads as an inverted, high-contrast
+          // chip instead of defaulting to Chart.js's literal white text
+          // (invisible once `t.ink` turns light in dark mode).
+          titleColor: t.panel,
+          bodyColor: t.panel,
           padding: 10,
           titleFont: { size: 12, weight: "600" as const },
           bodyFont: { size: 12 },

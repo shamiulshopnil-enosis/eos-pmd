@@ -2,23 +2,25 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
 import { canAccessDelivery, canManageProject } from "@/lib/permissions";
-import { getMilestoneFlag } from "@/lib/derived";
+import { getMilestoneDisplayStatus, getMilestoneFlag } from "@/lib/derived";
 import { deleteMilestone, reopenMilestone, requestRatingReconsideration, sendMilestoneForReview } from "@/lib/actions";
 import { formatDate, formatDateTime } from "@/lib/format";
 import {
+  Card,
   FlagBadge,
   GhostButton,
   GhostLink,
+  InfoField,
   InkButton,
   MilestoneStatusBadge,
   PageHeader,
   SectionHeading,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { SubmitButton } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
+import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import MilestoneAttachments from "@/components/MilestoneAttachments";
-import MilestoneReviewSummary from "@/components/MilestoneReviewSummary";
+import MilestoneReviewCard from "@/components/MilestoneReviewCard";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
 export default async function MilestoneDetailPage({
@@ -51,27 +53,40 @@ export default async function MilestoneDetailPage({
         description={`Project: ${project.name}`}
         back={{ href: `/projects/${id}`, label: project.name }}
         action={
-          milestone.status === "sent" || milestone.status === "reviewed" ? null : (
-            <GhostLink href={`/projects/${id}/milestones/${milestoneId}/edit`} icon="edit">
-              Edit milestone
-            </GhostLink>
-          )
+          <>
+            {milestone.status === "sent" || milestone.status === "reviewed" ? null : (
+              <GhostLink href={`/projects/${id}/milestones/${milestoneId}/edit`} icon="edit">
+                Edit milestone
+              </GhostLink>
+            )}
+            {milestone.status !== "sent" ? (
+              <ConfirmDeleteButton
+                label="Delete milestone"
+                action={deleteMilestone.bind(null, id, milestoneId)}
+                confirmTitle="Delete this milestone?"
+                confirmBody={`"${milestone.title}" and its attachments and review history will be permanently removed. This can't be undone.`}
+                confirmLabel="Delete milestone"
+              />
+            ) : null}
+          </>
         }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-1.5">
-        <MilestoneStatusBadge status={milestone.status} />
+        <MilestoneStatusBadge status={getMilestoneDisplayStatus(milestone)} />
         <FlagBadge flag={flag} />
       </div>
 
-      <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div>
+      <div className="space-y-4">
+        <Card>
           <SectionHeading>Milestone details</SectionHeading>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm sm:grid-cols-3">
-            <Info label="Start date" value={formatDate(milestone.startDate)} mono />
-            <Info label="Due date" value={formatDate(milestone.dueDate)} mono />
-            <Info label="Created" value={formatDate(milestone.createdAt)} mono />
-            <Info
+          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
+            <InfoField icon="calendar" tone="green" label="Start date" value={formatDate(milestone.startDate)} mono />
+            <InfoField icon="calendar" tone="orange" label="Due date" value={formatDate(milestone.dueDate)} mono />
+            <InfoField icon="clock" tone="slate" label="Created" value={formatDate(milestone.createdAt)} mono />
+            <InfoField
+              icon="users"
+              tone="purple"
               label="Assigned to"
               value={
                 milestone.assignees.length === 0
@@ -79,10 +94,10 @@ export default async function MilestoneDetailPage({
                   : milestone.assignees.map((a) => a.name ?? a.email).join(", ")
               }
             />
-          </dl>
+          </div>
 
           {milestone.url ? (
-            <div className="mt-4 text-sm">
+            <div className="mt-5 text-sm">
               <a
                 href={milestone.url}
                 target="_blank"
@@ -95,16 +110,19 @@ export default async function MilestoneDetailPage({
             </div>
           ) : null}
 
-          {milestone.description ? (
-            <div
-              className="prose-ledger mt-4 max-w-[68ch] border-t border-rule pt-4 text-sm"
-              dangerouslySetInnerHTML={{ __html: milestone.description }}
-            />
-          ) : (
-            <p className="mt-4 border-t border-rule pt-4 text-sm text-ink-muted">No description.</p>
-          )}
+          <div className="mt-5 border-t border-rule pt-4">
+            <div className="mb-2 text-xs font-medium text-ink-muted">Description</div>
+            {milestone.description ? (
+              <div
+                className="prose-ledger max-w-[68ch] text-sm"
+                dangerouslySetInnerHTML={{ __html: milestone.description }}
+              />
+            ) : (
+              <p className="text-sm text-ink-muted">No description.</p>
+            )}
+          </div>
 
-          <div className="mt-6">
+          <div className="mt-6 border-t border-rule pt-5">
             <SectionHeading>Attachments</SectionHeading>
             <MilestoneAttachments
               projectId={id}
@@ -114,10 +132,10 @@ export default async function MilestoneDetailPage({
               canUpload={project.executionStatus !== "completed"}
             />
           </div>
-        </div>
+        </Card>
 
-        <aside className="lg:border-l lg:border-rule lg:pl-6">
-          <SectionHeading>Client review</SectionHeading>
+        <Card>
+          {milestone.status !== "reviewed" ? <SectionHeading>Client review</SectionHeading> : null}
 
           {milestone.status === "draft" ? (
             <div className="space-y-3">
@@ -182,17 +200,23 @@ export default async function MilestoneDetailPage({
             </div>
           ) : (
             <div className="space-y-3">
-              <MilestoneReviewSummary milestone={milestone} />
+              <MilestoneReviewCard milestone={milestone} />
               {milestone.comment ? (
                 <blockquote className="rounded-ledger border border-rule bg-band p-3 text-sm italic text-ink-muted">
                   &ldquo;{milestone.comment}&rdquo;
                 </blockquote>
               ) : null}
-              <div className="font-mono text-xs text-ink-muted">
-                Reviewed {formatDateTime(milestone.reviewedAt)}
-                {milestone.reviewedByName || milestone.reviewedByEmail
-                  ? ` by ${milestone.reviewedByName ?? milestone.reviewedByEmail}`
-                  : ""}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon name="calendar" className="text-[13px]" />
+                  Reviewed {formatDateTime(milestone.reviewedAt)}
+                </span>
+                {milestone.reviewedByName || milestone.reviewedByEmail ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="user" className="text-[13px]" />
+                    by {milestone.reviewedByName ?? milestone.reviewedByEmail}
+                  </span>
+                ) : null}
               </div>
               {milestone.editRequestedByVendor ? (
                 <p className="rounded-ledger border border-rule bg-band px-3 py-2 text-xs text-rag-warn">
@@ -203,41 +227,19 @@ export default async function MilestoneDetailPage({
                   action={requestRatingReconsideration.bind(null, id, milestoneId)}
                   success="Asked the client to reconsider their rating."
                 >
-                  <GhostButton type="submit" icon="rate_review">
+                  <GhostButton
+                    type="submit"
+                    icon="rate_review"
+                    className="!rounded-full !border-transparent !bg-[var(--link-subtle-bg)] !text-link hover:!bg-[var(--link-subtle-bg)]"
+                  >
                     Ask client to reconsider
                   </GhostButton>
                 </ActionForm>
               )}
             </div>
           )}
-
-          {milestone.status !== "sent" ? (
-            <form
-              action={deleteMilestone.bind(null, id, milestoneId)}
-              className="mt-5 border-t border-rule pt-4"
-            >
-              <SubmitButton variant="text" icon="pi pi-trash">Delete milestone</SubmitButton>
-            </form>
-          ) : null}
-        </aside>
+        </Card>
       </div>
-    </div>
-  );
-}
-
-function Info({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
-      <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
     </div>
   );
 }

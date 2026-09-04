@@ -141,8 +141,9 @@ export const EXECUTION_STATUS_LABELS: Record<string, string> = {
 };
 
 export const MILESTONE_STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  sent: "With Client",
+  draft: "Ongoing",
+  overdue: "Overdue",
+  sent: "Review Requested",
   reviewed: "Reviewed",
   rejected: "Rejected",
 };

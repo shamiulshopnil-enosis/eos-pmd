@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getProjectWithMilestones } from "@/lib/data";
 import { canRateMilestone } from "@/lib/permissions";
+import { getMilestoneDisplayStatus } from "@/lib/derived";
 import {
   editOwnMilestoneRating,
   rejectMilestone,
@@ -72,7 +73,7 @@ export default async function MilestoneReviewPage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold text-ink">{milestone.title}</h1>
-              <MilestoneStatusBadge status={milestone.status} />
+              <MilestoneStatusBadge status={getMilestoneDisplayStatus(milestone)} />
               {isSubmit ? <FlagBadge flag="AWAITING_REVIEW" /> : null}
             </div>
             <p className="mt-1 text-sm text-ink-muted">

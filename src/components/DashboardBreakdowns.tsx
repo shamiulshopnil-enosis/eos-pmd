@@ -145,7 +145,7 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--rag-good)" }} /> Reviewed
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full" style={{ background: "var(--rag-warn)" }} /> With client
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--rag-warn)" }} /> Review requested
               </span>
               {progress.length > MAX_ROWS ? (
                 <span className="ml-auto text-ink-subtle">+{progress.length - MAX_ROWS} more</span>

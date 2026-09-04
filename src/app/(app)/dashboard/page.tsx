@@ -9,18 +9,12 @@ import {
   computeAlerts,
   computeDashboardKpis,
   computeProjectPerformance,
+  getMilestoneDisplayStatus,
   getMilestoneFlag,
 } from "@/lib/derived";
-import { reviewRoleLabel } from "@/lib/permissions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
-import type { ClientHealth } from "@/lib/constants";
-import {
-  EmptyState,
-  InkLink,
-  MilestoneStatusBadge,
-  PageHeader,
-  SectionHeading,
-} from "@/components/ui";
+import { SATISFIED_RATING_THRESHOLD, type ClientHealth } from "@/lib/constants";
+import { EmptyState, InkLink, PageHeader, SectionHeading } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { TrendChart } from "@/components/TrendChart";
 import { DashboardBreakdowns } from "@/components/DashboardBreakdowns";
@@ -37,72 +31,6 @@ const HEALTH_RANK: Record<ClientHealth, number> = {
   HAPPY: 3,
 };
 
-function ReviewSection({
-  reviewProjects,
-}: {
-  reviewProjects: Awaited<ReturnType<typeof listReviewProjects>>;
-}) {
-  const awaiting = reviewProjects.flatMap((p) =>
-    p.milestones.filter((m) => m.status === "sent").map((m) => ({ project: p, milestone: m })),
-  );
-  return (
-    <section className="mt-10">
-      <SectionHeading>Projects you review</SectionHeading>
-      {awaiting.length > 0 ? (
-        <div className="mb-4 rounded-ledger border border-rule bg-panel p-3">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-rag-warn">
-            <Icon name="hourglass_top" className="text-[14px]" />
-            Awaiting your review · {awaiting.length}
-          </div>
-          <ul className="divide-y divide-rule">
-            {awaiting.map(({ project, milestone }) => (
-              <li key={milestone.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="block min-w-0 flex-1 truncate text-ink hover:text-link hover:underline"
-                >
-                  {project.name}
-                  <span className="text-ink-muted"> · {milestone.title}</span>
-                </Link>
-                <span className="shrink-0">
-                  <MilestoneStatusBadge status={milestone.status} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      <div className="rounded-ledger border border-rule bg-panel">
-        <ul className="divide-y divide-rule">
-          {reviewProjects.map((p) => {
-            const reviewed = p.milestones.filter((m) => m.status === "reviewed").length;
-            const role = reviewRoleLabel(p);
-            return (
-              <li
-                key={p.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
-              >
-                <div className="min-w-0">
-                  <Link
-                    href={`/projects/${p.id}`}
-                    className="block truncate font-medium text-ink hover:text-link hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                  <div className="text-xs capitalize text-ink-muted">{role}</div>
-                </div>
-                <div className="shrink-0 font-mono text-xs tabular-nums text-ink-muted">
-                  {reviewed} / {p.milestones.length} reviewed
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
 export default async function DashboardPage() {
   const user = await requireUser();
   const sides = await getMyProjectSides().catch(() => ({ delivery: false, review: false }));
@@ -113,12 +41,11 @@ export default async function DashboardPage() {
     return <ClientDashboard projects={reviewProjects} viewerId={user.id} />;
   }
 
-  const [projects, reviewProjects] = await Promise.all([
-    listProjectsWithMilestones(),
-    listReviewProjects(),
-  ]);
+  // The review-side view lives entirely behind the Client switch above — no
+  // need to fetch it here just to say how many review projects exist.
+  const projects = await listProjectsWithMilestones();
 
-  if (projects.length === 0 && reviewProjects.length === 0) {
+  if (projects.length === 0 && !sides.review) {
     return (
       <div>
         <PageHeader title="Dashboard" />
@@ -134,10 +61,18 @@ export default async function DashboardPage() {
   }
 
   if (projects.length === 0) {
+    // Reaching here means `sides.review` is true — a dual-role user with
+    // nothing on the delivery side yet.
     return (
       <div>
-        <PageHeader title="Dashboard" description="Projects your company reviews." />
-        <ReviewSection reviewProjects={reviewProjects} />
+        <PageHeader title="Delivery register" description="Every client engagement, ruled and scored." />
+        <EmptyState
+          icon="folder_open"
+          title="You're not delivering any projects"
+          description="Switch to Client view above to see what you review."
+          actionHref="/projects/new"
+          actionLabel="Create project"
+        />
       </div>
     );
   }
@@ -192,7 +127,7 @@ export default async function DashboardPage() {
     milestones: p.milestones.map((m) => ({
       id: m.id,
       title: m.title,
-      status: m.status,
+      status: getMilestoneDisplayStatus(m),
       ratingText: m.status === "reviewed" && m.rating != null ? formatRating(m.rating) : null,
       due: m.dueDate ? formatDate(m.dueDate) : "—",
     })),
@@ -268,7 +203,7 @@ export default async function DashboardPage() {
         <SectionHeading>Summary</SectionHeading>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <FigureBlock
-            label="Active projects"
+            label="Ongoing projects"
             value={kpis.activeProjects}
             icon="folder_open"
             hint={`of ${projects.length} total`}
@@ -278,18 +213,21 @@ export default async function DashboardPage() {
             label="Completed projects"
             value={kpis.completedProjects}
             icon="verified"
+            hint={`of ${projects.length} total`}
             href="/projects?status=COMPLETED"
           />
           <FigureBlock
-            label="Active milestones"
+            label="Ongoing milestones"
             value={kpis.activeMilestones}
             icon="flag"
+            hint={`of ${allMilestones.length} total`}
             href="/milestones?status=draft"
           />
           <FigureBlock
             label="Milestones reviewed"
             value={kpis.milestonesReviewed}
             icon="check_circle"
+            hint={`of ${allMilestones.length} total`}
             href="/milestones?status=reviewed"
           />
           <FigureBlock
@@ -297,6 +235,7 @@ export default async function DashboardPage() {
             value={kpis.awaitingReview}
             icon="hourglass_top"
             tone={kpis.awaitingReview > 0 ? "warn" : undefined}
+            hint={`of ${allMilestones.length} total`}
             href="/milestones?status=sent"
           />
           <FigureBlock
@@ -304,13 +243,15 @@ export default async function DashboardPage() {
             value={overdueCount}
             icon="event_busy"
             tone={overdueCount > 0 ? "bad" : undefined}
-            href="/milestones?flag=OVERDUE"
+            hint={`of ${allMilestones.length} total`}
+            href="/milestones?status=overdue"
           />
           <FigureBlock
             label="Due soon"
             value={dueSoonCount}
             icon="schedule"
             tone={dueSoonCount > 0 ? "warn" : undefined}
+            hint={`of ${allMilestones.length} total`}
             href="/milestones?flag=DUE_SOON"
           />
           <FigureBlock
@@ -322,18 +263,25 @@ export default async function DashboardPage() {
                 ? `across ${kpis.milestonesReviewed} reviewed`
                 : "none reviewed yet"
             }
+            href="/milestones?status=reviewed"
           />
           <FigureBlock
             label="Client satisfaction rate"
             value={formatPercent(kpis.clientSatisfactionRate)}
             icon="thumb_up"
-            href="/milestones?status=reviewed"
+            hint={
+              kpis.milestonesReviewed > 0
+                ? `across ${kpis.milestonesReviewed} reviewed`
+                : "none reviewed yet"
+            }
+            info={`Share of reviewed milestones the client rated ${SATISFIED_RATING_THRESHOLD.toFixed(1)} or higher out of 5.`}
           />
           <FigureBlock
             label="At-risk projects"
             value={kpis.atRiskProjects}
             icon="warning"
             tone={kpis.atRiskProjects > 0 ? "bad" : undefined}
+            hint={`of ${projects.length} total`}
             href="/projects?health=AT_RISK"
           />
         </div>
@@ -395,8 +343,6 @@ export default async function DashboardPage() {
         </SectionHeading>
         <DashboardLedger groups={clientGroups} />
       </section>
-
-      {reviewProjects.length > 0 ? <ReviewSection reviewProjects={reviewProjects} /> : null}
     </div>
   );
 }
@@ -408,6 +354,7 @@ function FigureBlock({
   hint,
   tone,
   href,
+  info,
 }: {
   label: string;
   value: string | number;
@@ -415,6 +362,7 @@ function FigureBlock({
   hint?: string;
   tone?: "warn" | "bad";
   href?: string;
+  info?: string;
 }) {
   const figCls = `text-[1.625rem] font-semibold leading-none tabular-nums ${
     tone === "bad" ? "text-rag-bad" : tone === "warn" ? "text-rag-warn" : "text-ink"
@@ -437,6 +385,11 @@ function FigureBlock({
       <span className="flex min-w-0 flex-col gap-1.5">
         <span className="flex items-center gap-1 text-xs font-medium text-ink-muted">
           {label}
+          {info ? (
+            <span title={info} className="inline-flex text-ink-subtle">
+              <Icon name="info" className="text-[13px]" />
+            </span>
+          ) : null}
           {href ? <Icon name="north_east" className="text-[12px]" /> : null}
         </span>
         <span className="flex min-w-0 items-baseline gap-1.5">

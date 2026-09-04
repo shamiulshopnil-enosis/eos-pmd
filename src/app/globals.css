@@ -41,6 +41,28 @@
   --rag-bad-fill: #ca3521;
   --rag-bad-bg: #ffeceb;
 
+  /* field icon chips — categorical tags for a dense overview panel (Project /
+     Milestone detail). Informational only: never a link, a button, or a
+     substitute for RAG status — see DESIGN.md "Field icon chips". */
+  --chip-blue-bg: #eaf2fe;
+  --chip-blue-fg: #1d4fd8;
+  --chip-indigo-bg: #eeecfe;
+  --chip-indigo-fg: #5b3ff0;
+  --chip-green-bg: #e3faf0;
+  --chip-green-fg: #0f9d58;
+  --chip-amber-bg: #fff4d6;
+  --chip-amber-fg: #b45f06;
+  --chip-orange-bg: #ffedd9;
+  --chip-orange-fg: #c2410c;
+  --chip-purple-bg: #f1ebfe;
+  --chip-purple-fg: #7c3aed;
+  --chip-teal-bg: #e1f7f5;
+  --chip-teal-fg: #0f766e;
+  --chip-rose-bg: #ffe7ec;
+  --chip-rose-fg: #be123c;
+  --chip-slate-bg: var(--band);
+  --chip-slate-fg: var(--ink-muted);
+
   /* interactive neutrals (subtle button, ghost hover) */
   --subtle-btn: rgba(9, 30, 66, 0.06);
   --subtle-btn-hover: rgba(9, 30, 66, 0.12);
@@ -90,6 +112,25 @@
   --rag-bad: #fd9891;
   --rag-bad-fill: #e2483d;
   --rag-bad-bg: #42221f;
+
+  --chip-blue-bg: #16283f;
+  --chip-blue-fg: #8ab4ff;
+  --chip-indigo-bg: #241f42;
+  --chip-indigo-fg: #b9a8ff;
+  --chip-green-bg: #17301f;
+  --chip-green-fg: #6fe0a0;
+  --chip-amber-bg: #332a12;
+  --chip-amber-fg: #f0c14b;
+  --chip-orange-bg: #3a2413;
+  --chip-orange-fg: #ffb37a;
+  --chip-purple-bg: #2a2050;
+  --chip-purple-fg: #c7b4ff;
+  --chip-teal-bg: #123330;
+  --chip-teal-fg: #7de0d6;
+  --chip-rose-bg: #3a1622;
+  --chip-rose-fg: #ff9db3;
+  --chip-slate-bg: var(--band);
+  --chip-slate-fg: var(--ink-muted);
 
   --subtle-btn: rgba(161, 189, 217, 0.08);
   --subtle-btn-hover: rgba(166, 197, 226, 0.16);
@@ -336,21 +377,27 @@
   min-height: 1.875rem;
   font-size: 0.75rem;
 }
-/* primary — bold blue */
-.p-button:not(.p-button-outlined):not(.p-button-text):not(.p-button-link):not(.p-button-secondary) {
+/* primary — bold blue. Excludes `.p-button-danger` — a non-outlined, non-text
+   danger button (a standalone "Delete …" trigger, a dialog's confirm button)
+   must fall through to the danger rule below, not this higher-specificity
+   catch-all. */
+.p-button:not(.p-button-outlined):not(.p-button-text):not(.p-button-link):not(.p-button-secondary):not(.p-button-danger) {
   background: var(--link);
   border-color: transparent;
   color: #fff;
 }
-.p-button:not(.p-button-outlined):not(.p-button-text):not(.p-button-link):not(.p-button-secondary):hover {
+.p-button:not(.p-button-outlined):not(.p-button-text):not(.p-button-link):not(.p-button-secondary):not(.p-button-danger):hover {
   background: var(--link-strong);
   color: #fff;
 }
 .p-button.p-button-danger:not(.p-button-text):not(.p-button-outlined) {
   background: var(--rag-bad-fill);
+  border-color: transparent;
+  color: #fff;
 }
 .p-button.p-button-danger:not(.p-button-text):not(.p-button-outlined):hover {
   background: var(--rag-bad);
+  color: #fff;
 }
 /* default / secondary — subtle grey fill, no border (this is the ADS "default" button) */
 .p-button.p-button-outlined,
@@ -824,6 +871,22 @@ a.eos-linkbtn.p-button-secondary:hover {
 .eos-table.p-datatable .p-datatable-wrapper {
   overflow-x: auto;
 }
+/* PrimeReact's `scrollable` tables paint the <thead>/<tfoot> element itself
+   (not just the <th> cells) with a hardcoded light background — invisible
+   under our own `th` background override, and never themed for dark mode.
+   Selector specificity has to match theirs (5 classes) since our `th`-level
+   rule below targets a different element and can't out-rank it. */
+.eos-table.p-datatable.p-datatable-scrollable > .p-datatable-wrapper > .p-datatable-table > .p-datatable-thead,
+.eos-table.p-datatable.p-datatable-scrollable > .p-datatable-wrapper > .p-virtualscroller > .p-datatable-table > .p-datatable-thead,
+.eos-table.p-datatable.p-datatable-scrollable > .p-datatable-wrapper > .p-datatable-table > .p-datatable-tfoot,
+.eos-table.p-datatable.p-datatable-scrollable > .p-datatable-wrapper > .p-virtualscroller > .p-datatable-table > .p-datatable-tfoot {
+  background-color: var(--panel);
+}
+.eos-table.p-datatable .p-datatable-thead,
+.eos-table.p-datatable .p-datatable-scrollable-header,
+.eos-table.p-datatable .p-datatable-scrollable-footer {
+  background: var(--panel);
+}
 .eos-table.p-datatable .p-datatable-thead > tr > th {
   background: var(--panel);
   color: var(--ink-muted);
@@ -1018,6 +1081,34 @@ a.eos-linkbtn.p-button-secondary:hover {
   width: 56px;
   height: 6px;
 }
+
+/* --- Field icon chips (Project / Milestone overview panels) ------- */
+.eos-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+.eos-chip-size-md {
+  width: 2rem;
+  height: 2rem;
+  font-size: 15px;
+}
+.eos-chip-size-sm {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 13px;
+}
+.eos-chip-blue { background: var(--chip-blue-bg); color: var(--chip-blue-fg); }
+.eos-chip-indigo { background: var(--chip-indigo-bg); color: var(--chip-indigo-fg); }
+.eos-chip-green { background: var(--chip-green-bg); color: var(--chip-green-fg); }
+.eos-chip-amber { background: var(--chip-amber-bg); color: var(--chip-amber-fg); }
+.eos-chip-orange { background: var(--chip-orange-bg); color: var(--chip-orange-fg); }
+.eos-chip-purple { background: var(--chip-purple-bg); color: var(--chip-purple-fg); }
+.eos-chip-teal { background: var(--chip-teal-bg); color: var(--chip-teal-fg); }
+.eos-chip-rose { background: var(--chip-rose-bg); color: var(--chip-rose-fg); }
+.eos-chip-slate { background: var(--chip-slate-bg); color: var(--chip-slate-fg); }
 
 /* --- Toast (Jira-style flag) ---------------------------- */
 .eos-toast .p-toast-message {

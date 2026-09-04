@@ -7,6 +7,7 @@ import {
   computeRatingDistribution,
   computeReviewWorkload,
   computeVendorBreakdown,
+  getMilestoneDisplayStatus,
 } from "@/lib/derived";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
 import {
@@ -145,6 +146,7 @@ export function ClientDashboard({
   const ratingSamples = collectRatingSamples(projects);
 
   const overdueFromVendor = projectRows.reduce((n, r) => n + r.overdueCount, 0);
+  const totalMilestones = projects.reduce((n, p) => n + p.milestones.length, 0);
 
   return (
     <div>
@@ -168,6 +170,7 @@ export function ClientDashboard({
             value={workload.awaitingCount}
             icon="hourglass_top"
             tone={workload.awaitingCount > 0 ? "warn" : undefined}
+            hint={`of ${totalMilestones} total`}
             href="/milestones?status=sent"
           />
           <Figure
@@ -175,12 +178,17 @@ export function ClientDashboard({
             value={workload.overdueToReview}
             icon="schedule"
             tone={workload.overdueToReview > 0 ? "bad" : undefined}
-            hint="over 7 days"
+            hint={
+              workload.awaitingCount > 0
+                ? `of ${workload.awaitingCount} awaiting`
+                : "none awaiting"
+            }
           />
           <Figure
             label="Milestones reviewed"
             value={workload.reviewedByCompany}
             icon="check_circle"
+            hint={`of ${totalMilestones} total`}
             href="/milestones?status=reviewed"
           />
           <Figure
@@ -207,13 +215,19 @@ export function ClientDashboard({
             label="Satisfaction rate"
             value={formatPercent(satisfaction.satisfactionRate)}
             icon="thumb_up"
+            hint={
+              satisfaction.reviewedCount > 0
+                ? `across ${satisfaction.reviewedCount} reviewed`
+                : "none reviewed yet"
+            }
           />
           <Figure
             label="Overdue from vendor"
             value={overdueFromVendor}
             icon="event_busy"
             tone={overdueFromVendor > 0 ? "bad" : undefined}
-            href="/milestones?flag=OVERDUE"
+            hint={`of ${totalMilestones} total`}
+            href="/milestones?status=overdue"
           />
           <Figure label="Delivery teams" value={vendors.length} icon="groups" />
         </div>
@@ -272,7 +286,7 @@ export function ClientDashboard({
                           {waitingDays}d waiting
                         </span>
                       ) : null}
-                      <MilestoneStatusBadge status={milestone.status} />
+                      <MilestoneStatusBadge status={getMilestoneDisplayStatus(milestone)} />
                     </div>
                   </li>
                 );

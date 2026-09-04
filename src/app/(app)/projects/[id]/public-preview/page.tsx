@@ -7,7 +7,7 @@ import { meetsPublicThreshold } from "@/lib/scoring";
 import { minReviewThreshold } from "@/lib/constants";
 import { unpublishProject } from "@/lib/actions";
 import { formatDate, formatPercent, formatRating } from "@/lib/format";
-import { Badge, Card, GhostButton, PageHeader } from "@/components/ui";
+import { Badge, Card, GhostButton, InfoField, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
 
@@ -60,8 +60,10 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
             />
           ) : null}
 
-          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm sm:grid-cols-4">
-            <Info
+          <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-4">
+            <InfoField
+              icon="calendar"
+              tone="green"
               label="Duration"
               value={
                 project.startDate
@@ -71,10 +73,10 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
                   : "—"
               }
             />
-            <Info label="Budget" value={project.publicBudget} />
-            <Info label="Team size" value={project.teamSize?.toString()} mono />
-            <Info label="Engagement model" value={project.engagementModel} />
-          </dl>
+            <InfoField icon="dollar" tone="teal" label="Budget" value={project.publicBudget} />
+            <InfoField icon="users" tone="purple" label="Team size" value={project.teamSize?.toString()} mono />
+            <InfoField icon="tag" tone="rose" label="Engagement model" value={project.engagementModel} />
+          </div>
         </div>
 
         <div className="space-y-6 p-6">
@@ -140,23 +142,6 @@ export default async function PublicPreviewPage({ params }: { params: Promise<{ 
           ) : null}
         </div>
       </Card>
-    </div>
-  );
-}
-
-function Info({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
-      <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
     </div>
   );
 }

@@ -8,7 +8,12 @@ import {
   canManageReview,
   reviewRoleLabel,
 } from "@/lib/permissions";
-import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
+import {
+  computeProjectPerformance,
+  getMilestoneDisplayStatus,
+  getMilestoneFlag,
+  isMilestoneReviewed,
+} from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
 import { CAPSTONE_TIER_LABELS, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
@@ -21,18 +26,20 @@ import {
 import {
   AdminStatusBadge,
   Badge,
+  Card,
   EmptyState,
   ExecutionStatusBadge,
   FlagBadge,
   GhostButton,
   GhostLink,
   HealthBadge,
+  InfoField,
   InkButton,
   InkLink,
   MilestoneStatusBadge,
   PageHeader,
-  ProjectStatusBadge,
   SectionHeading,
+  StatRow,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ActionForm } from "@/components/ActionForm";
@@ -155,7 +162,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-1.5">
-        <ProjectStatusBadge status={project.status} />
         <AdminStatusBadge status={project.adminStatus} />
         <ExecutionStatusBadge status={project.executionStatus} />
         <Badge tone={project.visibility === "PUBLIC" ? "blue" : "slate"}>
@@ -199,27 +205,50 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       ) : null}
 
       {/* --- Overview + performance --- */}
-      <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <Card>
           <SectionHeading>Project overview</SectionHeading>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 text-sm sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-3">
             {del ? (
-              <Info label="Client" value={project.clientCompanyName} />
+              <InfoField icon="building" tone="blue" label="Client" value={project.clientCompanyName} />
             ) : (
-              <Info label="Delivered by" value={project.deliveringCompanyName ?? "—"} />
+              <InfoField
+                icon="building"
+                tone="blue"
+                label="Delivered by"
+                value={project.deliveringCompanyName ?? "—"}
+              />
             )}
-            {del ? <Info label="Client email" value={project.clientEmail} mono /> : null}
-            <Info label="Services" value={project.services} />
-            <Info label="Start date" value={formatDate(project.startDate)} mono />
-            <Info label="Expected completion" value={formatDate(project.expectedCompletionDate)} mono />
-            {del ? <Info label="Team size" value={project.teamSize?.toString() ?? "—"} mono /> : null}
-            {del ? <Info label="Engagement model" value={project.engagementModel} /> : null}
             {del ? (
-              <Info
+              <InfoField icon="envelope" tone="blue" label="Client email" value={project.clientEmail} mono />
+            ) : null}
+            <InfoField icon="th-large" tone="indigo" label="Services" value={project.services} />
+            <InfoField icon="calendar" tone="green" label="Start date" value={formatDate(project.startDate)} mono />
+            <InfoField
+              icon="calendar"
+              tone="orange"
+              label="Expected completion"
+              value={formatDate(project.expectedCompletionDate)}
+              mono
+            />
+            {del ? (
+              <InfoField
+                icon="users"
+                tone="purple"
+                label="Team size"
+                value={project.teamSize?.toString() ?? "—"}
+                mono
+              />
+            ) : null}
+            {del ? (
+              <InfoField icon="tag" tone="rose" label="Engagement model" value={project.engagementModel} />
+            ) : null}
+            {del ? (
+              <InfoField
+                icon="user"
+                tone="purple"
                 label="Client contacts"
-                value={
-                  project.clientContacts.map((c) => c.name ?? c.email).join(", ") || "—"
-                }
+                value={project.clientContacts.map((c) => c.name ?? c.email).join(", ") || "—"}
               />
             ) : null}
             {del ? (
@@ -236,37 +265,36 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 companyId={project.deliveringCompanyId ?? ""}
               />
             ) : null}
-          </dl>
+          </div>
           {project.description ? (
-            <p className="prose-ledger mt-5 max-w-[68ch] whitespace-pre-line border-t border-rule pt-4 text-sm">
-              {project.description}
+            <div className="mt-5 border-t border-rule pt-4">
+              <div className="mb-2 text-xs font-medium text-ink-muted">Description</div>
+              <div className="flex items-start gap-3 rounded-[8px] bg-band p-4">
+                <Icon name="file" className="mt-0.5 shrink-0 text-[15px] text-ink-muted" />
+                <p className="prose-ledger whitespace-pre-line text-sm text-ink">{project.description}</p>
+              </div>
+            </div>
+          ) : null}
+        </Card>
+
+        <Card>
+          <SectionHeading>Performance</SectionHeading>
+          <div className="space-y-3">
+            <StatRow icon="star" tone="amber" label="Average rating" value={formatRating(perf.avgRating)} strong />
+            <StatRow icon="flag" tone="green" label="Milestones" value={perf.totalMilestones} />
+            <StatRow icon="comment" tone="blue" label="Reviewed" value={perf.milestonesReviewed} />
+            <StatRow icon="clock" tone="purple" label="In progress" value={perf.activeMilestones} />
+            <StatRow icon="send" tone="teal" label="Response rate" value={formatPercent(perf.responseRate)} />
+            <StatRow icon="star" tone="slate" label="Latest rating" value={formatRating(perf.latestRating)} />
+            <StatRow icon="heart" tone="rose" label="Client health" value={<HealthBadge health={perf.health} />} />
+          </div>
+          {perf.satisfactionDeclined ? (
+            <p className="mt-3 flex items-start gap-1.5 border-t border-rule pt-3 text-xs text-rag-warn">
+              <Icon name="trending_down" className="mt-0.5 shrink-0 text-[14px]" />
+              Rating is declining versus the previous milestone.
             </p>
           ) : null}
-        </div>
-
-        <aside className="lg:border-l lg:border-rule lg:pl-6">
-          <SectionHeading>Performance</SectionHeading>
-          <dl className="space-y-2.5 text-sm">
-            <SummaryRow label="Average rating" value={formatRating(perf.avgRating)} strong />
-            <SummaryRow label="Milestones" value={perf.totalMilestones} />
-            <SummaryRow label="Reviewed" value={perf.milestonesReviewed} />
-            <SummaryRow label="In progress" value={perf.activeMilestones} />
-            <SummaryRow label="Response rate" value={formatPercent(perf.responseRate)} />
-            <SummaryRow label="Latest rating" value={formatRating(perf.latestRating)} />
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <dt className="text-ink-muted">Client health</dt>
-              <dd>
-                <HealthBadge health={perf.health} />
-              </dd>
-            </div>
-            {perf.satisfactionDeclined ? (
-              <p className="mt-1 flex items-start gap-1.5 border-t border-rule pt-2 text-xs text-rag-warn">
-                <Icon name="trending_down" className="mt-0.5 shrink-0 text-[14px]" />
-                Rating is declining versus the previous milestone.
-              </p>
-            ) : null}
-          </dl>
-        </aside>
+        </Card>
       </div>
 
       {/* --- Milestones --- */}
@@ -299,7 +327,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2 font-medium text-ink">
                       {m.title}
-                      <MilestoneStatusBadge status={m.status} />
+                      <MilestoneStatusBadge status={getMilestoneDisplayStatus(m)} />
                       <FlagBadge flag={getMilestoneFlag(m)} />
                     </span>
                     <span className="font-mono text-xs text-ink-muted">
@@ -435,42 +463,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Info({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="mb-0.5 text-xs font-medium text-ink-muted">{label}</dt>
-      <dd className={`text-ink ${mono ? "font-mono text-xs" : ""}`}>{value || "—"}</dd>
-    </div>
-  );
-}
-
-function SummaryRow({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string | number;
-  strong?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className={`font-mono tabular-nums text-ink ${strong ? "text-base font-semibold" : ""}`}>
-        {value}
-      </dd>
     </div>
   );
 }

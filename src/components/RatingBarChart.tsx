@@ -6,11 +6,20 @@ import { Chart } from "primereact/chart";
 import type { ActiveElement, Chart as ChartJS, ChartEvent, Plugin } from "chart.js";
 import type { RatingDistributionBar } from "@/lib/derived";
 
-type Tokens = { ink: string; subtle: string; rule: string; good: string; warn: string; bad: string };
+type Tokens = {
+  ink: string;
+  subtle: string;
+  rule: string;
+  panel: string;
+  good: string;
+  warn: string;
+  bad: string;
+};
 const FALLBACK: Tokens = {
   ink: "#1f2733",
   subtle: "#8993a4",
   rule: "#e4e7ec",
+  panel: "#ffffff",
   good: "#216e4e",
   warn: "#7f5f01",
   bad: "#ae2e24",
@@ -25,6 +34,7 @@ function readTokens(): Tokens {
     ink: g("--ink", FALLBACK.ink),
     subtle: g("--ink-subtle", FALLBACK.subtle),
     rule: g("--rule", FALLBACK.rule),
+    panel: g("--panel", FALLBACK.panel),
     good: g("--rag-good", FALLBACK.good),
     warn: g("--rag-warn", FALLBACK.warn),
     bad: g("--rag-bad", FALLBACK.bad),
@@ -111,6 +121,11 @@ export function RatingBarChart({ bars }: { bars: RatingDistributionBar[] }) {
         legend: { display: false },
         tooltip: {
           backgroundColor: t.ink,
+          // `t.ink` flips light/dark with the theme; pin the text to the
+          // surface color instead of Chart.js's literal white default, which
+          // goes invisible once `t.ink` turns light in dark mode.
+          titleColor: t.panel,
+          bodyColor: t.panel,
           padding: 9,
           displayColors: false,
           callbacks: {

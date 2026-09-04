@@ -6,6 +6,7 @@ import type { CompanyMember } from "@/lib/types";
 import { addCompanyPerson, setProjectStaffing } from "@/lib/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { SubmitButton } from "@/components/form";
+import { FieldIcon } from "@/components/ui";
 import PeoplePicker from "@/components/PeoplePicker";
 
 type Teammate = { email: string; name: string | null; invitePending: boolean };
@@ -64,58 +65,61 @@ export function ProjectPeopleField({
   const rest = team.slice(MAX_AVATARS);
 
   return (
-    <div>
-      <dt className="mb-1 text-xs font-medium text-ink-muted">People</dt>
-      <dd className="flex items-center pl-1.5">
-        {team.length === 0 && !canManage ? (
-          <span className="text-ink">—</span>
-        ) : (
-          shown.map((p) => <Avatar key={p.email} person={p} className="-ml-1.5" />)
-        )}
+    <div className="flex items-start gap-2.5">
+      <FieldIcon icon="users" tone="purple" />
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-ink-muted">People</div>
+        <div className="mt-1 flex items-center pl-1.5">
+          {team.length === 0 && !canManage ? (
+            <span className="text-sm text-ink">—</span>
+          ) : (
+            shown.map((p) => <Avatar key={p.email} person={p} className="-ml-1.5" />)
+          )}
 
-        {rest.length > 0 ? (
-          <span
-            title={rest.map((p) => p.name ?? p.email).join(", ")}
-            className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-band text-[11px] font-semibold text-ink-muted ring-2 ring-panel"
-          >
-            +{rest.length}
-          </span>
-        ) : null}
-
-        {canManage ? (
-          <>
-            <button
-              type="button"
-              aria-label="Add or remove people"
-              onClick={(e) => op.current?.toggle(e)}
-              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--input-border)] bg-panel text-ink-muted ring-2 ring-panel transition-colors hover:border-link hover:text-link"
+          {rest.length > 0 ? (
+            <span
+              title={rest.map((p) => p.name ?? p.email).join(", ")}
+              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-band text-[11px] font-semibold text-ink-muted ring-2 ring-panel"
             >
-              <i className="pi pi-plus text-[11px]" />
-            </button>
-            <OverlayPanel ref={op} className="eos-overlay eos-people-op">
-              <div className="mb-2 text-xs font-semibold text-ink">Project people</div>
-              <ActionForm
-                action={setProjectStaffing.bind(null, projectId)}
-                success="People updated."
-                className="space-y-3"
+              +{rest.length}
+            </span>
+          ) : null}
+
+          {canManage ? (
+            <>
+              <button
+                type="button"
+                aria-label="Add or remove people"
+                onClick={(e) => op.current?.toggle(e)}
+                className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--input-border)] bg-panel text-ink-muted ring-2 ring-panel transition-colors hover:border-link hover:text-link"
               >
-                <PeoplePicker
-                  directory={directory}
-                  name="memberIds"
-                  emit="id"
-                  selectedLayout="rows"
-                  defaultSelected={selectedMemberIds}
-                  placeholder="Search your company by name or email…"
-                  addPerson={addCompanyPerson.bind(null, companyId)}
-                  addContextLabel="your company"
-                  emptyHint="No one on this project yet. Search above to add people from your company."
-                />
-                <SubmitButton>Save</SubmitButton>
-              </ActionForm>
-            </OverlayPanel>
-          </>
-        ) : null}
-      </dd>
+                <i className="pi pi-plus text-[11px]" />
+              </button>
+              <OverlayPanel ref={op} className="eos-overlay eos-people-op">
+                <div className="mb-2 text-xs font-semibold text-ink">Project people</div>
+                <ActionForm
+                  action={setProjectStaffing.bind(null, projectId)}
+                  success="People updated."
+                  className="space-y-3"
+                >
+                  <PeoplePicker
+                    directory={directory}
+                    name="memberIds"
+                    emit="id"
+                    selectedLayout="rows"
+                    defaultSelected={selectedMemberIds}
+                    placeholder="Search your company by name or email…"
+                    addPerson={addCompanyPerson.bind(null, companyId)}
+                    addContextLabel="your company"
+                    emptyHint="No one on this project yet. Search above to add people from your company."
+                  />
+                  <SubmitButton>Save</SubmitButton>
+                </ActionForm>
+              </OverlayPanel>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
