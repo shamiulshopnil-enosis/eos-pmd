@@ -39,6 +39,8 @@ const ICON_MAP: Record<string, string> = {
   trending_down: "arrow-down-right",
   public: "globe",
   lock: "lock",
+  star: "star",
+  thumb_up: "thumbs-up",
   // actions
   add: "plus",
   edit: "pencil",

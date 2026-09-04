@@ -251,40 +251,47 @@ export default async function DashboardPage() {
           <FigureBlock
             label="Active projects"
             value={kpis.activeProjects}
+            icon="folder_open"
             hint={`of ${projects.length} total`}
             href="/projects?status=ACTIVE"
           />
           <FigureBlock
             label="Active milestones"
             value={kpis.activeMilestones}
+            icon="flag"
             href="/milestones?status=draft"
           />
           <FigureBlock
             label="Milestones reviewed"
             value={kpis.milestonesReviewed}
+            icon="check_circle"
             href="/milestones?status=reviewed"
           />
           <FigureBlock
             label="Awaiting client review"
             value={kpis.awaitingReview}
+            icon="hourglass_top"
             tone={kpis.awaitingReview > 0 ? "warn" : undefined}
             href="/milestones?status=sent"
           />
           <FigureBlock
             label="Overdue milestones"
             value={overdueCount}
+            icon="event_busy"
             tone={overdueCount > 0 ? "bad" : undefined}
             href="/milestones?flag=OVERDUE"
           />
           <FigureBlock
             label="Due soon"
             value={dueSoonCount}
+            icon="schedule"
             tone={dueSoonCount > 0 ? "warn" : undefined}
             href="/milestones?flag=DUE_SOON"
           />
           <FigureBlock
             label="Avg. milestone rating"
             value={formatRating(kpis.averageMilestoneRating)}
+            icon="star"
             hint={
               kpis.milestonesReviewed > 0
                 ? `across ${kpis.milestonesReviewed} reviewed`
@@ -294,11 +301,13 @@ export default async function DashboardPage() {
           <FigureBlock
             label="Client satisfaction rate"
             value={formatPercent(kpis.clientSatisfactionRate)}
+            icon="thumb_up"
             href="/milestones?status=reviewed"
           />
           <FigureBlock
             label="At-risk projects"
             value={kpis.atRiskProjects}
+            icon="warning"
             tone={kpis.atRiskProjects > 0 ? "bad" : undefined}
             href="/projects?health=AT_RISK"
           />
@@ -389,12 +398,14 @@ export default async function DashboardPage() {
 function FigureBlock({
   label,
   value,
+  icon,
   hint,
   tone,
   href,
 }: {
   label: string;
   value: string | number;
+  icon: string;
   hint?: string;
   tone?: "warn" | "bad";
   href?: string;
@@ -402,17 +413,29 @@ function FigureBlock({
   const figCls = `text-[1.625rem] font-semibold leading-none tabular-nums ${
     tone === "bad" ? "text-rag-bad" : tone === "warn" ? "text-rag-warn" : "text-ink"
   }`;
-  const cls = `flex flex-col gap-2 rounded-[8px] border border-rule bg-panel px-4 py-3.5 ${
+  const chipCls = `flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] ${
+    tone === "bad"
+      ? "bg-[var(--rag-bad-bg,rgba(174,46,36,0.12))] text-rag-bad"
+      : tone === "warn"
+        ? "bg-[var(--rag-warn-bg,rgba(127,95,1,0.12))] text-rag-warn"
+        : "bg-band text-ink-muted"
+  }`;
+  const cls = `flex items-start gap-3 rounded-[8px] border border-rule bg-panel px-4 py-3.5 ${
     href ? "transition-colors hover:border-link" : ""
   }`;
   const body = (
     <>
-      <span className="flex items-center gap-1 text-xs font-medium text-ink-muted">
-        {label}
-        {href ? <Icon name="north_east" className="text-[12px]" /> : null}
+      <span className={chipCls}>
+        <Icon name={icon} className="text-[16px]" />
       </span>
-      <span className={figCls}>{value}</span>
-      {hint ? <span className="text-xs text-ink-subtle">{hint}</span> : null}
+      <span className="flex min-w-0 flex-col gap-1.5">
+        <span className="flex items-center gap-1 text-xs font-medium text-ink-muted">
+          {label}
+          {href ? <Icon name="north_east" className="text-[12px]" /> : null}
+        </span>
+        <span className={figCls}>{value}</span>
+        {hint ? <span className="text-xs text-ink-subtle">{hint}</span> : null}
+      </span>
     </>
   );
   return href ? (
