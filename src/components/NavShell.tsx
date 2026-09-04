@@ -68,7 +68,7 @@ export default async function NavShell({ user, children }: { user: SessionUser; 
           </div>
         </header>
 
-        <main className="w-full flex-1 px-4 py-7 md:px-8">{children}</main>
+        <main className="w-full flex-1 overflow-x-clip px-4 py-7 md:px-8">{children}</main>
       </div>
     </div>
   );
