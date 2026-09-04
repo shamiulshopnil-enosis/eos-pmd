@@ -29,9 +29,9 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-ledger border border-rule bg-panel p-4">
+    <div className="min-w-0 rounded-ledger border border-rule bg-panel p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
           {hint ? <p className="mt-0.5 text-xs text-ink-muted">{hint}</p> : null}
         </div>
@@ -60,7 +60,7 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
   const workloadMax = Math.max(1, ...workload.map((w) => w.total));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-6 lg:grid-cols-2">
       {/* Rating distribution */}
       <CardShell
         title="Rating distribution"
@@ -83,10 +83,10 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
               <li key={r.status}>
                 <Link
                   href={`/milestones?status=${r.status}`}
-                  className="-mx-1 grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 rounded-[4px] px-1 py-1 text-sm transition-colors hover:bg-paper"
+                  className="-mx-1 grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition-colors hover:bg-paper sm:grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:gap-3"
                 >
                   <span className="truncate text-ink-muted">{r.label}</span>
-                  <span className="h-2 rounded-full bg-band">
+                  <span className="h-2 min-w-0 rounded-full bg-band">
                     <span
                       className="block h-full rounded-full"
                       style={{ width: `${Math.max(r.pct, 2)}%`, background: TONE_VAR[r.tone] }}
@@ -115,11 +115,11 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
           <>
             <ul className="space-y-3">
               {progress.slice(0, MAX_ROWS).map((r) => (
-                <li key={r.id}>
+                <li key={r.id} className="min-w-0">
                   <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
                     <Link
                       href={`/projects/${r.id}`}
-                      className="truncate font-medium text-ink hover:text-link hover:underline"
+                      className="min-w-0 truncate font-medium text-ink hover:text-link hover:underline"
                     >
                       {r.name}
                     </Link>
@@ -167,13 +167,16 @@ export function DashboardBreakdowns({ projects }: { projects: ProjectWithMilesto
           <>
             <ul className="space-y-2.5">
               {workload.slice(0, MAX_ROWS).map((w) => (
-                <li key={w.key} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 text-sm">
+                <li
+                  key={w.key}
+                  className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-2 text-sm sm:grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:gap-3"
+                >
                   <span
                     className={`truncate ${w.key === "__unassigned__" ? "italic text-ink-subtle" : "text-ink-muted"}`}
                   >
                     {w.name}
                   </span>
-                  <span className="h-2 rounded-full bg-band">
+                  <span className="h-2 min-w-0 rounded-full bg-band">
                     <span
                       className="flex h-full overflow-hidden rounded-full"
                       style={{ width: `${Math.max((w.total / workloadMax) * 100, 3)}%` }}

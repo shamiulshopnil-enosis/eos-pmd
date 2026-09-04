@@ -498,14 +498,39 @@ async function main() {
         reviewedAtByIdx.push(reviewed);
         dueAt.push(reviewed - (2 + Math.floor(rand() * 5)) * DAY);
       }
-      // the "with client" milestone: sent a few days ago, due shortly
+      const lastReviewedDue = dueAt[dueAt.length - 1] ?? now - 30 * DAY;
+
+      // A slice of the ongoing projects (those whose review run ended long
+      // enough ago to leave room) carry a lapsed deadline, so the dashboard
+      // "Overdue milestones" / "Due soon" cards aren't stuck at zero:
+      //   k 6–8  → the sent milestone AND its next draft are past due
+      //   k 9–13 → the sent milestone is past due, the next draft is due soon
+      const flag: "future" | "overdueBoth" | "overdueSent" =
+        k >= 6 && lastReviewedDue < now - 12 * DAY
+          ? k <= 8
+            ? "overdueBoth"
+            : "overdueSent"
+          : "future";
+
+      // the "with client" milestone: normally sent a few days ago and due
+      // shortly; when flagged, its deadline has already lapsed.
       if (sentIdx >= 0 && sentIdx < n) {
-        dueAt.push(now + (3 + Math.floor(rand() * 6)) * DAY);
+        const sentDue =
+          flag === "future"
+            ? now + (3 + Math.floor(rand() * 6)) * DAY
+            : now - (4 + (k % 7)) * DAY;
+        dueAt.push(sentDue);
         reviewedAtByIdx.push(null);
       }
-      // remaining drafts: due in the near future
+      // remaining drafts: near-future, unless this project is flagged
       for (let i = dueAt.length; i < n; i++) {
-        dueAt.push(now + (12 + (i - sentIdx) * 16 + Math.floor(rand() * 8)) * DAY);
+        const draftDue =
+          flag === "overdueBoth"
+            ? now - (1 + (k % 4)) * DAY // already overdue
+            : flag === "overdueSent"
+              ? now + (2 + (k % 5)) * DAY // inside the 7-day "due soon" window
+              : now + (12 + (i - sentIdx) * 16 + Math.floor(rand() * 8)) * DAY;
+        dueAt.push(draftDue);
         reviewedAtByIdx.push(null);
       }
     }
