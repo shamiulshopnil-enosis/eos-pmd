@@ -144,22 +144,6 @@ export function HealthBadge({ health }: { health: ClientHealth }) {
   );
 }
 
-export function RagDisc({ health, className = "" }: { health: ClientHealth; className?: string }) {
-  const fill: Record<ClientHealth, string> = {
-    HAPPY: "bg-rag-good-fill ring-black/15 dark:ring-white/25",
-    NEEDS_ATTENTION: "bg-rag-warn-fill ring-black/15 dark:ring-white/25",
-    AT_RISK: "bg-rag-bad-fill ring-black/15 dark:ring-white/25",
-    NO_DATA: "bg-transparent ring-rule-strong",
-  };
-  return (
-    <span
-      role="img"
-      aria-label={CLIENT_HEALTH_LABELS[health]}
-      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ${fill[health]} ${className}`}
-    />
-  );
-}
-
 export function FlagBadge({ flag }: { flag: "OVERDUE" | "DUE_SOON" | "AWAITING_REVIEW" | null }) {
   if (!flag) return null;
   if (flag === "OVERDUE")
