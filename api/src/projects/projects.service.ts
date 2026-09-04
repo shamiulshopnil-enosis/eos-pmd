@@ -723,7 +723,6 @@ export class ProjectsService {
       teamSize: optInt(body, "teamSize"),
       engagementModel: optStr(body, "engagementModel"),
       projectUrl: optStr(body, "projectUrl"),
-      status: str(body, "status"),
     });
 
     await this.projects.updateOne(
@@ -776,17 +775,6 @@ export class ProjectsService {
   async rejectProject(projectId: string): Promise<void> {
     await this.projects.findByIdAndUpdate(projectId, { adminStatus: "rejected" });
     await this.activity.log({ projectId, type: "PROJECT_UPDATED", message: "Project shell rejected by admin" });
-  }
-
-  async setProjectStatus(user: SessionUser, projectId: string, body: Record<string, unknown>): Promise<void> {
-    await this.requirePermission(projectId, user, canManageProject, "Only a project owner can change the project status.");
-    const status = str(body, "status");
-    await this.projects.findByIdAndUpdate(projectId, { status });
-    await this.activity.log({
-      projectId,
-      type: status === "COMPLETED" ? "PROJECT_COMPLETED" : "PROJECT_UPDATED",
-      message: `Project status changed to ${status.replace("_", " ")}`,
-    });
   }
 
   // --- Completion (spec §5.2, §6.8) ---

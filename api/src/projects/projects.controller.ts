@@ -138,16 +138,6 @@ export class ProjectsController {
     return { ok: true };
   }
 
-  @Post(":id/status")
-  async setStatus(
-    @CurrentUser() user: SessionUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    await this.projects.setProjectStatus(user, id, body);
-    return { ok: true };
-  }
-
   @Post(":id/request-completion")
   async requestCompletion(@CurrentUser() user: SessionUser, @Param("id") id: string) {
     await this.projects.requestCompletion(user, id);

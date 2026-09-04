@@ -10,18 +10,13 @@ import {
 } from "@/lib/permissions";
 import { computeProjectPerformance, getMilestoneFlag, isMilestoneReviewed } from "@/lib/derived";
 import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/format";
-import {
-  PROJECT_STATUS_LABELS,
-  CAPSTONE_TIER_LABELS,
-  RATING_SELF_CORRECTION_HOURS,
-} from "@/lib/constants";
+import { CAPSTONE_TIER_LABELS, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
   confirmCompletion,
   editOwnMilestoneRating,
   rejectMilestone,
   requestCapstone,
   requestCompletion,
-  setProjectStatus,
   submitForApproval,
   submitMilestoneRating,
 } from "@/lib/actions";
@@ -31,7 +26,6 @@ import {
   EmptyState,
   ExecutionStatusBadge,
   FlagBadge,
-  GhostButton,
   GhostLink,
   HealthBadge,
   InkButton,
@@ -42,7 +36,6 @@ import {
   SectionHeading,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { Select } from "@/components/form";
 import { ActionForm } from "@/components/ActionForm";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
 import {
@@ -233,22 +226,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <p className="prose-ledger mt-5 max-w-[68ch] whitespace-pre-line border-t border-rule pt-4 text-sm">
               {project.description}
             </p>
-          ) : null}
-
-          {delLead ? (
-            <ActionForm
-              action={setProjectStatus.bind(null, project.id)}
-              success="Project status updated."
-              className="mt-5 flex flex-wrap items-end gap-3 border-t border-rule pt-4"
-            >
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-ink">Project status</span>
-                <div className="w-48">
-                  <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} />
-                </div>
-              </label>
-              <GhostButton type="submit">Update</GhostButton>
-            </ActionForm>
           ) : null}
         </div>
 

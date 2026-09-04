@@ -3,9 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { getProject } from "@/lib/data";
 import { canManageProject } from "@/lib/permissions";
 import { updateProject } from "@/lib/actions";
-import { PROJECT_STATUS_LABELS } from "@/lib/constants";
 import { toDateInputValue } from "@/lib/format";
-import { Field, FormActions, Select, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { Field, FormActions, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 import { ActionForm } from "@/components/ActionForm";
 import { SetBreadcrumb } from "@/components/Breadcrumbs";
@@ -63,15 +62,12 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field label="Team size" optional width="xs">
               <TextInput type="number" min={1} name="teamSize" defaultValue={project.teamSize ?? ""} placeholder="e.g. 4" />
             </Field>
             <Field label="Engagement model" optional>
               <TextInput name="engagementModel" defaultValue={project.engagementModel ?? ""} placeholder="e.g. Offshore, Dedicated Team" />
-            </Field>
-            <Field label="Project status">
-              <Select name="status" defaultValue={project.status} options={Object.entries(PROJECT_STATUS_LABELS)} placeholder="Select a status…" />
             </Field>
           </div>
 

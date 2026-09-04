@@ -75,13 +75,6 @@ export async function rejectProject(projectId: string) {
   revalidatePath(`/admin/projects/${projectId}`);
 }
 
-export async function setProjectStatus(projectId: string, formData: FormData) {
-  await post(`/projects/${projectId}/status`, formToObject(formData));
-  revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/projects");
-  revalidatePath("/dashboard");
-}
-
 // ---------------------------------------------------------------------------
 // Milestones (Milestones plan, Phase 2 — spec §6.2, §6.3, §5.3)
 // ---------------------------------------------------------------------------

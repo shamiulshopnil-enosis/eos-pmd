@@ -112,7 +112,8 @@ export function serializeProject(p: Raw): Project {
     startDate: date(p.startDate),
     expectedCompletionDate: date(p.expectedCompletionDate),
     actualCompletionDate: date(p.actualCompletionDate),
-    status: (p.status as Project["status"]) ?? "ACTIVE",
+    // Project status is derived, not manual: it follows the completion flow.
+    status: p.executionStatus === "completed" ? "COMPLETED" : "ACTIVE",
     teamSize: num(p.teamSize),
     engagementModel: str(p.engagementModel),
     internalRef: str(p.internalRef),
