@@ -229,6 +229,11 @@ export class MilestonesService {
         "This milestone is locked for editing while it is with the client for review.",
       );
     }
+    if (existing.status === "reviewed") {
+      throw new BadRequestException(
+        "This milestone has been reviewed by the client and can no longer be edited.",
+      );
+    }
     existing.title = str(body, "title");
     existing.description = sanitizeMilestoneHtml(str(body, "description"));
     existing.url = optStr(body, "url");
