@@ -245,12 +245,12 @@ export function ClientDashboard({
                 return (
                   <li
                     key={milestone.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
                   >
                     <div className="min-w-0">
                       <Link
                         href={`/projects/${project.id}/milestones/${milestone.id}/review`}
-                        className="truncate font-medium text-ink hover:text-link hover:underline"
+                        className="block truncate font-medium text-ink hover:text-link hover:underline"
                       >
                         {milestone.title}
                       </Link>
@@ -262,7 +262,7 @@ export function ClientDashboard({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 justify-self-end">
+                    <div className="flex shrink-0 items-center gap-3 justify-self-end">
                       {waitingDays != null ? (
                         <span
                           className={`font-mono text-xs tabular-nums ${
@@ -321,12 +321,12 @@ export function ClientDashboard({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Link
                     href={`/projects/${r.id}`}
-                    className="font-medium text-ink hover:text-link hover:underline"
+                    className="min-w-0 break-words font-medium text-ink hover:text-link hover:underline"
                   >
                     {r.name}
                   </Link>
-                  <span className="text-xs text-ink-subtle">· {r.vendor}</span>
-                  <span className="ml-auto">
+                  <span className="min-w-0 break-words text-xs text-ink-subtle">· {r.vendor}</span>
+                  <span className="ml-auto shrink-0">
                     <HealthBadge health={r.health} />
                   </span>
                 </div>
@@ -384,10 +384,10 @@ export function ClientDashboard({
             {vendors.map((v) => (
               <li
                 key={v.id}
-                className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band sm:grid-cols-[1fr_9rem_6rem_auto]"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band sm:grid-cols-[minmax(0,1fr)_9rem_6rem_auto]"
               >
                 <div className="min-w-0">
-                  <span className="truncate font-medium text-ink">{v.name}</span>
+                  <span className="block truncate font-medium text-ink">{v.name}</span>
                   <div className="text-xs text-ink-muted">
                     {v.projectCount} project{v.projectCount === 1 ? "" : "s"} ·{" "}
                     {v.reviewedMilestones}/{v.totalMilestones} reviewed
@@ -399,7 +399,7 @@ export function ClientDashboard({
                 <span className="hidden justify-self-end font-mono text-xs tabular-nums text-ink-muted sm:block">
                   {formatRating(v.latestRating)} latest
                 </span>
-                <span className="justify-self-end">
+                <span className="shrink-0 justify-self-end">
                   <HealthBadge health={v.health} />
                 </span>
               </li>
