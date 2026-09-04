@@ -97,13 +97,16 @@ export default async function ProjectsPage() {
                 return (
                   <li
                     key={p.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band sm:grid-cols-[1fr_7rem_auto]"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band sm:grid-cols-[minmax(0,1fr)_7rem_auto]"
                   >
-                    <Link href={`/projects/${p.id}`} className="truncate font-medium text-ink hover:text-link hover:underline">
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="block min-w-0 truncate font-medium text-ink hover:text-link hover:underline"
+                    >
                       {p.name}
                     </Link>
                     <span className="hidden text-xs capitalize text-ink-muted sm:block">{role}</span>
-                    <span className="flex items-center gap-3 justify-self-end">
+                    <span className="flex shrink-0 items-center gap-3 justify-self-end">
                       <ExecutionStatusBadge status={p.executionStatus} />
                       <span className="font-mono text-xs tabular-nums text-ink-muted">
                         {reviewed} / {p.milestones.length}

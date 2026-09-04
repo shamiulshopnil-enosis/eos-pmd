@@ -57,11 +57,16 @@ function ReviewSection({
           <ul className="divide-y divide-rule">
             {awaiting.map(({ project, milestone }) => (
               <li key={milestone.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-                <Link href={`/projects/${project.id}`} className="truncate text-ink hover:text-link hover:underline">
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="block min-w-0 flex-1 truncate text-ink hover:text-link hover:underline"
+                >
                   {project.name}
                   <span className="text-ink-muted"> · {milestone.title}</span>
                 </Link>
-                <MilestoneStatusBadge status={milestone.status} />
+                <span className="shrink-0">
+                  <MilestoneStatusBadge status={milestone.status} />
+                </span>
               </li>
             ))}
           </ul>
@@ -75,15 +80,18 @@ function ReviewSection({
             return (
               <li
                 key={p.id}
-                className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2.5 hover:bg-band"
               >
                 <div className="min-w-0">
-                  <Link href={`/projects/${p.id}`} className="truncate font-medium text-ink hover:text-link hover:underline">
+                  <Link
+                    href={`/projects/${p.id}`}
+                    className="block truncate font-medium text-ink hover:text-link hover:underline"
+                  >
                     {p.name}
                   </Link>
                   <div className="text-xs capitalize text-ink-muted">{role}</div>
                 </div>
-                <div className="font-mono text-xs tabular-nums text-ink-muted">
+                <div className="shrink-0 font-mono text-xs tabular-nums text-ink-muted">
                   {reviewed} / {p.milestones.length} reviewed
                 </div>
               </li>
