@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -95,6 +96,12 @@ export class ProjectsController {
     @Body() body: Record<string, unknown>,
   ) {
     await this.projects.updateProject(user, id, body);
+    return { ok: true };
+  }
+
+  @Delete(":id")
+  async remove(@CurrentUser() user: SessionUser, @Param("id") id: string) {
+    await this.projects.deleteProject(user, id);
     return { ok: true };
   }
 

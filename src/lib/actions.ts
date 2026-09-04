@@ -50,6 +50,13 @@ export async function updateProject(projectId: string, formData: FormData) {
   redirect(`/projects/${projectId}`);
 }
 
+export async function deleteProject(projectId: string) {
+  await del(`/projects/${projectId}`);
+  revalidatePath("/projects");
+  revalidatePath("/dashboard");
+  redirect("/projects");
+}
+
 // --- Admin approval lifecycle (Milestones plan, Phase 1 — spec §5.1, §9) ---
 
 export async function submitForApproval(projectId: string) {

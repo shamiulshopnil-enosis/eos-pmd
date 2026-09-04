@@ -734,6 +734,24 @@ export class ProjectsService {
   }
 
   /**
+   * Permanently delete a project and everything under it: its milestones, the
+   * activity log, and any pending invitations. (Milestone file blobs in GridFS
+   * are left as orphans, matching how single-milestone deletes already behave.)
+   */
+  async deleteProject(user: SessionUser, projectId: string): Promise<void> {
+    await this.requirePermission(
+      projectId,
+      user,
+      canManageProject,
+      "Only a delivering-company owner or admin can delete a project.",
+    );
+    await this.milestones.deleteMany({ projectId });
+    await this.activities.deleteMany({ projectId });
+    await this.invitations.deleteMany({ projectId });
+    await this.projects.findByIdAndDelete(projectId);
+  }
+
+  /**
    * Replace the delivering-company people assigned to a project. The effective
    * vendor team is recomputed live on every read from these ids, so there is
    * nothing else to sync.

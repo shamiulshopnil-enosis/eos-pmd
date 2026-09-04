@@ -13,6 +13,7 @@ import { formatDate, formatDateTime, formatPercent, formatRating } from "@/lib/f
 import { CAPSTONE_TIER_LABELS, RATING_SELF_CORRECTION_HOURS } from "@/lib/constants";
 import {
   confirmCompletion,
+  deleteProject,
   editOwnMilestoneRating,
   rejectMilestone,
   requestCapstone,
@@ -26,6 +27,7 @@ import {
   EmptyState,
   ExecutionStatusBadge,
   FlagBadge,
+  GhostButton,
   GhostLink,
   HealthBadge,
   InkButton,
@@ -75,22 +77,30 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     delLead && !!myCompany && myCompany.id === project.deliveringCompanyId;
   const companyMembers = canManagePeople && myCompany ? await listCompanyMembers(myCompany.id) : [];
 
-  // Everything that isn't Edit / Add milestone lives under the "⋯" menu.
+  const canRequestCompletion = delLead && project.executionStatus === "ongoing";
+
+  // Everything that isn't Edit / Add milestone / Request completion lives under
+  // the "⋯" menu.
   const menuExtras: MenuActionItem[] = [];
-  if (delLead && project.executionStatus === "ongoing") {
-    menuExtras.push({
-      label: "Request completion",
-      icon: "pi pi-flag",
-      action: requestCompletion.bind(null, project.id),
-      success: "Completion requested — the client has been notified.",
-    });
-  }
   if (delLead && project.executionStatus === "completed" && !project.capstone?.requested) {
     menuExtras.push({
       label: "Request capstone endorsement",
       icon: "pi pi-verified",
       action: requestCapstone.bind(null, project.id),
       success: "Capstone endorsement requested.",
+    });
+  }
+  if (delLead) {
+    menuExtras.push({
+      label: "Delete project",
+      icon: "pi pi-trash",
+      danger: true,
+      action: deleteProject.bind(null, project.id),
+      confirm: {
+        title: "Delete this project?",
+        body: `"${project.name}" and everything under it — its milestones, uploaded files, activity log and pending invites — will be permanently removed. This can't be undone.`,
+        confirmLabel: "Delete project",
+      },
     });
   }
 
@@ -129,6 +139,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <GhostLink href={`/projects/${project.id}/milestones/new`} icon="add">
                 Add milestone
               </GhostLink>
+            ) : null}
+            {canRequestCompletion ? (
+              <ActionForm
+                action={requestCompletion.bind(null, project.id)}
+                success="Completion requested — the client has been notified."
+              >
+                <GhostButton type="submit" icon="flag">
+                  Request completion
+                </GhostButton>
+              </ActionForm>
             ) : null}
             <ProjectActionsMenu
               activities={project.activities}
